@@ -4,9 +4,13 @@
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>Hello, World</title>
+        <script src="https://unpkg.com/htmx.org"></script>
+        <link rel="stylesheet" href="/static/style.css">
     </head>
     <body>
-        <h1>Hello, World!</h1>
-        <p>Welcome to your first Go web server.</p>
+        <button hx-get="/grid" hx-target = "#grid-container" hx-swap="beforeend">
+            Load Map
+        </button>
+        <div id = "grid-container" class="grid"></div>
     </body>
 </html>
