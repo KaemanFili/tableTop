@@ -29,7 +29,7 @@ body, html {
   width: var(--cell-size);
   height: var(--cell-size);
   box-sizing: border-box;
-  border: 1px solid black;
+  border: 1px dotted black;
 }
 
 .unitOverlay {
@@ -47,6 +47,16 @@ body, html {
   position: absolute;
   width: var(--cell-size);
   height: var(--cell-size);
+  background-color: red;
+  border-radius: 50%;
+  z-index: 20;
+  cursor: grab;
+  pointer-events: auto; /* make it draggable */
+}
+.largeUnit {
+  position: absolute;
+  width: var(--cell-size)*2;
+  height: var(--cell-size)*2;
   background-color: red;
   border-radius: 50%;
   z-index: 20;
