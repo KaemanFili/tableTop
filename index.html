@@ -8,9 +8,21 @@
         <link rel="stylesheet" href="/static/style.css">
     </head>
     <body>
-        <button hx-get="/grid" hx-target = "#grid-container" hx-swap="beforeend">
-            Load Map
-        </button>
-        <div id = "grid-container" class="grid"></div>
+        <div id="ui-overlay">
+            <button hx-get="/grid" hx-target = "#grid-container" hx-swap="beforeend">
+                Load Map
+            </button>
+            <button 
+                hx-get="/unit" 
+                hx-target="#unitOverlay" 
+                hx-swap="beforeend">
+                Spawn Unit
+            </button>
+        </div>
+        <div class="grid-wrapper">
+            <div id = "grid-container" class="grid"></div>
+        </div>
+        <div id="unitOverlay" class="unitOverlay"></div>
+        <script src="/static/drag.js"></script>
     </body>
 </html>
