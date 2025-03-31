@@ -1,0 +1,11 @@
+need to deal with cross origin shit before I put this in prod
+
+var allowedOrigins = map[string]bool{
+    "http://example.com": true,
+    "https://example.com": true,
+}
+
+upgrader.CheckOrigin = func(r *http.Request) bool {
+    origin := r.Header.Get("Origin")
+    return allowedOrigins[origin]
+}

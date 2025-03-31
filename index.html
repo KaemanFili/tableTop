@@ -3,15 +3,26 @@
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Hello, World</title>
+        <title>VTT</title>
         <script src="https://unpkg.com/htmx.org"></script>
         <link rel="stylesheet" href="/static/style.css">
     </head>
     <body>
+        <div 
+            id="loadExistingUnits"
+            hx-get="/loadExistingUnits"
+            hx-trigger="load"
+            hx-target="#unitOverlay"
+            hx-swap="beforeend">
+        </div>
+        <div
+            id="loadGrid"
+            hx-get="/grid" 
+            hx-trigger="load"
+            hx-target = "#grid-container" 
+            hx-swap="beforeend">
+        </div>
         <div id="ui-overlay">
-            <button hx-get="/grid" hx-target = "#grid-container" hx-swap="beforeend">
-                Load Map
-            </button>
             <button 
                 hx-get="/unit" 
                 hx-target="#unitOverlay" 
@@ -24,5 +35,6 @@
         </div>
         <div id="unitOverlay" class="unitOverlay"></div>
         <script src="/static/drag.js"></script>
+        <script src="/static/loadUnits.js"></script>
     </body>
 </html>
