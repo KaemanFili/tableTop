@@ -45,6 +45,7 @@ body, html {
 /* Circle that can be moved */
 .unit {
   position: absolute;
+  transition: left 0.4s ease, top 0.4s ease;
   width: var(--cell-size);
   height: var(--cell-size);
   background-color: red;
@@ -52,6 +53,9 @@ body, html {
   z-index: 20;
   cursor: grab;
   pointer-events: auto; /* make it draggable */
+}
+.unit.dragging {
+  transition: none;
 }
 .largeUnit {
   position: absolute;

@@ -1,44 +1,52 @@
-const socket = new WebSocket('ws://localhost:18080/ws');
-socket.onopen = () => {
-    console.log("webSocket connection established")
-}
+const updateServerSocket = new WebSocket('ws://localhost:18080/ws/updateServer');
+
+updateServerSocket.onopen = () => {
+    console.log("webSocket connection established");
+};
+
 document.addEventListener("mousedown", function (e) {
     const target = e.target;
     if (!target.classList.contains("unit")) return;
-  
+
     let offsetX = e.clientX - target.offsetLeft;
     let offsetY = e.clientY - target.offsetTop;
-  
+
+    // 🟢 Add dragging class
+    target.classList.add("dragging");
+    target.style.cursor = "grabbing";
+
     function move(e) {
-      target.style.left = `${e.clientX - offsetX}px`;
-      target.style.top = `${e.clientY - offsetY}px`;
-      updateUnitPositionOnServer();
-    }
-  
-    function up() {
-      document.removeEventListener("mousemove", move);
-      document.removeEventListener("mouseup", up);
-      target.style.cursor = "grab";
-      console.log("up: updating position")
-      updateUnitPositionOnServer();
+        target.style.left = `${e.clientX - offsetX}px`;
+        target.style.top = `${e.clientY - offsetY}px`;
+        updateUnitPositionOnServer();
     }
 
-    function updateUnitPositionOnServer(){
-        if (socket.readyState === WebSocket.OPEN) {
+    function up() {
+        document.removeEventListener("mousemove", move);
+        document.removeEventListener("mouseup", up);
+
+        // 🔴 Remove dragging class
+        target.classList.remove("dragging");
+        target.style.cursor = "grab";
+
+        console.log("up: updating position");
+        updateUnitPositionOnServer();
+    }
+
+    function updateUnitPositionOnServer() {
+        if (updateServerSocket.readyState === WebSocket.OPEN) {
             let data = {
                 Left: parseInt(target.style.left, 10),
-                Top:  parseInt(target.style.top, 10),
-                ID:    target.id
+                Top: parseInt(target.style.top, 10),
+                ID: target.id
             };
-            socket.send(JSON.stringify(data));
+            updateServerSocket.send(JSON.stringify(data));
             console.log(data);
-        }
-        else{
-            console.log("can't connect to server via websocket")
+        } else {
+            console.log("can't connect to server via websocket");
         }
     }
-  
+
     document.addEventListener("mousemove", move);
     document.addEventListener("mouseup", up);
-    target.style.cursor = "grabbing";
-  });
+});

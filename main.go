@@ -7,6 +7,8 @@ import (
 	"math/rand"
 	"net/http"
 	"strconv"
+	"sync"
+	"time"
 
 	"github.com/gorilla/websocket"
 )
@@ -27,9 +29,43 @@ var (
 	unitMap      = make(map[string]UnitData)
 	gridTemplate = template.Must(template.ParseFiles("templates/grid.html"))
 	unitTemplate = template.Must(template.ParseFiles("templates/unit.html"))
+	clients      = make(map[*websocket.Conn]bool)
+	clientsMutex sync.Mutex
 )
 
-func wsHandler(w http.ResponseWriter, r *http.Request) {
+func startBroadcaster() {
+	go func() {
+		ticker := time.NewTicker(100 * time.Millisecond)
+		defer ticker.Stop()
+
+		for range ticker.C {
+			// Prepare data
+			units := make([]UnitData, 0, len(unitMap))
+			for _, u := range unitMap {
+				units = append(units, u)
+			}
+
+			data, err := json.Marshal(units)
+			if err != nil {
+				log.Println("Marshal error:", err)
+				continue
+			}
+
+			// Send to all connected clients
+			clientsMutex.Lock()
+			for conn := range clients {
+				if err := conn.WriteMessage(websocket.TextMessage, data); err != nil {
+					log.Println("Write error, removing client:", err)
+					conn.Close()
+					delete(clients, conn)
+				}
+			}
+			clientsMutex.Unlock()
+		}
+	}()
+}
+
+func updateServerHandler(w http.ResponseWriter, r *http.Request) {
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		log.Println("Upgrade failed:", err)
@@ -61,6 +97,30 @@ func wsHandler(w http.ResponseWriter, r *http.Request) {
 		}
 
 	}
+}
+func updateClientHandler(w http.ResponseWriter, r *http.Request) {
+	conn, err := upgrader.Upgrade(w, r, nil)
+	if err != nil {
+		log.Println("Upgrade failed:", err)
+		return
+	}
+	defer conn.Close()
+
+	clientsMutex.Lock()
+	clients[conn] = true
+	clientsMutex.Unlock()
+
+	for {
+		// keep the connection open until it breaks
+		_, _, err := conn.ReadMessage()
+		if err != nil {
+			break
+		}
+	}
+
+	clientsMutex.Lock()
+	delete(clients, conn)
+	clientsMutex.Unlock()
 }
 
 func handler(w http.ResponseWriter, r *http.Request) {
@@ -125,6 +185,9 @@ func main() {
 	//load static scripts and html
 	http.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("static"))))
 
+	//Goroutine
+	startBroadcaster()
+
 	//regular http handlers
 	http.HandleFunc("/", handler)
 	http.HandleFunc("/loadExistingUnits", existingUnitHandler)
@@ -132,7 +195,8 @@ func main() {
 	http.HandleFunc("/unit", newUnitHandler)
 
 	//ws handlers
-	http.HandleFunc("/ws", wsHandler)
+	http.HandleFunc("/ws/updateServer", updateServerHandler)
+	http.HandleFunc("/ws/updateClients", updateClientHandler)
 
 	//handle errors via log
 	log.Fatal(http.ListenAndServe(":18080", nil))
