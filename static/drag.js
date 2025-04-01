@@ -44,7 +44,6 @@ document.addEventListener("mousedown", function (e) {
                 ID: target.id
             };
             updateServerSocket.send(JSON.stringify(data));
-            console.log(data);
         } else {
             console.log("can't connect to server via websocket");
         }

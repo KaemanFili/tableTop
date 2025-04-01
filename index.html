@@ -11,6 +11,13 @@
         <div 
             id="loadExistingUnits"
             hx-get="/loadExistingUnits"
+            hx-trigger="loadUnits"
+            hx-target="#unitOverlay"
+            hx-swap="innerHTML">
+        </div>
+        <div 
+            id="loadUnitsOnStart"
+            hx-get="/loadExistingUnits"
             hx-trigger="load"
             hx-target="#unitOverlay"
             hx-swap="innerHTML">

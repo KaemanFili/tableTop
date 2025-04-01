@@ -20,6 +20,6 @@ posUpdateSocket.onerror = function(err) {
 newUnitUpdateSocket.onmessage = function(event) {
     console.log(JSON.parse(event.data));
     if(!isDragging){
-         htmx.trigger("#loadExistingUnits", "load");
+         htmx.trigger("#loadExistingUnits", "loadUnits");
     }
 };

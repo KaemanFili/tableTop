@@ -22,7 +22,7 @@ body, html {
   grid-template-columns: repeat(64, var(--cell-size));
   grid-template-rows: repeat(64, var(--cell-size));
   position: center;
-  background-color: white; /* for contrast */
+  background-color: darkgray; /* for contrast */
 }
 
 .cell {
