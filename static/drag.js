@@ -1,3 +1,4 @@
+let isDragging = false;
 const updateServerSocket = new WebSocket('ws://localhost:18080/ws/updateServer');
 
 updateServerSocket.onopen = () => {
@@ -11,7 +12,8 @@ document.addEventListener("mousedown", function (e) {
     let offsetX = e.clientX - target.offsetLeft;
     let offsetY = e.clientY - target.offsetTop;
 
-    // 🟢 Add dragging class
+    //Add dragging class
+    isDragging = true;
     target.classList.add("dragging");
     target.style.cursor = "grabbing";
 
@@ -25,7 +27,8 @@ document.addEventListener("mousedown", function (e) {
         document.removeEventListener("mousemove", move);
         document.removeEventListener("mouseup", up);
 
-        // 🔴 Remove dragging class
+        // Remove dragging class
+        isDragging = false;
         target.classList.remove("dragging");
         target.style.cursor = "grab";
 

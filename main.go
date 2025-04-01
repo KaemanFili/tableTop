@@ -26,14 +26,16 @@ var (
 			return true // Note: Adjust this for production environments! look at changeWebsocket.txt
 		},
 	}
-	unitMap      = make(map[string]UnitData)
-	gridTemplate = template.Must(template.ParseFiles("templates/grid.html"))
-	unitTemplate = template.Must(template.ParseFiles("templates/unit.html"))
-	clients      = make(map[*websocket.Conn]bool)
-	clientsMutex sync.Mutex
+	unitMap            = make(map[string]UnitData)
+	gridTemplate       = template.Must(template.ParseFiles("templates/grid.html"))
+	unitTemplate       = template.Must(template.ParseFiles("templates/unit.html"))
+	positionClients    = make(map[*websocket.Conn]bool)
+	unitCreatedClients = make(map[*websocket.Conn]bool)
+	positionMutex      sync.Mutex
+	unitCreatedMutex   sync.Mutex
 )
 
-func startBroadcaster() {
+func broadcastUnitPosition() {
 	go func() {
 		ticker := time.NewTicker(100 * time.Millisecond)
 		defer ticker.Stop()
@@ -52,17 +54,34 @@ func startBroadcaster() {
 			}
 
 			// Send to all connected clients
-			clientsMutex.Lock()
-			for conn := range clients {
+			positionMutex.Lock()
+			for conn := range positionClients {
 				if err := conn.WriteMessage(websocket.TextMessage, data); err != nil {
 					log.Println("Write error, removing client:", err)
 					conn.Close()
-					delete(clients, conn)
+					delete(positionClients, conn)
 				}
 			}
-			clientsMutex.Unlock()
+			positionMutex.Unlock()
 		}
 	}()
+}
+
+func broadcastUnitState() {
+	data, err := json.Marshal("unit created")
+	if err != nil {
+		log.Println("Marshal error:", err)
+	} else {
+		unitCreatedMutex.Lock()
+		for conn := range unitCreatedClients {
+			if err := conn.WriteMessage(websocket.TextMessage, data); err != nil {
+				log.Println("Write error, removing client:", err)
+				conn.Close()
+				delete(unitCreatedClients, conn)
+			}
+		}
+		unitCreatedMutex.Unlock()
+	}
 }
 
 func updateServerHandler(w http.ResponseWriter, r *http.Request) {
@@ -98,7 +117,7 @@ func updateServerHandler(w http.ResponseWriter, r *http.Request) {
 
 	}
 }
-func updateClientHandler(w http.ResponseWriter, r *http.Request) {
+func updateClientPositionHandler(w http.ResponseWriter, r *http.Request) {
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		log.Println("Upgrade failed:", err)
@@ -106,9 +125,9 @@ func updateClientHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	defer conn.Close()
 
-	clientsMutex.Lock()
-	clients[conn] = true
-	clientsMutex.Unlock()
+	positionMutex.Lock()
+	positionClients[conn] = true
+	positionMutex.Unlock()
 
 	for {
 		// keep the connection open until it breaks
@@ -118,9 +137,33 @@ func updateClientHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	clientsMutex.Lock()
-	delete(clients, conn)
-	clientsMutex.Unlock()
+	positionMutex.Lock()
+	delete(positionClients, conn)
+	positionMutex.Unlock()
+}
+func updateClientUnitsHandler(w http.ResponseWriter, r *http.Request) {
+	conn, err := upgrader.Upgrade(w, r, nil)
+	if err != nil {
+		log.Println("Upgrade failed:", err)
+		return
+	}
+	defer conn.Close()
+
+	unitCreatedMutex.Lock()
+	unitCreatedClients[conn] = true
+	unitCreatedMutex.Unlock()
+
+	for {
+		// keep the connection open until it breaks
+		_, _, err := conn.ReadMessage()
+		if err != nil {
+			break
+		}
+	}
+
+	unitCreatedMutex.Lock()
+	delete(unitCreatedClients, conn)
+	unitCreatedMutex.Unlock()
 }
 
 func handler(w http.ResponseWriter, r *http.Request) {
@@ -145,6 +188,7 @@ func newUnitHandler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
+	broadcastUnitState()
 	log.Println("map size: " + strconv.Itoa(len(unitMap)))
 }
 
@@ -186,7 +230,7 @@ func main() {
 	http.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("static"))))
 
 	//Goroutine
-	startBroadcaster()
+	broadcastUnitPosition()
 
 	//regular http handlers
 	http.HandleFunc("/", handler)
@@ -196,7 +240,8 @@ func main() {
 
 	//ws handlers
 	http.HandleFunc("/ws/updateServer", updateServerHandler)
-	http.HandleFunc("/ws/updateClients", updateClientHandler)
+	http.HandleFunc("/ws/updatePosForClients", updateClientPositionHandler)
+	http.HandleFunc("/ws/updateUnitsForClients", updateClientUnitsHandler)
 
 	//handle errors via log
 	log.Fatal(http.ListenAndServe(":18080", nil))
