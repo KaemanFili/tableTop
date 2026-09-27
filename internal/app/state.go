@@ -13,7 +13,11 @@ type UnitData struct {
 	ImageID string
 }
 
-const DefaultUnitImageID = "default-unit"
+const (
+	DefaultUnitImageID = "default-unit"
+	NPCUnitImageID     = "goblin"
+	PCUnitImageID      = "knight"
+)
 
 type AppState struct {
 	mutex sync.RWMutex
@@ -52,7 +56,7 @@ func (s *AppState) UnitsSnapshot() []UnitData {
 	return units
 }
 
-func (s *AppState) AddRandomUnit() UnitData {
+func (s *AppState) AddRandomUnit(imageID string) UnitData {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
@@ -66,7 +70,7 @@ func (s *AppState) AddRandomUnit() UnitData {
 			Left:    100,
 			Top:     150,
 			ID:      id,
-			ImageID: DefaultUnitImageID,
+			ImageID: imageID,
 		}
 		s.units[id] = unit
 

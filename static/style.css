@@ -101,3 +101,35 @@ body, html {
 #ui-overlay button:hover {
   background-color: rgba(255, 255, 255, 0.2);
 }
+
+#spawn-controls {
+  position: relative;
+}
+
+#spawn-menu {
+  position: absolute;
+  top: calc(100% + 0.5rem);
+  left: 0;
+  min-width: 170px;
+  padding: 0.5rem;
+  background-color: #202020;
+  border: 1px solid #555;
+  border-radius: 8px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+}
+
+#spawn-menu:not([hidden]) {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+#spawn-menu button {
+  text-align: left;
+  white-space: nowrap;
+}
+
+#ui-overlay button:focus-visible {
+  outline: 2px solid #fbbf24;
+  outline-offset: 2px;
+}

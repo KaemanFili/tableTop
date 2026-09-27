@@ -4,7 +4,7 @@ import "testing"
 
 func TestMovementPreservesUnitImage(t *testing.T) {
 	state := NewState()
-	unit := state.AddRandomUnit()
+	unit := state.AddRandomUnit(DefaultUnitImageID)
 	if unit.ImageID != DefaultUnitImageID {
 		t.Fatalf("spawned image = %q, want %q", unit.ImageID, DefaultUnitImageID)
 	}

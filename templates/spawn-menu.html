@@ -1,0 +1,58 @@
+{{ define "spawn-controls" }}
+<div
+    id="spawn-controls"
+    {{ if . }}
+        hx-get="/spawn-menu"
+        hx-trigger="
+            click[!target.closest('#spawn-controls')] from:body,
+            keydown[key=='Escape'] from:body,
+            unitSpawned from:body
+        "
+        hx-target="this"
+        hx-swap="outerHTML"
+    {{ end }}
+>
+    <button
+        type="button"
+        id="spawn-menu-toggle"
+        aria-expanded="{{ if . }}true{{ else }}false{{ end }}"
+        aria-controls="spawn-menu"
+        hx-get="/spawn-menu{{ if not . }}?open=true{{ end }}"
+        hx-target="#spawn-controls"
+        hx-swap="outerHTML"
+        {{ if not . }}autofocus{{ end }}
+    >
+        Spawn Unit
+    </button>
+
+    <div
+        id="spawn-menu"
+        role="group"
+        aria-label="Spawn unit"
+        {{ if not . }}hidden{{ end }}
+    >
+        {{ if . }}
+            <button
+                type="button"
+                id="spawn-npc"
+                hx-get="/unit?kind=npc"
+                hx-target="#unitOverlay"
+                hx-swap="beforeend"
+                autofocus
+            >
+                SPAWN NPC
+            </button>
+
+            <button
+                type="button"
+                id="spawn-pc"
+                hx-get="/unit?kind=pc"
+                hx-target="#unitOverlay"
+                hx-swap="beforeend"
+            >
+                SPAWN PC
+            </button>
+        {{ end }}
+    </div>
+</div>
+{{ end }}

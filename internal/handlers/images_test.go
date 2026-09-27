@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"image/png"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -10,6 +11,54 @@ import (
 	"github.com/gorilla/websocket"
 	"tableTop/main/internal/app"
 )
+
+func TestSpawnUnitImageChoice(t *testing.T) {
+	t.Chdir("../..")
+	for _, test := range []struct {
+		kind    string
+		imageID string
+	}{
+		{kind: "npc", imageID: app.NPCUnitImageID},
+		{kind: "pc", imageID: app.PCUnitImageID},
+	} {
+		t.Run(test.kind, func(t *testing.T) {
+			state := app.NewState()
+			h := NewEndpointHandler(state, NewWebSocketHandler(state))
+			mux := http.NewServeMux()
+			h.RegisterRoutes(mux)
+			spawn := httptest.NewRecorder()
+			mux.ServeHTTP(spawn, httptest.NewRequest(http.MethodGet, "/unit?kind="+test.kind, nil))
+			if spawn.Code != http.StatusOK || !strings.Contains(spawn.Body.String(), `src="/images/`+test.imageID+`"`) {
+				t.Fatalf("spawn response = %d %s", spawn.Code, spawn.Body.String())
+			}
+			if spawn.Header().Get("HX-Trigger-After-Swap") != "unitSpawned" {
+				t.Fatal("spawn must tell HTMX to close the menu")
+			}
+			units := state.UnitsSnapshot()
+			if len(units) != 1 || units[0].ImageID != test.imageID {
+				t.Fatalf("unexpected units: %+v", units)
+			}
+			state.UpdateUnitPosition(units[0].ID, 250, 300)
+			unit, _ := state.UnitByID(units[0].ID)
+			if unit.ImageID != test.imageID {
+				t.Fatal("movement changed the selected artwork")
+			}
+			image := httptest.NewRecorder()
+			mux.ServeHTTP(image, httptest.NewRequest(http.MethodGet, "/images/"+test.imageID, nil))
+			if image.Code != http.StatusOK || image.Header().Get("Content-Type") != "image/png" {
+				t.Fatalf("image response = %d %q", image.Code, image.Header().Get("Content-Type"))
+			}
+			if _, err := png.DecodeConfig(image.Body); err != nil {
+				t.Fatalf("invalid PNG artwork: %v", err)
+			}
+			invalid := httptest.NewRecorder()
+			mux.ServeHTTP(invalid, httptest.NewRequest(http.MethodGet, "/unit?kind=unknown", nil))
+			if invalid.Code != http.StatusBadRequest || state.UnitCount() != 1 {
+				t.Fatal("invalid kind must be rejected without spawning a unit")
+			}
+		})
+	}
+}
 
 func TestUnitImageLifecycle(t *testing.T) {
 	// Production resolves templates and static files from the project root.

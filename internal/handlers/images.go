@@ -10,6 +10,8 @@ import (
 // Resolve IDs here rather than accepting filesystem paths from clients.
 var unitImages = map[string]string{
 	app.DefaultUnitImageID: "static/images/default-unit.svg",
+	app.NPCUnitImageID:     "static/images/goblin.png",
+	app.PCUnitImageID:      "static/images/knight.png",
 }
 
 func (h *EndpointHandler) unitImage(w http.ResponseWriter, r *http.Request) {

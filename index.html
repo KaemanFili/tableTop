@@ -5,7 +5,7 @@
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>VTT</title>
         <script src="https://unpkg.com/htmx.org"></script>
-        <link rel="stylesheet" href="/static/style.css?v=2">
+        <link rel="stylesheet" href="/static/style.css?v=3">
     </head>
     <body>
         <div 
@@ -30,12 +30,7 @@
             hx-swap="beforeend">
         </div>
         <div id="ui-overlay">
-            <button 
-                hx-get="/unit" 
-                hx-target="#unitOverlay" 
-                hx-swap="beforeend">
-                Spawn Unit
-            </button>
+            {{ template "spawn-controls" . }}
         </div>
         <div class="grid-wrapper">
             <div id = "grid-container" class="grid"></div>
