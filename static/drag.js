@@ -6,8 +6,11 @@ updateServerSocket.onopen = () => {
 };
 
 document.addEventListener("mousedown", function (e) {
-    const target = e.target;
-    if (!target.classList.contains("unit")) return;
+    if (e.button !== 0) return;
+    const target = e.target.closest(".unit");
+    if (!target) return;
+    // Artwork and other children should drag their containing unit.
+    e.preventDefault();
 
     let offsetX = e.clientX - target.offsetLeft;
     let offsetY = e.clientY - target.offsetTop;

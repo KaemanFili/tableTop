@@ -57,6 +57,15 @@ body, html {
 .unit.dragging {
   transition: none;
 }
+.unit-image {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  border-radius: inherit;
+  pointer-events: none;
+  user-select: none;
+}
 .largeUnit {
   position: absolute;
   width: var(--cell-size)*2;

@@ -102,14 +102,21 @@ func (h *WebSocketHandler) updateServer(w http.ResponseWriter, r *http.Request) 
 
 		log.Printf("Received: %s", data)
 
-		var unitData app.UnitData
+		var unitData struct {
+			ID   string
+			Left int
+			Top  int
+		}
 		if err := json.Unmarshal(data, &unitData); err != nil {
 			log.Println("Unmarshal error:", err)
 			continue
 		}
 
-		h.state.SetUnit(unitData)
-		h.logData(unitData)
+		if !h.state.UpdateUnitPosition(unitData.ID, unitData.Left, unitData.Top) {
+			log.Printf("unit %s not found", unitData.ID)
+			continue
+		}
+		h.logData(unitData.ID)
 
 		if err := conn.WriteMessage(websocket.TextMessage, data); err != nil {
 			log.Println("Write error:", err)
@@ -164,10 +171,10 @@ func (h *WebSocketHandler) updateClientUnits(w http.ResponseWriter, r *http.Requ
 	h.unitCreatedMutex.Unlock()
 }
 
-func (h *WebSocketHandler) logData(unitData app.UnitData) {
-	unit, exists := h.state.UnitByID(unitData.ID)
+func (h *WebSocketHandler) logData(id string) {
+	unit, exists := h.state.UnitByID(id)
 	if !exists {
-		log.Printf("unit %s not found", unitData.ID)
+		log.Printf("unit %s not found", id)
 		return
 	}
 

@@ -7,10 +7,13 @@ import (
 )
 
 type UnitData struct {
-	Left int
-	Top  int
-	ID   string
+	Left    int
+	Top     int
+	ID      string
+	ImageID string
 }
+
+const DefaultUnitImageID = "default-unit"
 
 type AppState struct {
 	mutex sync.RWMutex
@@ -23,11 +26,18 @@ func NewState() *AppState {
 	}
 }
 
-func (s *AppState) SetUnit(unit UnitData) {
+func (s *AppState) UpdateUnitPosition(id string, left, top int) bool {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
-	s.units[unit.ID] = unit
+	unit, exists := s.units[id]
+	if !exists {
+		return false
+	}
+	unit.Left = left
+	unit.Top = top
+	s.units[id] = unit
+	return true
 }
 
 func (s *AppState) UnitsSnapshot() []UnitData {
@@ -53,9 +63,10 @@ func (s *AppState) AddRandomUnit() UnitData {
 		}
 
 		unit := UnitData{
-			Left: 100,
-			Top:  150,
-			ID:   id,
+			Left:    100,
+			Top:     150,
+			ID:      id,
+			ImageID: DefaultUnitImageID,
 		}
 		s.units[id] = unit
 

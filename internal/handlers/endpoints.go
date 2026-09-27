@@ -30,6 +30,7 @@ func (h *EndpointHandler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/loadExistingUnits", h.existingUnit)
 	mux.HandleFunc("/grid", h.grid)
 	mux.HandleFunc("/unit", h.newUnit)
+	mux.HandleFunc("GET /images/{id}", h.unitImage)
 }
 
 func (h *EndpointHandler) index(w http.ResponseWriter, r *http.Request) {
