@@ -1,7 +1,9 @@
 {{ define "unit" }}
 <div class="unit" 
     id="{{.ID}}" 
-    style="left: {{.Left}}px; top: {{.Top}}px;">
-    <img class="unit-image" src="/images/{{.ImageID}}" alt="Unit {{.ID}}" draggable="false">
+    title="{{if .Name}}{{.Name}}{{else}}Unit {{.ID}}{{end}} — {{.Size.Label}}"
+    data-size="{{.Size}}"
+    style="left: {{.Left}}px; top: {{.Top}}px; --unit-squares: {{.Size.Squares}}; --image-zoom: {{.ImageFit.Zoom}}; --image-offset-x: {{.ImageFit.OffsetX}}%; --image-offset-y: {{.ImageFit.OffsetY}}%;">
+    <img class="unit-image" src="/images/{{.ImageID}}" alt="{{if .Name}}{{.Name}}{{else}}Unit {{.ID}}{{end}}" draggable="false">
 </div>
 {{ end }}

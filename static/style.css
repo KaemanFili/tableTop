@@ -1,13 +1,13 @@
 :root {
   /*--cell-size: calc(min(100vw, 100vh) / 64);*/
   --cell-size: 40px; 
+  --token-background: #303030;
 }
 body, html {
   margin: 0;
   padding: 0;
   height: 100vh;
   width: 100vw;
-  display: absolute;
   align-items: center;
   justify-content: center;
 }
@@ -21,7 +21,6 @@ body, html {
   display: grid;
   grid-template-columns: repeat(64, var(--cell-size));
   grid-template-rows: repeat(64, var(--cell-size));
-  position: center;
   background-color: darkgray; /* for contrast */
 }
 
@@ -46,10 +45,11 @@ body, html {
 .unit {
   position: absolute;
   transition: left 0.4s ease, top 0.4s ease;
-  width: var(--cell-size);
-  height: var(--cell-size);
-  background-color: red;
+  width: calc(var(--cell-size) * var(--unit-squares, 1));
+  height: calc(var(--cell-size) * var(--unit-squares, 1));
+  background-color: var(--token-background);
   border-radius: 50%;
+  overflow: hidden;
   z-index: 20;
   cursor: grab;
   pointer-events: auto; /* make it draggable */
@@ -62,23 +62,14 @@ body, html {
   width: 100%;
   height: 100%;
   object-fit: contain;
-  border-radius: inherit;
+  transform: translate(var(--image-offset-x, 0%), var(--image-offset-y, 0%)) scale(var(--image-zoom, 1));
+  transform-origin: center;
   pointer-events: none;
   user-select: none;
 }
-.largeUnit {
-  position: absolute;
-  width: var(--cell-size)*2;
-  height: var(--cell-size)*2;
-  background-color: red;
-  border-radius: 50%;
-  z-index: 20;
-  cursor: grab;
-  pointer-events: auto; /* make it draggable */
-}
 
 #ui-overlay {
-  position: absolute;
+  position: fixed;
   top: 1rem;
   left: 1rem;
   display: flex;
@@ -106,29 +97,270 @@ body, html {
   position: relative;
 }
 
-#spawn-menu {
+#ui-overlay button[aria-expanded="true"] {
+  background-color: #43351d;
+  box-shadow: inset 0 0 0 1px #fbbf24;
+}
+
+.spawn-menu {
   position: absolute;
   top: calc(100% + 0.5rem);
   left: 0;
-  min-width: 170px;
-  padding: 0.5rem;
+  box-sizing: border-box;
+  width: min(380px, calc(100vw - 2rem));
+  max-height: calc(100dvh - 6rem);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 1rem;
+  color: #f5f5f5;
+  font-family: system-ui, sans-serif;
   background-color: #202020;
   border: 1px solid #555;
   border-radius: 8px;
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
 }
 
-#spawn-menu:not([hidden]) {
+.spawn-menu:not([hidden]) {
   display: flex;
   flex-direction: column;
-  gap: 0.25rem;
+  gap: 0.75rem;
 }
 
-#spawn-menu button {
+.spawn-menu h2 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.spawn-menu p {
+  margin: 0;
+  color: #ccc;
+  font-size: 0.875rem;
+  line-height: 1.4;
+}
+
+.spawn-menu-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.unit-library-group {
+  border: 1px solid #484848;
+  border-radius: 6px;
+}
+
+.unit-library-group summary {
+  padding: 0.75rem;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.unit-count {
+  margin-left: 0.35rem;
+  color: #bbb;
+  font-size: 0.85rem;
+  font-weight: normal;
+}
+
+.unit-library-list {
+  margin: 0;
+  padding: 0 0.5rem 0.5rem;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+#ui-overlay .library-unit {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+  padding: 0.5rem;
   text-align: left;
-  white-space: nowrap;
 }
 
+.library-token-preview {
+  display: block;
+  width: 48px;
+  height: 48px;
+  flex-shrink: 0;
+  overflow: hidden;
+  border-radius: 50%;
+  background: var(--token-background);
+}
+
+#create-unit-form #image-fit-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  padding-top: 0.25rem;
+}
+
+.token-image-preview {
+  width: 192px;
+  height: 192px;
+  margin: 0.5rem auto;
+  overflow: hidden;
+  border-radius: 50%;
+  background: var(--token-background);
+  outline: 1px solid #666;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+
+.token-image-preview.is-dragging {
+  cursor: grabbing;
+}
+
+.image-fit-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+#image-zoom {
+  width: 100%;
+  margin: 0;
+  accent-color: #fbbf24;
+}
+
+#image-zoom-value {
+  float: right;
+  color: #ccc;
+  font-variant-numeric: tabular-nums;
+}
+
+.library-unit-name {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.library-unit-size {
+  display: block;
+  margin-top: 0.2rem;
+  color: #bbb;
+  font-size: 0.8rem;
+}
+
+.spawn-action {
+  color: #fbbf24;
+  font-size: 0.8rem;
+}
+
+.empty-library {
+  padding: 0.5rem;
+  color: #bbb;
+  font-size: 0.875rem;
+}
+
+#create-unit-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+#create-unit-form input[type="text"],
+#create-unit-form select,
+#create-unit-form input[type="file"] {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  padding: 0.65rem;
+  border: 1px solid #666;
+  border-radius: 6px;
+  background: #121212;
+  color: #fff;
+  font: inherit;
+}
+
+#create-unit-form input[type="file"] {
+  font-size: 0.8rem;
+}
+
+#create-unit-form fieldset {
+  margin: 0.35rem 0;
+  padding: 0;
+  border: 0;
+}
+
+#create-unit-form legend {
+  padding: 0;
+  margin-bottom: 0.5rem;
+}
+
+.unit-type-options {
+  display: flex;
+  gap: 1.5rem;
+}
+
+.unit-type-options label {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  cursor: pointer;
+}
+
+.optional-label {
+  color: #bbb;
+  font-size: 0.875rem;
+}
+
+.unit-form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+#ui-overlay .primary-button {
+  background: #fbbf24;
+  color: #1c170c;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+#ui-overlay .primary-button:hover {
+  background: #fcd34d;
+}
+
+#ui-overlay .secondary-button {
+  background: #383838;
+  font-size: 0.875rem;
+}
+
+#ui-overlay button:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+.spawn-menu .menu-error {
+  color: #fecaca;
+  background: #451b1b;
+  padding: 0.75rem;
+  border-radius: 6px;
+}
+
+.spawn-menu .menu-notice {
+  color: #bbf7d0;
+}
+
+.saving-label,
+.htmx-request .save-label {
+  display: none;
+}
+
+.htmx-request .saving-label {
+  display: inline;
+}
+
+.spawn-menu input:focus-visible,
+.token-image-preview:focus-visible,
+.spawn-menu select:focus-visible,
+.spawn-menu summary:focus-visible,
 #ui-overlay button:focus-visible {
   outline: 2px solid #fbbf24;
   outline-offset: 2px;

@@ -1,6 +1,6 @@
-posUpdateSocket = new WebSocket("ws://localhost:18080/ws/updatePosForClients");
+posUpdateSocket = new WebSocket(`${location.protocol === 'https:' ? 'wss:' : 'ws:'}//${location.host}/ws/updatePosForClients`);
 
-newUnitUpdateSocket = new WebSocket("ws://localhost:18080/ws/updateUnitsForClients");
+newUnitUpdateSocket = new WebSocket(`${location.protocol === 'https:' ? 'wss:' : 'ws:'}//${location.host}/ws/updateUnitsForClients`);
 
 posUpdateSocket.onmessage = function(event) {
     const units = JSON.parse(event.data);

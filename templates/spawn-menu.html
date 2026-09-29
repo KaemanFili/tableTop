@@ -1,13 +1,9 @@
 {{ define "spawn-controls" }}
 <div
     id="spawn-controls"
-    {{ if . }}
+    {{ if and .Open (not .Creating) }}
         hx-get="/spawn-menu"
-        hx-trigger="
-            click[!target.closest('#spawn-controls')] from:body,
-            keydown[key=='Escape'] from:body,
-            unitSpawned from:body
-        "
+        hx-trigger="click[!target.closest('#spawn-controls')] from:body, keydown[key=='Escape'] from:body, unitSpawned from:body"
         hx-target="this"
         hx-swap="outerHTML"
     {{ end }}
@@ -15,44 +11,121 @@
     <button
         type="button"
         id="spawn-menu-toggle"
-        aria-expanded="{{ if . }}true{{ else }}false{{ end }}"
+        aria-expanded="{{ .Open }}"
         aria-controls="spawn-menu"
-        hx-get="/spawn-menu{{ if not . }}?open=true{{ end }}"
+        hx-get="/spawn-menu{{ if not .Open }}?open=true{{ end }}"
         hx-target="#spawn-controls"
         hx-swap="outerHTML"
-        {{ if not . }}autofocus{{ end }}
-    >
-        Spawn Unit
-    </button>
+        {{ if not .Open }}autofocus{{ end }}
+    >Spawn unit</button>
 
-    <div
-        id="spawn-menu"
-        role="group"
-        aria-label="Spawn unit"
-        {{ if not . }}hidden{{ end }}
-    >
-        {{ if . }}
-            <button
-                type="button"
-                id="spawn-npc"
-                hx-get="/unit?kind=npc"
-                hx-target="#unitOverlay"
-                hx-swap="beforeend"
-                autofocus
-            >
-                SPAWN NPC
-            </button>
+    <section id="spawn-menu" class="spawn-menu" aria-label="Unit library" {{ if not .Open }}hidden{{ end }}>
+        {{ if .Open }}
+            {{ if .Creating }}
+                <div class="spawn-menu-heading">
+                    <h2>Create a new unit</h2>
+                    <button type="button" class="secondary-button" hx-get="/spawn-menu?open=true" hx-target="#spawn-controls" hx-swap="outerHTML">Back</button>
+                </div>
+                <p>Save a unit to your library, then spawn as many copies as you need.</p>
+                {{ if .Error }}<p class="menu-error" role="alert">{{ .Error }}</p>{{ end }}
+                <form
+                    id="create-unit-form"
+                    method="post"
+                    action="/unit-library"
+                    enctype="multipart/form-data"
+                    hx-post="/unit-library"
+                    hx-encoding="multipart/form-data"
+                    hx-target="#spawn-controls"
+                    hx-swap="outerHTML"
+                    hx-disabled-elt="find button[type='submit']"
+                >
+                    <label for="unit-name">Name</label>
+                    <input id="unit-name" name="name" type="text" maxlength="80" required value="{{ .Name }}" placeholder="e.g. Forest scout" autofocus>
 
-            <button
-                type="button"
-                id="spawn-pc"
-                hx-get="/unit?kind=pc"
-                hx-target="#unitOverlay"
-                hx-swap="beforeend"
-            >
-                SPAWN PC
-            </button>
+                    <fieldset>
+                        <legend>Unit type</legend>
+                        <div class="unit-type-options">
+                            <label><input type="radio" name="unitType" value="pc" required {{ if eq .UnitType "pc" }}checked{{ end }}> PC</label>
+                            <label><input type="radio" name="unitType" value="npc" required {{ if eq .UnitType "npc" }}checked{{ end }}> NPC</label>
+                        </div>
+                    </fieldset>
+
+                    <label for="unit-size">Size</label>
+                    <select id="unit-size" name="size" required aria-describedby="unit-size-help">
+                        {{ range .Sizes }}
+                            <option value="{{ .Value }}" {{ if eq $.Size .Value }}selected{{ end }}>{{ .Label }} — {{ .Footprint }}</option>
+                        {{ end }}
+                    </select>
+                    <p id="unit-size-help">Each grid square represents 5 feet. Size sets the token’s footprint on the tabletop.</p>
+
+                    <label for="unit-image">Image <span class="optional-label">(optional)</span></label>
+                    <input id="unit-image" name="image" type="file" accept="image/png,image/jpeg,image/gif" aria-describedby="unit-image-help">
+                    <p id="unit-image-help">PNG, JPEG, or GIF. Up to 5 MB and 4096 × 4096 pixels. Leave empty to use the default PC or NPC artwork.</p>
+                    {{ if .Error }}<p>If you selected an image, choose it again before saving.</p>{{ end }}
+
+                    <fieldset id="image-fit-editor" data-preserve-fit="{{ if .Error }}true{{ else }}false{{ end }}">
+                        <legend>Fit image to token</legend>
+                        <p id="image-fit-help">Drag the artwork to reposition it, or focus the preview and use the arrow keys. Zoom changes the artwork, not the unit’s size.</p>
+                        <div class="token-image-preview" id="token-image-preview" tabindex="0" role="group" aria-label="Reposition token artwork" aria-describedby="image-fit-help">
+                            <img class="unit-image" alt="Token artwork preview" draggable="false">
+                        </div>
+                        <p id="image-fit-error" class="menu-error" role="alert" hidden></p>
+                        <label for="image-zoom">Zoom <output id="image-zoom-value" for="image-zoom">100%</output></label>
+                        <input id="image-zoom" name="imageZoom" type="range" min="0.25" max="4" step="0.01" value="{{ .ImageFit.Zoom }}">
+                        <input id="image-offset-x" name="imageOffsetX" type="hidden" value="{{ .ImageFit.OffsetX }}">
+                        <input id="image-offset-y" name="imageOffsetY" type="hidden" value="{{ .ImageFit.OffsetY }}">
+                        <div class="image-fit-actions">
+                            <button type="button" class="secondary-button" id="fit-image">Fit image</button>
+                            <button type="button" class="secondary-button" id="center-image">Center image</button>
+                        </div>
+                    </fieldset>
+
+                    <div class="unit-form-actions">
+                        <button type="button" class="secondary-button" hx-get="/spawn-menu?open=true" hx-target="#spawn-controls" hx-swap="outerHTML">Cancel</button>
+                        <button type="submit" class="primary-button"><span class="save-label">Save unit</span><span class="saving-label">Saving…</span></button>
+                    </div>
+                </form>
+            {{ else }}
+                <div class="spawn-menu-heading">
+                    <h2>Spawn unit</h2>
+                    <button type="button" id="create-unit-toggle" class="primary-button" hx-get="/unit-library/new" hx-target="#spawn-controls" hx-swap="outerHTML" autofocus>+ Create new unit</button>
+                </div>
+                <p>Select a unit to add it to the tabletop.</p>
+                {{ if .Notice }}<p class="menu-notice" role="status">{{ .Notice }}</p>{{ end }}
+                <details class="unit-library-group" id="pc-list" open>
+                    <summary>PCs <span class="unit-count">{{ len .PCs }}</span></summary>
+                    <ul class="unit-library-list">
+                        {{ range .PCs }}{{ template "library-unit" . }}{{ else }}<li class="empty-library">No PCs yet. Create one to get started.</li>{{ end }}
+                    </ul>
+                </details>
+                <details class="unit-library-group" id="npc-list" open>
+                    <summary>NPCs <span class="unit-count">{{ len .NPCs }}</span></summary>
+                    <ul class="unit-library-list">
+                        {{ range .NPCs }}{{ template "library-unit" . }}{{ else }}<li class="empty-library">No NPCs yet. Create one to get started.</li>{{ end }}
+                    </ul>
+                </details>
+            {{ end }}
         {{ end }}
-    </div>
+    </section>
 </div>
+{{ end }}
+
+{{ define "library-unit" }}
+<li>
+    <button
+        type="button"
+        class="library-unit"
+        aria-label="Spawn {{ .Name }}"
+        hx-post="/unit?unitID={{ .ID }}"
+        hx-target="#unitOverlay"
+        hx-swap="beforeend"
+        hx-disabled-elt="this"
+    >
+        <span class="library-token-preview" style="--image-zoom: {{.ImageFit.Zoom}}; --image-offset-x: {{.ImageFit.OffsetX}}%; --image-offset-y: {{.ImageFit.OffsetY}}%;">
+            <img class="unit-image" src="/images/{{ .ImageID }}" alt="" width="48" height="48" loading="lazy">
+        </span>
+        <span class="library-unit-name">{{ .Name }}<span class="library-unit-size">{{ .Size.Label }}</span></span>
+        <span class="spawn-action" aria-hidden="true">Spawn</span>
+    </button>
+</li>
 {{ end }}

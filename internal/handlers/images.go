@@ -17,6 +17,9 @@ var unitImages = map[string]string{
 func (h *EndpointHandler) unitImage(w http.ResponseWriter, r *http.Request) {
 	path, exists := unitImages[r.PathValue("id")]
 	if !exists {
+		path, exists = h.library.ImagePath(r.PathValue("id"))
+	}
+	if !exists {
 		http.NotFound(w, r)
 		return
 	}

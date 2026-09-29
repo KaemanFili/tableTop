@@ -15,19 +15,19 @@ import (
 func TestSpawnUnitImageChoice(t *testing.T) {
 	t.Chdir("../..")
 	for _, test := range []struct {
-		kind    string
-		imageID string
+		unitType string
+		imageID  string
 	}{
-		{kind: "npc", imageID: app.NPCUnitImageID},
-		{kind: "pc", imageID: app.PCUnitImageID},
+		{unitType: "npc", imageID: app.NPCUnitImageID},
+		{unitType: "pc", imageID: app.PCUnitImageID},
 	} {
-		t.Run(test.kind, func(t *testing.T) {
+		t.Run(test.unitType, func(t *testing.T) {
 			state := app.NewState()
-			h := NewEndpointHandler(state, NewWebSocketHandler(state))
+			h := NewEndpointHandler(state, NewWebSocketHandler(state), newTestLibrary(t))
 			mux := http.NewServeMux()
 			h.RegisterRoutes(mux)
 			spawn := httptest.NewRecorder()
-			mux.ServeHTTP(spawn, httptest.NewRequest(http.MethodGet, "/unit?kind="+test.kind, nil))
+			mux.ServeHTTP(spawn, httptest.NewRequest(http.MethodGet, "/unit?unitType="+test.unitType, nil))
 			if spawn.Code != http.StatusOK || !strings.Contains(spawn.Body.String(), `src="/images/`+test.imageID+`"`) {
 				t.Fatalf("spawn response = %d %s", spawn.Code, spawn.Body.String())
 			}
@@ -52,9 +52,9 @@ func TestSpawnUnitImageChoice(t *testing.T) {
 				t.Fatalf("invalid PNG artwork: %v", err)
 			}
 			invalid := httptest.NewRecorder()
-			mux.ServeHTTP(invalid, httptest.NewRequest(http.MethodGet, "/unit?kind=unknown", nil))
+			mux.ServeHTTP(invalid, httptest.NewRequest(http.MethodGet, "/unit?unitType=unknown", nil))
 			if invalid.Code != http.StatusBadRequest || state.UnitCount() != 1 {
-				t.Fatal("invalid kind must be rejected without spawning a unit")
+				t.Fatal("invalid unit type must be rejected without spawning a unit")
 			}
 		})
 	}
@@ -65,7 +65,7 @@ func TestUnitImageLifecycle(t *testing.T) {
 	t.Chdir("../..")
 	state := app.NewState()
 	ws := NewWebSocketHandler(state)
-	h := NewEndpointHandler(state, ws)
+	h := NewEndpointHandler(state, ws, newTestLibrary(t))
 	mux := http.NewServeMux()
 	h.RegisterRoutes(mux)
 	ws.RegisterRoutes(mux)

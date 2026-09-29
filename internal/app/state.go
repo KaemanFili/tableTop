@@ -1,16 +1,19 @@
 package app
 
 import (
-	"math/rand"
 	"strconv"
 	"sync"
 )
 
 type UnitData struct {
-	Left    int
-	Top     int
-	ID      string
-	ImageID string
+	Left     int
+	Top      int
+	ID       string
+	ImageID  string
+	Name     string
+	UnitType string
+	Size     UnitSize
+	ImageFit ImageFit
 }
 
 const (
@@ -20,8 +23,9 @@ const (
 )
 
 type AppState struct {
-	mutex sync.RWMutex
-	units map[string]UnitData
+	mutex      sync.RWMutex
+	units      map[string]UnitData
+	nextUnitID uint64
 }
 
 func NewState() *AppState {
@@ -57,25 +61,33 @@ func (s *AppState) UnitsSnapshot() []UnitData {
 }
 
 func (s *AppState) AddRandomUnit(imageID string) UnitData {
+	return s.AddUnit(UnitDefinition{ImageID: imageID})
+}
+
+func (s *AppState) AddUnit(definition UnitDefinition) UnitData {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
-
-	for {
-		id := "U" + strconv.Itoa(rand.Intn(100))
-		if _, exists := s.units[id]; exists {
-			continue
-		}
-
-		unit := UnitData{
-			Left:    100,
-			Top:     150,
-			ID:      id,
-			ImageID: imageID,
-		}
-		s.units[id] = unit
-
-		return unit
+	if definition.Size == "" {
+		definition.Size = SizeMedium
 	}
+	if definition.ImageFit == (ImageFit{}) {
+		definition.ImageFit = DefaultImageFit()
+	}
+	s.nextUnitID++
+	id := "U" + strconv.FormatUint(s.nextUnitID, 10)
+	unit := UnitData{
+		Left:     100,
+		Top:      150,
+		ID:       id,
+		ImageID:  definition.ImageID,
+		Name:     definition.Name,
+		UnitType: definition.UnitType,
+		Size:     definition.Size,
+		ImageFit: definition.ImageFit,
+	}
+	s.units[id] = unit
+
+	return unit
 }
 
 func (s *AppState) UnitCount() int {

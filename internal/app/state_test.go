@@ -20,3 +20,23 @@ func TestMovementPreservesUnitImage(t *testing.T) {
 		t.Fatal("movement must not create unknown units")
 	}
 }
+
+func TestSpawnCopiesKeepIdentityAndHaveUniqueIDs(t *testing.T) {
+	state := NewState()
+	definition := UnitDefinition{Name: "Scout", UnitType: "npc", ImageID: NPCUnitImageID, Size: SizeHuge, ImageFit: ImageFit{Zoom: 2, OffsetX: 10, OffsetY: -20}}
+	for range 150 {
+		unit := state.AddUnit(definition)
+		if unit.ImageFit != definition.ImageFit || unit.Size != definition.Size || unit.Name != definition.Name || unit.UnitType != definition.UnitType || unit.ImageID != definition.ImageID {
+			t.Fatalf("spawn lost library information: %+v", unit)
+		}
+		state.UpdateUnitPosition(unit.ID, 400, 500)
+		want := unit
+		want.Left, want.Top = 400, 500
+		if got, _ := state.UnitByID(unit.ID); got != want {
+			t.Fatal("movement changed unit identity")
+		}
+	}
+	if state.UnitCount() != 150 {
+		t.Fatal("spawning copies reused existing token IDs")
+	}
+}

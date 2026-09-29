@@ -1,5 +1,5 @@
 let isDragging = false;
-const updateServerSocket = new WebSocket('ws://localhost:18080/ws/updateServer');
+const updateServerSocket = new WebSocket(`${location.protocol === 'https:' ? 'wss:' : 'ws:'}//${location.host}/ws/updateServer`);
 
 updateServerSocket.onopen = () => {
     console.log("webSocket connection established");
