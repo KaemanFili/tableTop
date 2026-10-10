@@ -5,7 +5,7 @@
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>VTT</title>
         <script src="https://unpkg.com/htmx.org"></script>
-        <link rel="stylesheet" href="/static/style.css?v=7">
+        <link rel="stylesheet" href="/static/style.css?v=8">
     </head>
     <body>
         <div 
@@ -36,8 +36,15 @@
             <div id = "grid-container" class="grid"></div>
         </div>
         <div id="unitOverlay" class="unitOverlay"></div>
-        <script src="/static/drag.js?v=3"></script>
-        <script src="/static/updateClients.js?v=2"></script>
+        <div id="token-menu" class="token-menu" role="group" aria-label="Unit actions" hidden>
+            <button type="button">Status</button>
+            <button type="button">Resize</button>
+            <button type="button" id="remove-token" hx-swap="none" hx-disabled-elt="this">Remove</button>
+            <span id="token-menu-error" role="alert" hidden></span>
+        </div>
+        <script src="/static/tokenMenu.js?v=2"></script>
+        <script src="/static/drag.js?v=4"></script>
+        <script src="/static/updateClients.js?v=3"></script>
         <script src="/static/imageFit.js?v=2"></script>
     </body>
 </html>

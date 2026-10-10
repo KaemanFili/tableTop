@@ -73,7 +73,19 @@ func (h *WebSocketHandler) BroadcastUnitState() {
 		log.Println("Marshal error:", err)
 		return
 	}
+	h.broadcastUnits(data)
+}
 
+func (h *WebSocketHandler) BroadcastUnitRemoved(id string) {
+	data, err := json.Marshal(map[string]string{"type": "unitRemoved", "id": id})
+	if err != nil {
+		log.Println("Marshal error:", err)
+		return
+	}
+	h.broadcastUnits(data)
+}
+
+func (h *WebSocketHandler) broadcastUnits(data []byte) {
 	h.unitCreatedMutex.Lock()
 	for conn := range h.unitCreatedClients {
 		if err := conn.WriteMessage(websocket.TextMessage, data); err != nil {

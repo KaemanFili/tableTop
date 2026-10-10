@@ -27,6 +27,13 @@ Prefer HTMX requests and server-rendered HTML templates for UI interactions.
 Keep custom JavaScript for interactions that need it, such as dragging, image
 framing previews, and the existing WebSocket synchronization.
 
+Right-click a placed unit to show a small Status, Resize, and Remove menu beside
+it. Remove deletes that placed token from server memory and connected boards,
+and closes its menu. Status and Resize are currently UI placeholders. Outside
+clicks, Escape, dragging, scrolling, resizing the window, and board replacement
+close the menu. Removal keeps the saved library entry, shared artwork, and other
+copies available. `DELETE /unit/{id}` removes a placed token; repeating it succeeds.
+
 The base menu shows one **Spawn unit** button. It opens a library with independently
 collapsible PC and NPC lists. Each entry shows a name and image; selecting it
 spawns a copy on the tabletop. Knight (PC) and Goblin (NPC) are included initially.

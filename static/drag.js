@@ -27,19 +27,28 @@ document.addEventListener("mousedown", function (e) {
     }
 
     function up() {
+        finish(true);
+    }
+
+    function removed(event) {
+        if (event.detail.id === target.id) finish(false);
+    }
+
+    function finish(sendPosition) {
         document.removeEventListener("mousemove", move);
         document.removeEventListener("mouseup", up);
+        document.removeEventListener("unitRemoved", removed);
 
         // Remove dragging class
         isDragging = false;
         target.classList.remove("dragging");
         target.style.cursor = "grab";
 
-        console.log("up: updating position");
-        updateUnitPositionOnServer();
+        if (sendPosition) updateUnitPositionOnServer();
     }
 
     function updateUnitPositionOnServer() {
+        if (!target.isConnected) return;
         if (updateServerSocket.readyState === WebSocket.OPEN) {
             let data = {
                 Left: parseInt(target.style.left, 10),
@@ -54,4 +63,5 @@ document.addEventListener("mousedown", function (e) {
 
     document.addEventListener("mousemove", move);
     document.addEventListener("mouseup", up);
+    document.addEventListener("unitRemoved", removed);
 });

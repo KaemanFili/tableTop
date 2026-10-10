@@ -1,6 +1,9 @@
 package app
 
-import "testing"
+import (
+	"sync"
+	"testing"
+)
 
 func TestMovementPreservesUnitImage(t *testing.T) {
 	state := NewState()
@@ -38,5 +41,47 @@ func TestSpawnCopiesKeepIdentityAndHaveUniqueIDs(t *testing.T) {
 	}
 	if state.UnitCount() != 150 {
 		t.Fatal("spawning copies reused existing token IDs")
+	}
+}
+
+func TestRemovalClearsPlacedUnitAndPreservesOtherCopies(t *testing.T) {
+	state := NewState()
+	definition := UnitDefinition{Name: "Scout", ImageID: NPCUnitImageID, Size: SizeSmall}
+	removed := state.AddUnit(definition)
+	other := state.AddUnit(definition)
+	if !state.RemoveUnit(removed.ID) {
+		t.Fatal("existing token was not removed")
+	}
+	if _, exists := state.UnitByID(removed.ID); exists {
+		t.Fatal("removed token remains in server state")
+	}
+	if units := state.UnitsSnapshot(); len(units) != 1 || units[0] != other {
+		t.Fatalf("board after removal = %+v, want only %+v", units, other)
+	}
+	if state.UnitCount() != 1 || state.RemoveUnit(removed.ID) || state.RemoveUnit("missing") {
+		t.Fatal("repeated removal must not change remaining tokens")
+	}
+	if state.UpdateUnitPosition(removed.ID, 999, 999) {
+		t.Fatal("late movement recreated a removed token")
+	}
+	if replacement := state.AddUnit(definition); replacement.ID == removed.ID || replacement.ID == other.ID {
+		t.Fatal("spawning reused a removed token ID")
+	}
+}
+
+func TestRemovalDuringConcurrentMovement(t *testing.T) {
+	state := NewState()
+	unit := state.AddRandomUnit(DefaultUnitImageID)
+	var workers sync.WaitGroup
+	workers.Go(func() {
+		for i := range 100 {
+			state.UpdateUnitPosition(unit.ID, i, i)
+			state.UnitsSnapshot()
+		}
+	})
+	workers.Go(func() { state.RemoveUnit(unit.ID) })
+	workers.Wait()
+	if state.UnitCount() != 0 || state.UpdateUnitPosition(unit.ID, 1, 2) {
+		t.Fatal("concurrent movement restored a removed token")
 	}
 }

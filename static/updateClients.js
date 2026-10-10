@@ -2,6 +2,18 @@ posUpdateSocket = new WebSocket(`${location.protocol === 'https:' ? 'wss:' : 'ws
 
 newUnitUpdateSocket = new WebSocket(`${location.protocol === 'https:' ? 'wss:' : 'ws:'}//${location.host}/ws/updateUnitsForClients`);
 
+// Remember only deleted IDs so an older in-flight HTML response cannot restore them.
+const removedUnitIDs = new Set();
+document.addEventListener('unitRemoved', event => {
+    const id = event.detail.id;
+    if (typeof id !== 'string' || !id) return;
+    removedUnitIDs.add(id);
+    document.getElementById(id)?.remove();
+});
+document.addEventListener('htmx:afterSwap', () => {
+    removedUnitIDs.forEach(id => document.getElementById(id)?.remove());
+});
+
 posUpdateSocket.onmessage = function(event) {
     const units = JSON.parse(event.data);
     units.forEach(unit => {
@@ -18,7 +30,11 @@ posUpdateSocket.onerror = function(err) {
 };
 
 newUnitUpdateSocket.onmessage = function(event) {
-    console.log(JSON.parse(event.data));
+    const message = JSON.parse(event.data);
+    if (message.type === 'unitRemoved') {
+        document.dispatchEvent(new CustomEvent('unitRemoved', {detail: {id: message.id}}));
+        return;
+    }
     if(!isDragging){
          htmx.trigger("#loadExistingUnits", "loadUnits");
     }

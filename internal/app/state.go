@@ -97,6 +97,16 @@ func (s *AppState) UnitCount() int {
 	return len(s.units)
 }
 
+func (s *AppState) RemoveUnit(id string) bool {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+	if _, exists := s.units[id]; !exists {
+		return false
+	}
+	delete(s.units, id)
+	return true
+}
+
 func (s *AppState) UnitByID(id string) (UnitData, bool) {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()

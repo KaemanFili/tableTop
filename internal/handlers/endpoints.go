@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"encoding/json"
 	"html/template"
 	"log"
 	"net/http"
@@ -35,6 +36,7 @@ func (h *EndpointHandler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/grid", h.grid)
 	mux.HandleFunc("GET /unit", h.newUnit)
 	mux.HandleFunc("POST /unit", h.newUnit)
+	mux.HandleFunc("DELETE /unit/{id}", h.removeUnit)
 	mux.HandleFunc("GET /spawn-menu", h.spawnMenu)
 	mux.HandleFunc("GET /unit-library/new", h.newUnitForm)
 	mux.HandleFunc("POST /unit-library", h.createUnit)
@@ -101,6 +103,7 @@ func (h *EndpointHandler) newUnit(w http.ResponseWriter, r *http.Request) {
 
 func (h *EndpointHandler) existingUnit(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/html")
+	w.Header().Set("Cache-Control", "no-store")
 
 	for _, data := range h.state.UnitsSnapshot() {
 		if err := h.unitTemplate.ExecuteTemplate(w, "unit", data); err != nil {
@@ -108,4 +111,16 @@ func (h *EndpointHandler) existingUnit(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+}
+
+func (h *EndpointHandler) removeUnit(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	if h.state.RemoveUnit(id) {
+		h.webSocketHandler.BroadcastUnitRemoved(id)
+	}
+	// Repeated removal succeeds, including when another client removed it first.
+	trigger, _ := json.Marshal(map[string]any{"unitRemoved": map[string]string{"id": id}})
+	w.Header().Set("HX-Trigger", string(trigger))
+	w.Header().Set("Cache-Control", "no-store")
+	w.WriteHeader(http.StatusNoContent)
 }
