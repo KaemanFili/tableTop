@@ -37,6 +37,7 @@ func (h *EndpointHandler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /unit", h.newUnit)
 	mux.HandleFunc("POST /unit", h.newUnit)
 	mux.HandleFunc("DELETE /unit/{id}", h.removeUnit)
+	mux.HandleFunc("POST /unit/{id}/size", h.resizeUnit)
 	mux.HandleFunc("GET /spawn-menu", h.spawnMenu)
 	mux.HandleFunc("GET /unit-library/new", h.newUnitForm)
 	mux.HandleFunc("POST /unit-library", h.createUnit)
@@ -46,7 +47,12 @@ func (h *EndpointHandler) RegisterRoutes(mux *http.ServeMux) {
 func (h *EndpointHandler) index(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-store")
-	if err := h.indexTemplate.ExecuteTemplate(w, "index.html", spawnMenuData{}); err != nil {
+	sizes, _ := json.Marshal(app.UnitSizes())
+	data := struct {
+		spawnMenuData
+		UnitSizes template.JS
+	}{UnitSizes: template.JS(sizes)}
+	if err := h.indexTemplate.ExecuteTemplate(w, "index.html", data); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 }

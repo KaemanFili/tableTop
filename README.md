@@ -27,9 +27,15 @@ Prefer HTMX requests and server-rendered HTML templates for UI interactions.
 Keep custom JavaScript for interactions that need it, such as dragging, image
 framing previews, and the existing WebSocket synchronization.
 
-Right-click a placed unit to show a small Status, Resize, and Remove menu beside
-it. Remove deletes that placed token from server memory and connected boards,
-and closes its menu. Status and Resize are currently UI placeholders. Outside
+Right-click a placed unit to show a small menu beside it. The ↑ and ↓ arrows
+increase or decrease its size by one existing category, stopping at Tiny and
+Gargantuan. Resizing updates only that placed token in memory and on connected
+boards; the saved library unit and newly spawned copies keep their original size.
+The menu stays open beside the resized token. `POST /unit/{id}/size` accepts
+`direction=up` or `direction=down`.
+
+Remove deletes that placed token from server memory and connected boards,
+and closes its menu. Status is currently a UI placeholder. Outside
 clicks, Escape, dragging, scrolling, resizing the window, and board replacement
 close the menu. Removal keeps the saved library entry, shared artwork, and other
 copies available. `DELETE /unit/{id}` removes a placed token; repeating it succeeds.

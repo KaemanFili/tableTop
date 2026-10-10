@@ -1,6 +1,62 @@
 package app
 
+import (
+	"errors"
+	"slices"
+)
+
+var (
+	ErrInvalidSizeDirection = errors.New("choose up or down")
+	ErrUnitNotFound         = errors.New("unit not found")
+)
+
+// ResizeUnit changes one placed token by one category, without changing its library entry.
+func (s *AppState) ResizeUnit(id, direction string) (UnitData, bool, error) {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+	var step int
+	switch direction {
+	case "up":
+		step = 1
+	case "down":
+		step = -1
+	default:
+		return UnitData{}, false, ErrInvalidSizeDirection
+	}
+	unit, exists := s.units[id]
+	if !exists {
+		return UnitData{}, false, ErrUnitNotFound
+	}
+	return s.getChangedSize(unit, step)
+}
+
+// getChangedSize requires the caller to hold s.mutex.
+func (s *AppState) getChangedSize(unit UnitData, step int) (UnitData, bool, error) {
+	sizes := UnitSizes()
+	index, err := unit.Size.getIndex(sizes)
+	if err != nil {
+		return UnitData{}, false, err
+	}
+	next := index + step
+	if next < 0 || next >= len(sizes) {
+		return unit, false, nil
+	}
+	unit.Size = sizes[next].Value
+	s.units[unit.ID] = unit
+	return unit, true, nil
+}
+
 type UnitSize string
+
+func (s UnitSize) getIndex(sizes []UnitSizeOption) (int, error) {
+	index := slices.IndexFunc(sizes, func(option UnitSizeOption) bool {
+		return option.Value == s
+	})
+	if index == -1 {
+		return -1, errors.New("unit has an invalid size")
+	}
+	return index, nil
+}
 
 const (
 	SizeTiny       UnitSize = "tiny"
