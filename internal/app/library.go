@@ -85,7 +85,7 @@ func ValidateUnitDefinition(name, unitType string, size UnitSize) error {
 	return nil
 }
 
-func (l *UnitLibrary) Snapshot() []UnitDefinition {
+func (l *UnitLibrary) Units() []UnitDefinition {
 	l.mutex.RLock()
 	defer l.mutex.RUnlock()
 	units := make([]UnitDefinition, 0, len(l.units))

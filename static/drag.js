@@ -7,7 +7,7 @@ updateServerSocket.onopen = () => {
 
 document.addEventListener("mousedown", function (e) {
     if (e.button !== 0) return;
-    if (['ping', 'ruler'].includes(document.body.dataset.tool)) return;
+    if (['ping', 'ruler', 'pen', 'eraser'].includes(document.body.dataset.tool)) return;
     const target = e.target.closest(".unit");
     if (!target) return;
     // Artwork and other children should drag their containing unit.

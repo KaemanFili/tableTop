@@ -5,12 +5,18 @@
             <path d="M3 16 16 3l5 5L8 21zM13 6l2 2M10 9l3 3M7 12l2 2M4 15l3 3"/>
         </svg>
     </button>
-    <button type="button" id="utility-pen" class="utility-button" title="Pen" aria-label="Pen">
+    <button type="button" id="utility-pen" class="utility-button" title="Pen (right-click for settings)" aria-label="Pen" aria-pressed="false" aria-expanded="false" aria-controls="pen-settings">
         <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
             <path d="m15 4 5 5M3 21l5-1L21 7a2 2 0 0 0 0-3l-1-1a2 2 0 0 0-3 0L4 16zM4 16l4 4"/>
         </svg>
     </button>
-    <button type="button" id="utility-eraser" class="utility-button" title="Eraser" aria-label="Eraser">
+    <div id="pen-settings" role="group" aria-label="Pen settings" hidden>
+        <label for="pen-color">Color</label>
+        <input type="color" id="pen-color" value="#1d4ed8">
+        <label for="pen-width">Thickness <output id="pen-width-value" for="pen-width">3 px</output></label>
+        <input type="range" id="pen-width" min="1" max="12" step="1" value="3">
+    </div>
+    <button type="button" id="utility-eraser" class="utility-button" title="Eraser" aria-label="Eraser" aria-pressed="false">
         <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
             <path d="m9 20-6-6a2 2 0 0 1 0-3l9-9a2 2 0 0 1 3 0l6 6a2 2 0 0 1 0 3l-9 9zM7 7l10 10M9 20h12"/>
         </svg>

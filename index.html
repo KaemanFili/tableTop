@@ -5,7 +5,7 @@
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>VTT</title>
         <script src="https://unpkg.com/htmx.org"></script>
-        <link rel="stylesheet" href="/static/style.css?v=19">
+        <link rel="stylesheet" href="/static/style.css?v=24">
     </head>
     <body>
         <div 
@@ -34,6 +34,7 @@
             {{ template "utilities-controls" false }}
         </div>
         <div class="grid-wrapper">
+            <svg id="drawing-layer" viewBox="0 0 64 64" preserveAspectRatio="none" aria-hidden="true" focusable="false"></svg>
             <div id = "grid-container" class="grid"></div>
             <div id="ping-layer" aria-hidden="true"></div>
             <div id="ruler-layer"></div>
@@ -57,9 +58,10 @@
         <script type="application/json" id="unit-sizes">{{ .UnitSizes }}</script>
         <script src="/static/tokenMenu.js?v=6"></script>
         <script src="/static/movement.js?v=1"></script>
-        <script src="/static/drag.js?v=7"></script>
-        <script src="/static/updateClients.js?v=10"></script>
-        <script src="/static/utilities.js?v=5"></script>
+        <script src="/static/drag.js?v=9"></script>
+        <script src="/static/updateClients.js?v=12"></script>
+        <script src="/static/utilities.js?v=8"></script>
+        <script src="/static/pen.js?v=3"></script>
         <script src="/static/imageFit.js?v=2"></script>
     </body>
 </html>

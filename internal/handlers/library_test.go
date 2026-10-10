@@ -86,10 +86,10 @@ func TestUnitLibraryCreateRestartAndSpawn(t *testing.T) {
 	}
 	mux = http.NewServeMux()
 	NewEndpointHandler(state, NewWebSocketHandler(state), library).RegisterRoutes(mux)
-	if len(library.Snapshot()) != 4 {
+	if len(library.Units()) != 4 {
 		t.Fatal("custom entries were not restored")
 	}
-	for _, unit := range library.Snapshot() {
+	for _, unit := range library.Units() {
 		if unit.ID == "knight" || unit.ID == "goblin" {
 			continue
 		}
@@ -115,7 +115,7 @@ func TestUnitLibraryCreateRestartAndSpawn(t *testing.T) {
 	if state.UnitCount() != 4 {
 		t.Fatal("library entries should spawn independent copies")
 	}
-	for _, unit := range state.UnitsSnapshot() {
+	for _, unit := range state.Units() {
 		if unit.ImageFit != (app.ImageFit{Zoom: 2, OffsetX: 10, OffsetY: -20}) || unit.Size != app.SizeLarge || unit.Name != "Scout <script>" || (unit.UnitType != "pc" && unit.UnitType != "npc") {
 			t.Fatalf("spawn lost identity: %+v", unit)
 		}
@@ -154,7 +154,7 @@ func TestCreateUnitValidation(t *testing.T) {
 			if !strings.Contains(body, `value="huge" selected`) {
 				t.Fatal("form error did not preserve the selected size")
 			}
-			if len(library.Snapshot()) != 2 || state.UnitCount() != 0 {
+			if len(library.Units()) != 2 || state.UnitCount() != 0 {
 				t.Fatal("invalid creation changed saved units")
 			}
 		})
@@ -192,7 +192,7 @@ func TestUnitMenusAndDefaultArtwork(t *testing.T) {
 			t.Fatal("creating without an upload failed")
 		}
 	}
-	for _, unit := range library.Snapshot() {
+	for _, unit := range library.Units() {
 		want := app.NPCUnitImageID
 		if unit.UnitType == "pc" {
 			want = app.PCUnitImageID
@@ -220,7 +220,7 @@ func TestSizeControlsSpawnAndReloadFootprint(t *testing.T) {
 				t.Fatalf("creation failed: %s", created.Body.String())
 			}
 			var definition app.UnitDefinition
-			for _, unit := range library.Snapshot() {
+			for _, unit := range library.Units() {
 				if unit.Name == "Size "+test.size {
 					definition = unit
 				}
@@ -234,7 +234,7 @@ func TestSizeControlsSpawnAndReloadFootprint(t *testing.T) {
 			if spawn.Code != http.StatusOK || !strings.Contains(spawn.Body.String(), footprint) || !strings.Contains(spawn.Body.String(), `data-size="`+test.size+`"`) {
 				t.Fatalf("incorrect token footprint: %s", spawn.Body.String())
 			}
-			for _, unit := range state.UnitsSnapshot() {
+			for _, unit := range state.Units() {
 				if unit.Name == definition.Name {
 					state.UpdateUnitPosition(unit.ID, 400, 500)
 					moved, _ := state.UnitByID(unit.ID)
@@ -261,7 +261,7 @@ func TestRejectInvalidUnitSizes(t *testing.T) {
 	for _, size := range []string{"", "gigantic", "2", "large; color:red"} {
 		response := httptest.NewRecorder()
 		mux.ServeHTTP(response, libraryRequest(t, "Scout", "npc", size, nil))
-		if !strings.Contains(response.Body.String(), "Choose a size from Tiny to Gargantuan") || len(library.Snapshot()) != 2 {
+		if !strings.Contains(response.Body.String(), "Choose a size from Tiny to Gargantuan") || len(library.Units()) != 2 {
 			t.Fatalf("invalid size %q was not rejected", size)
 		}
 		if _, err := library.Create("Scout", "npc", app.UnitSize(size), app.DefaultImageFit(), nil); err == nil {
@@ -283,7 +283,7 @@ func TestRejectInvalidImageFraming(t *testing.T) {
 	} {
 		response := httptest.NewRecorder()
 		mux.ServeHTTP(response, libraryRequest(t, "Scout", "npc", "large", nil, fields))
-		if !strings.Contains(response.Body.String(), `role="alert"`) || len(library.Snapshot()) != 2 {
+		if !strings.Contains(response.Body.String(), `role="alert"`) || len(library.Units()) != 2 {
 			t.Fatalf("invalid framing was not rejected: %v", fields)
 		}
 	}

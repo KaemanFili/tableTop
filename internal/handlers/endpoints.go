@@ -114,7 +114,7 @@ func (h *EndpointHandler) existingUnit(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/html")
 	w.Header().Set("Cache-Control", "no-store")
 
-	for _, data := range h.state.UnitsSnapshot() {
+	for _, data := range h.state.Units() {
 		if err := h.unitTemplate.ExecuteTemplate(w, "unit", data); err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return

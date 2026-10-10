@@ -23,6 +23,8 @@ type WebSocketHandler struct {
 	positionMutex      sync.Mutex
 	unitCreatedMutex   sync.Mutex
 	rulers             map[string]boardRuler
+	strokes            map[string]penStroke
+	erasedStrokes      map[string]bool
 }
 
 func NewWebSocketHandler(state *app.AppState) *WebSocketHandler {
@@ -36,13 +38,15 @@ func NewWebSocketHandler(state *app.AppState) *WebSocketHandler {
 		positionClients:    make(map[*websocket.Conn]bool),
 		unitCreatedClients: make(map[*websocket.Conn]bool),
 		rulers:             make(map[string]boardRuler),
+		strokes:            make(map[string]penStroke),
+		erasedStrokes:      make(map[string]bool),
 	}
 }
 
 func (h *WebSocketHandler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/ws/updateServer", h.updateServer)
 	mux.HandleFunc("/ws/updatePosForClients", h.updateClientPosition)
-	mux.HandleFunc("/ws/updateUnitsForClients", h.updateClientUnits)
+	mux.HandleFunc("/ws/updateUnitsForClients", h.updateBoardUtilityValues)
 }
 
 func (h *WebSocketHandler) StartPositionBroadcast() {
@@ -51,7 +55,7 @@ func (h *WebSocketHandler) StartPositionBroadcast() {
 		defer ticker.Stop()
 
 		for range ticker.C {
-			data, err := json.Marshal(h.state.UnitsSnapshot())
+			data, err := json.Marshal(h.state.Units())
 			if err != nil {
 				log.Println("Marshal error:", err)
 				continue
@@ -168,7 +172,7 @@ func (h *WebSocketHandler) updateClientPosition(w http.ResponseWriter, r *http.R
 	h.positionMutex.Unlock()
 }
 
-func (h *WebSocketHandler) updateClientUnits(w http.ResponseWriter, r *http.Request) {
+func (h *WebSocketHandler) updateBoardUtilityValues(w http.ResponseWriter, r *http.Request) {
 	conn, err := h.upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		log.Println("Upgrade failed:", err)
@@ -176,32 +180,82 @@ func (h *WebSocketHandler) updateClientUnits(w http.ResponseWriter, r *http.Requ
 	}
 	defer conn.Close()
 	conn.SetReadLimit(1024)
-	rulerID := rand.Text()
+	sessionID := rand.Text()
+	defer h.unregisterBoardUtilitiesClient(conn, sessionID)
 
-	h.unitCreatedMutex.Lock()
-	h.unitCreatedClients[conn] = true
-	conn.WriteJSON(map[string]string{"type": "rulerSession", "id": rulerID})
-	for _, ruler := range h.rulers {
-		conn.WriteJSON(ruler)
+	if err := h.registerBoardUtilitiesClient(conn, sessionID); err != nil {
+		log.Println("Send initial board state:", err)
+		return
 	}
-	h.unitCreatedMutex.Unlock()
+	h.readBoardUtilitiesMessages(conn, sessionID)
+}
 
+// Registration and the initial state share a lock so live updates cannot
+// arrive before the session identity and existing drawings.
+func (h *WebSocketHandler) registerBoardUtilitiesClient(conn *websocket.Conn, sessionID string) error {
+	h.unitCreatedMutex.Lock()
+	defer h.unitCreatedMutex.Unlock()
+	h.unitCreatedClients[conn] = true
+	if err := conn.WriteJSON(map[string]string{"type": "rulerSession", "id": sessionID}); err != nil {
+		return err
+	}
+	for _, ruler := range h.rulers {
+		if err := conn.WriteJSON(ruler); err != nil {
+			return err
+		}
+	}
+	for _, stroke := range h.strokes {
+		if err := conn.WriteJSON(stroke); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (h *WebSocketHandler) readBoardUtilitiesMessages(conn *websocket.Conn, sessionID string) {
 	for {
 		_, data, err := conn.ReadMessage()
 		if err != nil {
-			break
+			return
 		}
-		h.updateRuler(rulerID, data)
+		h.handleBoardUtilitiesMessage(sessionID, data)
 	}
+}
 
+func (h *WebSocketHandler) handleBoardUtilitiesMessage(sessionID string, data []byte) {
+	var message struct {
+		Type string `json:"type"`
+	}
+	if json.Unmarshal(data, &message) != nil {
+		return
+	}
+	switch message.Type {
+	case "rulerChanged":
+		h.updateRuler(sessionID, data)
+	case "penStroke":
+		h.updatePen(sessionID, data)
+	case "penErase":
+		h.erasePen(data)
+	}
+}
+
+func (h *WebSocketHandler) unregisterBoardUtilitiesClient(conn *websocket.Conn, sessionID string) {
 	h.unitCreatedMutex.Lock()
+	defer h.unitCreatedMutex.Unlock()
 	delete(h.unitCreatedClients, conn)
-	if _, exists := h.rulers[rulerID]; exists {
-		delete(h.rulers, rulerID)
-		data, _ := json.Marshal(boardRuler{Type: "rulerChanged", ID: rulerID, Clear: true})
+	if _, exists := h.rulers[sessionID]; exists {
+		delete(h.rulers, sessionID)
+		data, _ := json.Marshal(boardRuler{Type: "rulerChanged", ID: sessionID, Clear: true})
 		h.broadcastUnitsLocked(data)
 	}
-	h.unitCreatedMutex.Unlock()
+	for id, stroke := range h.strokes {
+		if stroke.Owner == sessionID && !stroke.Finished {
+			stroke.Finished = true
+			h.strokes[id] = stroke
+			message, _ := json.Marshal(penStroke{Type: "penStroke", ID: id, Owner: sessionID, Offset: len(stroke.Points), Finished: true, Color: stroke.Color, Width: stroke.Width})
+			h.broadcastUnitsLocked(message)
+		}
+	}
 }
 
 func (h *WebSocketHandler) logData(id string) {

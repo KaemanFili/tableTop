@@ -55,7 +55,7 @@ func TestRemovalClearsPlacedUnitAndPreservesOtherCopies(t *testing.T) {
 	if _, exists := state.UnitByID(removed.ID); exists {
 		t.Fatal("removed token remains in server state")
 	}
-	if units := state.UnitsSnapshot(); len(units) != 1 || units[0] != other {
+	if units := state.Units(); len(units) != 1 || units[0] != other {
 		t.Fatalf("board after removal = %+v, want only %+v", units, other)
 	}
 	if state.UnitCount() != 1 || state.RemoveUnit(removed.ID) || state.RemoveUnit("missing") {
@@ -76,7 +76,7 @@ func TestRemovalDuringConcurrentMovement(t *testing.T) {
 	workers.Go(func() {
 		for i := range 100 {
 			state.UpdateUnitPosition(unit.ID, i, i)
-			state.UnitsSnapshot()
+			state.Units()
 		}
 	})
 	workers.Go(func() { state.RemoveUnit(unit.ID) })

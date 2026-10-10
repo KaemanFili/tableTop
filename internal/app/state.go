@@ -49,7 +49,7 @@ func (s *AppState) UpdateUnitPosition(id string, left, top int) bool {
 	return true
 }
 
-func (s *AppState) UnitsSnapshot() []UnitData {
+func (s *AppState) Units() []UnitData {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
 

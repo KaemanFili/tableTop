@@ -26,10 +26,10 @@ func TestLibraryPersistsConcurrentCreations(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := len(reloaded.Snapshot()); got != 14 {
+	if got := len(reloaded.Units()); got != 14 {
 		t.Fatalf("saved %d entries, want 12 new units plus 2 defaults", got)
 	}
-	for _, unit := range library.Snapshot() {
+	for _, unit := range library.Units() {
 		if got, exists := reloaded.UnitByID(unit.ID); !exists || got != unit {
 			t.Fatalf("unit was not restored: %+v", unit)
 		}
@@ -49,7 +49,7 @@ func TestFailedLibrarySaveDoesNotPublishUnit(t *testing.T) {
 	if _, err := library.Create("Scout", "npc", SizeMedium, DefaultImageFit(), []byte("image")); err == nil {
 		t.Fatal("save should fail")
 	}
-	if len(library.Snapshot()) != 2 {
+	if len(library.Units()) != 2 {
 		t.Fatal("failed unit was published")
 	}
 	images, err := os.ReadDir(filepath.Join(dir, "images"))

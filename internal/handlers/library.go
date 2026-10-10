@@ -35,7 +35,7 @@ type spawnMenuData struct {
 func (h *EndpointHandler) menuData(open bool) spawnMenuData {
 	data := spawnMenuData{Open: open}
 	if open {
-		for _, unit := range h.library.Snapshot() {
+		for _, unit := range h.library.Units() {
 			if unit.UnitType == "pc" {
 				data.PCs = append(data.PCs, unit)
 			} else {

@@ -30,7 +30,7 @@ framing previews, and the existing WebSocket synchronization.
 
 Dragging follows your mouse immediately. Position updates are sent and broadcast
 about 30 times per second; other boards blend between positions over 60 ms.
-Releasing sends the final position immediately, and older snapshots are briefly
+Releasing sends the final position immediately, and older position updates are briefly
 ignored on your board until the server confirms the drop.
 
 See [How movement smoothing works](docs/movement.md) for the before/after code,
@@ -83,8 +83,26 @@ Click Ruler again, choose another tool, or press Escape to clear it. Measurement
 after a line is drawn. Updates are sent about 30 times per second, and receiving
 boards animate between positions over 50 ms to smooth movement. Each user has their own ruler; clearing yours leaves
 other rulers visible. Disconnecting removes your ruler. Coordinates use grid
-squares so all boards show the same distance and position. Rulers do not move tokens. Pen and Eraser interactions will
-be added separately.
+squares so all boards show the same distance and position. Rulers do not move tokens.
+
+Select **Pen**, then hold the mouse button and drag to draw a freehand stroke.
+Right-click the Pen icon to choose a color and thickness (1–12 px). Settings apply
+to new strokes, and everyone sees the same color and thickness. The default is blue
+with a 3 px thickness.
+Strokes appear beneath the grid lines and tokens, and sync live to every connected
+board. Grid-square coordinates keep drawings aligned when scrolling or changing
+the cell size. Release, press Escape, or switch tools to finish a stroke. Drawing
+over a token does not move it. Strokes remain after the author disconnects and
+are sent to users joining or refreshing the board. Drawings live in server memory
+and reset on server restart.
+
+Select **Eraser**, then click or drag over a drawing to remove its entire pen
+stroke. The eraser can remove anyone's strokes and syncs removals to all boards.
+It catches strokes crossed between mouse samples during fast drags, and has an
+8-pixel brush radius plus half the stroke width. Removed strokes stay removed
+after refresh, including when another user was still drawing them. Tokens,
+grid lines, rulers, and pings are unaffected. Click Eraser again, select another
+tool, or press Escape to return to moving tokens.
 
 **Create new unit** opens a form for a name, unit type (`unitType=pc` or
 `unitType=npc`), D&D size, and optional artwork. Saving returns to the library without

@@ -143,7 +143,7 @@ A new destination can arrive before the animation finishes. We start the next
 blend from the position currently displayed, which avoids jumping back to an
 older position. This adds a small visual delay on receiving screens.
 
-Repeated token snapshots with an unchanged destination let the current animation
+Repeated token position updates with an unchanged destination let the current animation
 finish. A ruler with a new starting point appears immediately at that origin;
 it does not animate across the board from the previous measurement.
 
@@ -163,8 +163,8 @@ if (element.classList.contains('dragging')) return;
 ```
 
 Releasing sends the final integer position immediately. Your browser ignores
-older snapshots until it receives that final position, or until the one-second
-guard expires. This prevents an older snapshot from pulling the token backward
+older position updates until it receives that final position, or until the one-second
+guard expires. This prevents an older position update from pulling the token backward
 just after release while still allowing later server positions to take effect.
 
 Your own ruler also draws immediately. Echoed ruler updates are ignored on the

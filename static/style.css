@@ -15,6 +15,24 @@ body, html {
 .grid-wrapper {
   position: relative;
   display: inline-block;
+  background-color: darkgray;
+}
+
+#drawing-layer {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 1;
+  pointer-events: none;
+}
+
+.pen-stroke {
+  fill: none;
+  stroke: #1d4ed8;
+  stroke-width: 0.075;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 #ping-layer {
@@ -31,9 +49,9 @@ body, html {
   height: 36px;
   border-radius: 50%;
   background: radial-gradient(circle,
-    rgba(239, 68, 68, 0.75) 0%,
-    rgba(239, 68, 68, 0.4) 30%,
-    rgba(239, 68, 68, 0.12) 55%,
+    rgba(239, 68, 68, 0.6) 0%,
+    rgba(239, 68, 68, 0.32) 30%,
+    rgba(239, 68, 68, 0.096) 55%,
     rgba(239, 68, 68, 0) 75%);
   filter: blur(2px);
   transform: translate(-50%, -50%);
@@ -55,13 +73,21 @@ body[data-tool="ruler"] .grid,
 body[data-tool="ruler"] .unit {
   cursor: crosshair;
 }
+
+body[data-tool="pen"] .grid,
+body[data-tool="pen"] .unit,
+body[data-tool="eraser"] .grid,
+body[data-tool="eraser"] .unit {
+  cursor: crosshair;
+}
 .grid {
+  position: relative;
+  z-index: 2;
   width: calc(var(--cell-size) * 64);
   height: calc(var(--cell-size) * 64);
   display: grid;
   grid-template-columns: repeat(64, var(--cell-size));
   grid-template-rows: repeat(64, var(--cell-size));
-  background-color: darkgray; /* for contrast */
 }
 
 .cell {
@@ -233,6 +259,13 @@ body[data-tool="ruler"] .unit {
   flex-direction: column;
   gap: 0.5rem;
   z-index: 1000; /* make sure it's on top of grid and units */
+  pointer-events: none;
+}
+
+#ui-overlay button,
+#ui-overlay .spawn-menu,
+#pen-settings {
+  pointer-events: auto;
 }
 
 #ui-overlay button {
@@ -285,6 +318,39 @@ body[data-tool="ruler"] .unit {
   background: #202020;
   color: #fecaca;
   font: 12px/1.4 system-ui, sans-serif;
+}
+
+#pen-settings {
+  position: fixed;
+  width: 190px;
+  box-sizing: border-box;
+  padding: 12px;
+  border: 1px solid #555;
+  border-radius: 6px;
+  background: #202020;
+  color: white;
+  box-shadow: 0 4px 12px #0006;
+  font: 14px/1.4 system-ui, sans-serif;
+}
+
+#pen-settings label {
+  display: block;
+  margin-bottom: 6px;
+}
+
+#pen-settings input {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  margin: 0 0 10px;
+}
+
+#pen-settings input:last-child {
+  margin-bottom: 0;
+}
+
+#pen-width-value {
+  float: right;
 }
 
 .utility-button svg {

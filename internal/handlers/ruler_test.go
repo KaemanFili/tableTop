@@ -69,7 +69,7 @@ func TestSharedRulersLiveUpdatesJoinClearAndDisconnect(t *testing.T) {
 	}
 	read(first, line)
 	read(second, line)
-	// New users receive a snapshot of rulers currently displayed.
+	// New users receive the state of rulers currently displayed.
 	third, _ := connect()
 	read(third, line)
 	line.End = &rulerPoint{6, 8}

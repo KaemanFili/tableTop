@@ -43,14 +43,14 @@ function updateUnitPosition(element, left, top) {
         if (left === pending.left && top === pending.top) {
             pendingUnitPositions.delete(id);
         } else if (performance.now() < pending.expires) {
-            // Wait for the server to observe the final drop before accepting older snapshots.
+            // Wait for the server to observe the final drop before accepting older position updates.
             return;
         } else {
             pendingUnitPositions.delete(id);
         }
     }
     const previous = unitAnimations.get(id);
-    // Repeated stationary snapshots must let an existing animation finish.
+    // Repeated stationary position updates must let an existing animation finish.
     if (previous?.element === element && previous.left === left && previous.top === top) return;
     const fromLeft = parseFloat(element.style.left) || 0;
     const fromTop = parseFloat(element.style.top) || 0;
@@ -131,6 +131,10 @@ posUpdateSocket.onerror = function(err) {
 
 newUnitUpdateSocket.onmessage = function(event) {
     const message = JSON.parse(event.data);
+    if (message.type === 'penStroke' || message.type === 'penErased') {
+        document.dispatchEvent(new CustomEvent(message.type, {detail: message}));
+        return;
+    }
     if (['rulerSession', 'rulerChanged'].includes(message.type)) {
         document.dispatchEvent(new CustomEvent(message.type, {detail: message}));
         return;

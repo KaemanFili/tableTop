@@ -34,7 +34,7 @@ func TestSpawnUnitImageChoice(t *testing.T) {
 			if spawn.Header().Get("HX-Trigger-After-Swap") != "unitSpawned" {
 				t.Fatal("spawn must tell HTMX to close the menu")
 			}
-			units := state.UnitsSnapshot()
+			units := state.Units()
 			if len(units) != 1 || units[0].ImageID != test.imageID {
 				t.Fatalf("unexpected units: %+v", units)
 			}
@@ -75,7 +75,7 @@ func TestUnitImageLifecycle(t *testing.T) {
 	if spawn.Code != http.StatusOK || !strings.Contains(spawn.Body.String(), `src="/images/default-unit"`) {
 		t.Fatalf("spawn response = %d %s", spawn.Code, spawn.Body.String())
 	}
-	units := state.UnitsSnapshot()
+	units := state.Units()
 	if len(units) != 1 {
 		t.Fatalf("spawned %d units, want 1", len(units))
 	}
