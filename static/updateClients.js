@@ -1,6 +1,6 @@
 posUpdateSocket = new WebSocket(`${location.protocol === 'https:' ? 'wss:' : 'ws:'}//${location.host}/ws/updatePosForClients`);
 
-newUnitUpdateSocket = new WebSocket(`${location.protocol === 'https:' ? 'wss:' : 'ws:'}//${location.host}/ws/updateUnitsForClients`);
+newUnitUpdateSocket = new WebSocket(`${location.protocol === 'https:' ? 'wss:' : 'ws:'}//${location.host}/ws/updateUnitsForClients${document.body.dataset.gm === 'true' ? '?gm=true' : ''}`);
 
 // Remember only deleted IDs so an older in-flight HTML response cannot restore them.
 const removedUnitIDs = new Set();
@@ -131,6 +131,10 @@ posUpdateSocket.onerror = function(err) {
 
 newUnitUpdateSocket.onmessage = function(event) {
     const message = JSON.parse(event.data);
+    if (message.type === 'fogMark' || message.type === 'fogReset') {
+        document.dispatchEvent(new CustomEvent(message.type, {detail: message}));
+        return;
+    }
     if (message.type === 'penStroke' || message.type === 'penErased') {
         document.dispatchEvent(new CustomEvent(message.type, {detail: message}));
         return;

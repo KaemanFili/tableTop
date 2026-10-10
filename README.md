@@ -21,12 +21,19 @@ and `go vet ./...`.
 - `static`: browser JavaScript and CSS.
 - `templates`: reusable HTML templates served by handlers.
 - `docs/movement.md`: movement smoothing, progress calculations, and worked examples.
+- [docs/erasers.md](docs/erasers.md): pen stroke deletion versus partial fog erasure,
+  with code examples and shared-state behavior.
 
 ## UI approach
 
 Prefer HTMX requests and server-rendered HTML templates for UI interactions.
 Keep custom JavaScript for interactions that need it, such as dragging, image
 framing previews, and the existing WebSocket synchronization.
+
+Hold the right mouse button on the map or a token and drag to pan your view.
+Panning scrolls only your browser and leaves token positions unchanged. A right-click
+without dragging still opens a token's menu. Toolbar right-click settings remain
+available, and the brush outline hides while panning.
 
 Dragging follows your mouse immediately. Position updates are sent and broadcast
 about 30 times per second; other boards blend between positions over 60 ms.
@@ -64,6 +71,26 @@ copies available. `DELETE /unit/{id}` removes a placed token; repeating it succe
 The base menu shows one **Spawn unit** button. It opens a library with independently
 collapsible PC and NPC lists. Each entry shows a name and image; selecting it
 spawns a copy on the tabletop. Knight (PC) and Goblin (NPC) are included initially.
+
+Open `http://localhost:18080/?gm=true` to show the **GM** button below the utilities.
+GM fog controls appear beneath it. Without `gm=true`, GM controls are omitted
+from the page. This URL flag selects the GM role for now; authenticated roles
+will replace it later.
+
+Use **Hide UI** in the top-right corner to hide Spawn unit, the utilities, and GM
+controls. The button stays visible as **Show UI** to bring them back. This affects
+only your browser and leaves your selected tool active.
+
+GM users can select **Fog of war** (the fog icon) and drag to paint an 80 px brush
+over the grid and tokens. **Erase fog** removes just the brushed area with a 40 px
+eraser, leaving the rest of the fog in place. Pen drawings have their own eraser.
+Right-click either fog button to adjust brush and eraser thickness.
+The pen, fog brush, and fog eraser show an outline at the cursor matching their
+selected thickness. It scales with the grid and stays visible over fog and tokens.
+Fog painting and partial erasure sync to every board and remain after refresh or
+GM disconnection. Brush sizes scale with the grid. Fog lives in server memory and
+resets on server restart. Fog is translucent (35% opacity) for GMs and fully opaque
+for players. Only WebSocket clients using `gm=true` may edit fog.
 
 **Ruler**, **Pen**, **Eraser**, and **Ping** appear as separate square icon buttons
 in a vertical toolbar below Spawn unit, with Eraser immediately below Pen.

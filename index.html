@@ -5,9 +5,9 @@
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>VTT</title>
         <script src="https://unpkg.com/htmx.org"></script>
-        <link rel="stylesheet" href="/static/style.css?v=24">
+        <link rel="stylesheet" href="/static/style.css?v=28">
     </head>
-    <body>
+    <body data-gm="{{ .IsGM }}">
         <div 
             id="loadExistingUnits"
             hx-get="/loadExistingUnits"
@@ -29,17 +29,41 @@
             hx-target = "#grid-container" 
             hx-swap="beforeend">
         </div>
+        <button type="button" id="toggle-ui-controls" aria-expanded="true" aria-controls="ui-overlay" title="Hide controls">Hide UI</button>
         <div id="ui-overlay">
             {{ template "spawn-controls" . }}
             {{ template "utilities-controls" false }}
+            {{ if .IsGM }}
+            <button type="button" id="gm-button" title="GM">GM</button>
+            <div id="gm-controls" role="group" aria-label="GM utilities">
+                <button type="button" id="utility-fog" class="utility-button" title="Fog of war (right-click for settings)" aria-label="Fog of war" aria-pressed="false" aria-expanded="false" aria-controls="fog-settings">
+                    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                        <path d="M5 11a4 4 0 0 1 1-8 5 5 0 0 1 9 1 3.5 3.5 0 1 1 3 7M3 15h18M5 19h14M8 23h8"/>
+                    </svg>
+                </button>
+                <button type="button" id="utility-fog-eraser" class="utility-button" title="Erase fog (right-click for settings)" aria-label="Erase fog" aria-pressed="false" aria-expanded="false" aria-controls="fog-settings">
+                    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                        <path d="M3 5h18M5 9h14m-7 12-6-6 8-8 7 7-7 7zM11 11l7 7M12 21h9"/>
+                    </svg>
+                </button>
+                <div id="fog-settings" role="group" aria-label="Fog brush settings" hidden>
+                    <label for="fog-width">Brush thickness <output id="fog-width-value" for="fog-width">80 px</output></label>
+                    <input type="range" id="fog-width" min="20" max="240" step="10" value="80">
+                    <label for="fog-eraser-width">Eraser thickness <output id="fog-eraser-width-value" for="fog-eraser-width">40 px</output></label>
+                    <input type="range" id="fog-eraser-width" min="10" max="120" step="10" value="40">
+                </div>
+            </div>
+            {{ end }}
         </div>
         <div class="grid-wrapper">
             <svg id="drawing-layer" viewBox="0 0 64 64" preserveAspectRatio="none" aria-hidden="true" focusable="false"></svg>
             <div id = "grid-container" class="grid"></div>
             <div id="ping-layer" aria-hidden="true"></div>
             <div id="ruler-layer"></div>
+            <canvas id="fog-layer" width="2560" height="2560" aria-hidden="true"></canvas>
         </div>
         <div id="unitOverlay" class="unitOverlay"></div>
+        <div id="brush-cursor" aria-hidden="true" hidden></div>
         <div id="token-menu" class="token-menu" role="group" aria-label="Unit actions" hidden>
             <button type="button" id="toggle-token-statuses" aria-expanded="false" aria-controls="token-statuses">Status</button>
             <div class="token-resize-buttons" role="group" aria-label="Resize unit">
@@ -56,12 +80,16 @@
         </div>
         <div id="token-status-tooltip" class="token-status-tooltip" role="tooltip" hidden></div>
         <script type="application/json" id="unit-sizes">{{ .UnitSizes }}</script>
+        <script src="/static/pan.js?v=1"></script>
         <script src="/static/tokenMenu.js?v=6"></script>
         <script src="/static/movement.js?v=1"></script>
-        <script src="/static/drag.js?v=9"></script>
-        <script src="/static/updateClients.js?v=12"></script>
-        <script src="/static/utilities.js?v=8"></script>
+        <script src="/static/drag.js?v=10"></script>
+        <script src="/static/updateClients.js?v=13"></script>
+        <script src="/static/utilities.js?v=9"></script>
         <script src="/static/pen.js?v=3"></script>
+        <script src="/static/fog.js?v=1"></script>
+        <script src="/static/brushCursor.js?v=2"></script>
+        <script src="/static/ui.js?v=1"></script>
         <script src="/static/imageFit.js?v=2"></script>
     </body>
 </html>

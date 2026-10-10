@@ -25,6 +25,7 @@ type WebSocketHandler struct {
 	rulers             map[string]boardRuler
 	strokes            map[string]penStroke
 	erasedStrokes      map[string]bool
+	fogMarks           []fogMark
 }
 
 func NewWebSocketHandler(state *app.AppState) *WebSocketHandler {
@@ -187,7 +188,7 @@ func (h *WebSocketHandler) updateBoardUtilityValues(w http.ResponseWriter, r *ht
 		log.Println("Send initial board state:", err)
 		return
 	}
-	h.readBoardUtilitiesMessages(conn, sessionID)
+	h.readBoardUtilitiesMessages(conn, sessionID, r.URL.Query().Get("gm") == "true")
 }
 
 // Registration and the initial state share a lock so live updates cannot
@@ -209,20 +210,30 @@ func (h *WebSocketHandler) registerBoardUtilitiesClient(conn *websocket.Conn, se
 			return err
 		}
 	}
+	if len(h.fogMarks) > 0 {
+		if err := conn.WriteJSON(map[string]string{"type": "fogReset"}); err != nil {
+			return err
+		}
+		for _, mark := range h.fogMarks {
+			if err := conn.WriteJSON(mark); err != nil {
+				return err
+			}
+		}
+	}
 	return nil
 }
 
-func (h *WebSocketHandler) readBoardUtilitiesMessages(conn *websocket.Conn, sessionID string) {
+func (h *WebSocketHandler) readBoardUtilitiesMessages(conn *websocket.Conn, sessionID string, isGM bool) {
 	for {
 		_, data, err := conn.ReadMessage()
 		if err != nil {
 			return
 		}
-		h.handleBoardUtilitiesMessage(sessionID, data)
+		h.handleBoardUtilitiesMessage(sessionID, data, isGM)
 	}
 }
 
-func (h *WebSocketHandler) handleBoardUtilitiesMessage(sessionID string, data []byte) {
+func (h *WebSocketHandler) handleBoardUtilitiesMessage(sessionID string, data []byte, isGM bool) {
 	var message struct {
 		Type string `json:"type"`
 	}
@@ -230,6 +241,10 @@ func (h *WebSocketHandler) handleBoardUtilitiesMessage(sessionID string, data []
 		return
 	}
 	switch message.Type {
+	case "fogMark":
+		if isGM {
+			h.updateFog(sessionID, data)
+		}
 	case "rulerChanged":
 		h.updateRuler(sessionID, data)
 	case "penStroke":

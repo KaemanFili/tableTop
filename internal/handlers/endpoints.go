@@ -54,7 +54,8 @@ func (h *EndpointHandler) index(w http.ResponseWriter, r *http.Request) {
 		spawnMenuData
 		UnitSizes    template.JS
 		UnitStatuses []app.UnitStatusOption
-	}{UnitSizes: template.JS(sizes), UnitStatuses: app.UnitStatuses()}
+		IsGM         bool
+	}{UnitSizes: template.JS(sizes), UnitStatuses: app.UnitStatuses(), IsGM: r.URL.Query().Get("gm") == "true"}
 	if err := h.indexTemplate.ExecuteTemplate(w, "index.html", data); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}

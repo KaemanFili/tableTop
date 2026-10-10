@@ -7,6 +7,8 @@
     const rulerButton = document.getElementById('utility-ruler');
     const penButton = document.getElementById('utility-pen');
     const eraserButton = document.getElementById('utility-eraser');
+    const fogButton = document.getElementById('utility-fog');
+    const fogEraserButton = document.getElementById('utility-fog-eraser');
     const rulerLayer = document.getElementById('ruler-layer');
     const rulers = new Map();
     let rulerID = null;
@@ -59,6 +61,8 @@
         rulerButton.setAttribute('aria-pressed', String(tool === 'ruler'));
         penButton.setAttribute('aria-pressed', String(tool === 'pen'));
         eraserButton.setAttribute('aria-pressed', String(tool === 'eraser'));
+        fogButton?.setAttribute('aria-pressed', String(tool === 'fog'));
+        fogEraserButton?.setAttribute('aria-pressed', String(tool === 'fog-eraser'));
         error.hidden = true;
         measuring = false;
         document.dispatchEvent(new CustomEvent('toolChanged', {detail: {tool}}));
@@ -68,6 +72,12 @@
         const button = event.target.closest('.utility-button');
         if (!button) return;
         const tool = button === pingButton ? 'ping' : button === rulerButton ? 'ruler' : button === penButton ? 'pen' : button === eraserButton ? 'eraser' : '';
+        selectTool(document.body.dataset.tool === tool ? '' : tool);
+    });
+    document.getElementById('gm-controls')?.addEventListener('click', event => {
+        const button = event.target.closest('.utility-button');
+        if (!button) return;
+        const tool = button === fogButton ? 'fog' : 'fog-eraser';
         selectTool(document.body.dataset.tool === tool ? '' : tool);
     });
     document.addEventListener('keydown', event => {

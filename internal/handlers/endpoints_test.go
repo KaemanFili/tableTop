@@ -33,6 +33,40 @@ func TestIndexRendersSpawnControls(t *testing.T) {
 	}
 }
 
+func TestGMButtonVisibilityIsPerRequest(t *testing.T) {
+	t.Chdir("../..")
+	state := app.NewState()
+	handler := NewEndpointHandler(state, NewWebSocketHandler(state), newTestLibrary(t))
+	mux := http.NewServeMux()
+	handler.RegisterRoutes(mux)
+	for _, test := range []struct {
+		url  string
+		isGM bool
+	}{
+		{"/", false},
+		{"/?gm=true", true},
+		{"/?gm=false", false},
+		{"/?gm=", false},
+		{"/?gm=invalid", false},
+		{"/?other=value&gm=true", true},
+		{"/", false},
+	} {
+		response := httptest.NewRecorder()
+		mux.ServeHTTP(response, httptest.NewRequest(http.MethodGet, test.url, nil))
+		if response.Code != http.StatusOK {
+			t.Fatalf("%s: index status = %d, want 200", test.url, response.Code)
+		}
+		if visible := strings.Contains(response.Body.String(), `id="gm-button"`); visible != test.isGM {
+			t.Errorf("%s: GM button visible = %t, want %t", test.url, visible, test.isGM)
+		}
+		for _, id := range []string{"utility-fog", "utility-fog-eraser"} {
+			if visible := strings.Contains(response.Body.String(), `id="`+id+`"`); visible != test.isGM {
+				t.Errorf("%s: %s visible = %t, want %t", test.url, id, visible, test.isGM)
+			}
+		}
+	}
+}
+
 func newTestLibrary(t *testing.T) *app.UnitLibrary {
 	t.Helper()
 	library, err := app.NewUnitLibrary(t.TempDir())
