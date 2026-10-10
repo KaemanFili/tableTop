@@ -7,8 +7,9 @@ import (
 )
 
 type boardPing struct {
-	X *int `json:"x"`
-	Y *int `json:"y"`
+	X          *int   `json:"x"`
+	Y          *int   `json:"y"`
+	Generation uint64 `json:"generation"`
 }
 
 func (h *EndpointHandler) pingBoard(w http.ResponseWriter, r *http.Request) {
@@ -29,6 +30,13 @@ func (h *EndpointHandler) pingBoard(w http.ResponseWriter, r *http.Request) {
 		Type string `json:"type"`
 		boardPing
 	}{"boardPing", ping})
-	h.webSocketHandler.broadcastUnits(data)
+	ws := h.webSocketHandler
+	ws.unitCreatedMutex.Lock()
+	defer ws.unitCreatedMutex.Unlock()
+	if ping.Generation != ws.boardGeneration {
+		w.WriteHeader(http.StatusConflict)
+		return
+	}
+	ws.broadcastUnitsLocked(data)
 	w.WriteHeader(http.StatusNoContent)
 }

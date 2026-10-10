@@ -108,10 +108,34 @@ func (s *AppState) RemoveUnit(id string) bool {
 	return true
 }
 
+// ClearUnits keeps the ID counter so delayed client updates cannot target new tokens.
+func (s *AppState) ClearUnits() []string {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+	ids := make([]string, 0, len(s.units))
+	for id := range s.units {
+		ids = append(ids, id)
+	}
+	clear(s.units)
+	return ids
+}
+
 func (s *AppState) UnitByID(id string) (UnitData, bool) {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
 
 	unit, exists := s.units[id]
 	return unit, exists
+}
+
+// RestoreUnits assigns fresh IDs so delayed updates cannot change restored tokens.
+func (s *AppState) RestoreUnits(units []UnitData) {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+	clear(s.units)
+	for _, unit := range units {
+		s.nextUnitID++
+		unit.ID = "U" + strconv.FormatUint(s.nextUnitID, 10)
+		s.units[unit.ID] = unit
+	}
 }

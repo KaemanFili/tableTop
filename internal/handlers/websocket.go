@@ -26,6 +26,8 @@ type WebSocketHandler struct {
 	strokes            map[string]penStroke
 	erasedStrokes      map[string]bool
 	fogMarks           []fogMark
+	boardGeneration    uint64
+	currentMap         *app.MapDefinition
 }
 
 func NewWebSocketHandler(state *app.AppState) *WebSocketHandler {
@@ -197,8 +199,13 @@ func (h *WebSocketHandler) registerBoardUtilitiesClient(conn *websocket.Conn, se
 	h.unitCreatedMutex.Lock()
 	defer h.unitCreatedMutex.Unlock()
 	h.unitCreatedClients[conn] = true
-	if err := conn.WriteJSON(map[string]string{"type": "rulerSession", "id": sessionID}); err != nil {
+	if err := conn.WriteJSON(map[string]any{"type": "rulerSession", "id": sessionID, "generation": h.boardGeneration}); err != nil {
 		return err
+	}
+	if h.currentMap != nil {
+		if err := conn.WriteJSON(map[string]any{"type": "boardMapChanged", "map": h.currentMap}); err != nil {
+			return err
+		}
 	}
 	for _, ruler := range h.rulers {
 		if err := conn.WriteJSON(ruler); err != nil {
@@ -267,7 +274,7 @@ func (h *WebSocketHandler) unregisterBoardUtilitiesClient(conn *websocket.Conn, 
 		if stroke.Owner == sessionID && !stroke.Finished {
 			stroke.Finished = true
 			h.strokes[id] = stroke
-			message, _ := json.Marshal(penStroke{Type: "penStroke", ID: id, Owner: sessionID, Offset: len(stroke.Points), Finished: true, Color: stroke.Color, Width: stroke.Width})
+			message, _ := json.Marshal(penStroke{Type: "penStroke", ID: id, Owner: sessionID, Offset: len(stroke.Points), Finished: true, Color: stroke.Color, Width: stroke.Width, Generation: stroke.Generation})
 			h.broadcastUnitsLocked(message)
 		}
 	}

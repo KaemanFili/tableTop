@@ -30,7 +30,7 @@
             error.hidden = false;
             return;
         }
-        const message = {type: 'rulerChanged', clear};
+        const message = {type: 'rulerChanged', clear, generation: boardGeneration};
         if (!clear) {
             message.start = measurement.start;
             message.end = measurement.end;
@@ -76,7 +76,7 @@
     });
     document.getElementById('gm-controls')?.addEventListener('click', event => {
         const button = event.target.closest('.utility-button');
-        if (!button) return;
+        if (!button || ![fogButton, fogEraserButton].includes(button)) return;
         const tool = button === fogButton ? 'fog' : 'fog-eraser';
         selectTool(document.body.dataset.tool === tool ? '' : tool);
     });
@@ -185,6 +185,19 @@
         rulerID = null;
         for (const id of rulers.keys()) removeRuler(id);
     });
+    document.addEventListener('boardCleared', () => {
+        clearTimeout(sendTimer);
+        sendTimer = null;
+        measuring = false;
+        lastPointer = null;
+        for (const id of rulers.keys()) removeRuler(id);
+        document.body.dataset.tool = '';
+        for (const button of [pingButton, rulerButton, penButton, eraserButton, fogButton, fogEraserButton]) {
+            button?.setAttribute('aria-pressed', 'false');
+        }
+        layer.replaceChildren();
+        error.hidden = true;
+    });
 
     document.addEventListener('mousedown', event => {
         if (document.body.dataset.tool !== 'ruler' || event.button !== 0) return;
@@ -251,7 +264,7 @@
             const response = await fetch('/board/ping', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({x, y}),
+                body: JSON.stringify({x, y, generation: boardGeneration}),
             });
             if (!response.ok) throw new Error('Ping failed');
             error.hidden = true;

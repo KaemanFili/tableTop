@@ -112,6 +112,7 @@
         if (!batch) {
             const tool = document.body.dataset.tool;
             batch = {type: 'fogMark', id: String(++nextMark), mode: tool === 'fog-eraser' ? 'erase' : 'paint',
+                generation: boardGeneration,
                 width: Number(tool === 'fog-eraser' ? eraserWidth.value : brushWidth.value) / 40,
                 points: lastPoint ? [lastPoint] : []};
             pending.set(`${owner}/${batch.id}`, batch);
@@ -133,6 +134,17 @@
         confirmedContext.clearRect(0, 0, canvas.width, canvas.height);
         pending.clear();
         renderPending();
+    });
+    document.addEventListener('boardCleared', () => {
+        clearTimeout(sendTimer);
+        sendTimer = null;
+        drawing = false;
+        lastPoint = null;
+        batch = null;
+        pending.clear();
+        confirmedContext.clearRect(0, 0, canvas.width, canvas.height);
+        renderPending();
+        closeSettings();
     });
     document.addEventListener('fogMark', event => {
         const mark = event.detail;

@@ -5,22 +5,14 @@ import (
 	"math"
 	"regexp"
 	"strconv"
+	"tableTop/main/internal/app"
 )
 
 const maxStrokePoints = 8192
 
 var penColorPattern = regexp.MustCompile(`^#[0-9a-fA-F]{6}$`)
 
-type penStroke struct {
-	Type     string       `json:"type"`
-	ID       string       `json:"id"`
-	Owner    string       `json:"owner"`
-	Offset   int          `json:"offset"`
-	Points   []rulerPoint `json:"points"`
-	Finished bool         `json:"finished"`
-	Color    string       `json:"color"`
-	Width    float64      `json:"width"`
-}
+type penStroke = app.PenStroke
 
 func (h *WebSocketHandler) updatePen(owner string, data []byte) {
 	var update penStroke
@@ -42,6 +34,9 @@ func (h *WebSocketHandler) updatePen(owner string, data []byte) {
 	update.Owner = owner
 	h.unitCreatedMutex.Lock()
 	defer h.unitCreatedMutex.Unlock()
+	if update.Generation != h.boardGeneration {
+		return
+	}
 	if h.erasedStrokes[update.ID] {
 		return
 	}
@@ -59,7 +54,7 @@ func (h *WebSocketHandler) updatePen(owner string, data []byte) {
 		if !penColorPattern.MatchString(update.Color) || math.IsNaN(update.Width) || math.IsInf(update.Width, 0) || update.Width < 1 || update.Width > 12 {
 			return
 		}
-		stroke = penStroke{Type: "penStroke", ID: update.ID, Owner: owner, Color: update.Color, Width: update.Width}
+		stroke = penStroke{Type: "penStroke", ID: update.ID, Owner: owner, Color: update.Color, Width: update.Width, Generation: update.Generation}
 	}
 	if stroke.Finished || update.Offset != len(stroke.Points) || len(stroke.Points)+len(update.Points) > maxStrokePoints {
 		return

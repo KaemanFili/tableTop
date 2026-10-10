@@ -188,6 +188,7 @@
         close();
     }, true);
     window.addEventListener('resize', close);
+    document.addEventListener('boardCleared', close);
     document.addEventListener('htmx:beforeSwap', event => {
         if (event.detail.target === overlay) close();
     });

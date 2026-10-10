@@ -18,6 +18,83 @@ body, html {
   background-color: darkgray;
 }
 
+#map-layer {
+  position: absolute;
+  z-index: 0;
+  max-width: none;
+  pointer-events: none;
+}
+
+#map-editor {
+  position: fixed;
+  top: 1rem;
+  left: min(160px, 1rem);
+  width: min(480px, calc(100vw - 2rem));
+  max-height: calc(100dvh - 2rem);
+  z-index: 2;
+}
+
+@media (min-width: 700px) {
+  #map-editor { left: 160px; }
+}
+
+#create-map-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+#create-map-form input:not([type="checkbox"]) {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0.5rem;
+  background: #303030;
+  border: 1px solid #666;
+  border-radius: 4px;
+  color: white;
+}
+
+#create-map-form fieldset {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  min-width: 0;
+  border: 1px solid #555;
+}
+
+#map-preview {
+  max-height: 280px;
+  overflow: auto;
+  overscroll-behavior: contain;
+  background: #888;
+}
+
+#map-preview-board {
+  position: relative;
+  width: 1024px;
+  height: 1024px;
+}
+
+#map-preview-board::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: linear-gradient(to right, #ffffff60 1px, transparent 1px),
+    linear-gradient(to bottom, #ffffff60 1px, transparent 1px);
+  background-size: 16px 16px;
+  pointer-events: none;
+}
+
+#map-preview-image {
+  position: absolute;
+  max-width: none;
+  cursor: move;
+}
+
+#map-zoom-value {
+  float: right;
+}
+
 #drawing-layer {
   position: absolute;
   inset: 0;
@@ -63,9 +140,9 @@ body[data-gm="true"] #fog-layer {
   height: 36px;
   border-radius: 50%;
   background: radial-gradient(circle,
-    rgba(239, 68, 68, 0.6) 0%,
-    rgba(239, 68, 68, 0.32) 30%,
-    rgba(239, 68, 68, 0.096) 55%,
+    rgba(239, 68, 68, 0.8) 0%,
+    rgba(239, 68, 68, 0.44) 30%,
+    rgba(239, 68, 68, 0.16) 55%,
     rgba(239, 68, 68, 0) 75%);
   filter: blur(2px);
   transform: translate(-50%, -50%);
@@ -309,7 +386,8 @@ body.map-panning * {
 #ui-overlay button,
 #ui-overlay .spawn-menu,
 #pen-settings,
-#fog-settings {
+#fog-settings,
+#map-options {
   pointer-events: auto;
 }
 
@@ -385,7 +463,8 @@ body.map-panning * {
 }
 
 #pen-settings,
-#fog-settings {
+#fog-settings,
+#map-options {
   position: fixed;
   width: 190px;
   box-sizing: border-box;
@@ -396,6 +475,47 @@ body.map-panning * {
   color: white;
   box-shadow: 0 4px 12px #0006;
   font: 14px/1.4 system-ui, sans-serif;
+}
+
+#map-options {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+#map-options[hidden] {
+  display: none;
+}
+
+#map-options button {
+  text-align: left;
+}
+
+#clear-map {
+  margin-top: 10px;
+}
+
+.saved-map-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.saved-map {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-align: left;
+}
+
+.saved-map img {
+  width: 64px;
+  height: 48px;
+  object-fit: contain;
+}
+
+.saved-map small {
+  display: block;
 }
 
 #pen-settings label,

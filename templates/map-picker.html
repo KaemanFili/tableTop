@@ -1,0 +1,19 @@
+{{ define "map-picker" }}
+<div class="spawn-menu-heading">
+    <h2>Load Map</h2>
+    <button type="button" data-close-map-editor>Cancel</button>
+</div>
+<p>Choose a saved map to replace the current board.</p>
+<p id="map-picker-error" class="menu-error" role="alert" hidden></p>
+<div class="saved-map-list">
+{{ range . }}
+    <button type="button" class="saved-map" data-load-map hx-post="/map-library/{{ .ID }}/load?gm=true"
+        hx-target="#map-editor" hx-swap="innerHTML" hx-disabled-elt="#map-editor [data-load-map]">
+        <img src="/maps/images/{{ .ID }}" alt="" loading="lazy">
+        <span>{{ .Name }}{{ if not .Board }}<small>Image only</small>{{ end }}</span>
+    </button>
+{{ else }}
+    <p>No saved maps yet. Use Create New Map to add one.</p>
+{{ end }}
+</div>
+{{ end }}

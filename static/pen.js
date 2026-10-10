@@ -97,6 +97,7 @@
                 type: 'penStroke', id: active.clientID, offset: active.sent, points,
                 finished: finished && active.pending.length === 0,
                 color: active.color, width: active.width,
+                generation: boardGeneration,
             }));
             active.sent += points.length;
         } while (active.pending.length);
@@ -199,6 +200,17 @@
         if (stroke.points?.length) appendPoints(stroke.id, stroke.points, stroke);
     });
     document.addEventListener('penErased', event => event.detail.ids.forEach(removeStroke));
+    document.addEventListener('boardCleared', () => {
+        clearTimeout(sendTimer);
+        sendTimer = null;
+        active = null;
+        erasing = false;
+        lastErasePoint = null;
+        strokes.clear();
+        erasedIDs.clear();
+        layer.replaceChildren();
+        closeSettings();
+    });
     document.addEventListener('rulerDisconnected', () => {
         clearTimeout(sendTimer);
         sendTimer = null;

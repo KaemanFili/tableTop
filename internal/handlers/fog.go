@@ -4,17 +4,11 @@ import (
 	"encoding/json"
 	"math"
 	"strconv"
+	"tableTop/main/internal/app"
 )
 
 // Paint and erasure are ordered brush marks; replaying them restores partial holes.
-type fogMark struct {
-	Type   string       `json:"type"`
-	ID     string       `json:"id"`
-	Owner  string       `json:"owner"`
-	Mode   string       `json:"mode"`
-	Width  float64      `json:"width"`
-	Points []rulerPoint `json:"points"`
-}
+type fogMark = app.FogMark
 
 func (h *WebSocketHandler) updateFog(owner string, data []byte) {
 	var mark fogMark
@@ -35,6 +29,9 @@ func (h *WebSocketHandler) updateFog(owner string, data []byte) {
 	mark.ID, mark.Owner = owner+"/"+mark.ID, owner
 	h.unitCreatedMutex.Lock()
 	defer h.unitCreatedMutex.Unlock()
+	if mark.Generation != h.boardGeneration {
+		return
+	}
 	h.fogMarks = append(h.fogMarks, mark)
 	message, _ := json.Marshal(mark)
 	h.broadcastUnitsLocked(message)

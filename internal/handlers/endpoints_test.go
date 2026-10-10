@@ -59,7 +59,7 @@ func TestGMButtonVisibilityIsPerRequest(t *testing.T) {
 		if visible := strings.Contains(response.Body.String(), `id="gm-button"`); visible != test.isGM {
 			t.Errorf("%s: GM button visible = %t, want %t", test.url, visible, test.isGM)
 		}
-		for _, id := range []string{"utility-fog", "utility-fog-eraser"} {
+		for _, id := range []string{"utility-map", "utility-fog", "utility-fog-eraser"} {
 			if visible := strings.Contains(response.Body.String(), `id="`+id+`"`); visible != test.isGM {
 				t.Errorf("%s: %s visible = %t, want %t", test.url, id, visible, test.isGM)
 			}

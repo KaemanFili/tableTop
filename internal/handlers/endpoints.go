@@ -17,17 +17,22 @@ type EndpointHandler struct {
 	unitTemplate     *template.Template
 	indexTemplate    *template.Template
 	library          *app.UnitLibrary
+	mapLibrary       *app.MapLibrary
 }
 
-func NewEndpointHandler(state *app.AppState, webSocketHandler *WebSocketHandler, library *app.UnitLibrary) *EndpointHandler {
-	return &EndpointHandler{
+func NewEndpointHandler(state *app.AppState, webSocketHandler *WebSocketHandler, library *app.UnitLibrary, maps ...*app.MapLibrary) *EndpointHandler {
+	handler := &EndpointHandler{
 		library:          library,
 		state:            state,
 		webSocketHandler: webSocketHandler,
 		gridTemplate:     template.Must(template.ParseFiles("templates/grid.html")),
 		unitTemplate:     template.Must(template.ParseFiles("templates/unit.html")),
-		indexTemplate:    template.Must(template.ParseFiles("index.html", "templates/spawn-menu.html", "templates/utilities.html")),
+		indexTemplate:    template.Must(template.ParseFiles("index.html", "templates/spawn-menu.html", "templates/utilities.html", "templates/map-editor.html", "templates/map-picker.html")),
 	}
+	if len(maps) > 0 {
+		handler.mapLibrary = maps[0]
+	}
+	return handler
 }
 
 func (h *EndpointHandler) RegisterRoutes(mux *http.ServeMux) {
@@ -40,6 +45,13 @@ func (h *EndpointHandler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /unit/{id}/size", h.resizeUnit)
 	mux.HandleFunc("POST /unit/{id}/status", h.setUnitStatus)
 	mux.HandleFunc("POST /board/ping", h.pingBoard)
+	mux.HandleFunc("POST /board/clear", h.clearBoard)
+	mux.HandleFunc("POST /board/save", h.saveBoard)
+	mux.HandleFunc("GET /map-library/new", h.newMapForm)
+	mux.HandleFunc("GET /map-library", h.mapPicker)
+	mux.HandleFunc("POST /map-library/{id}/load", h.loadMap)
+	mux.HandleFunc("POST /map-library", h.createMap)
+	mux.HandleFunc("GET /maps/images/{id}", h.mapImage)
 	mux.HandleFunc("GET /spawn-menu", h.spawnMenu)
 	mux.HandleFunc("GET /unit-library/new", h.newUnitForm)
 	mux.HandleFunc("POST /unit-library", h.createUnit)

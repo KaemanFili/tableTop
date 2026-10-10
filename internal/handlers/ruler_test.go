@@ -61,7 +61,7 @@ func TestSharedRulersLiveUpdatesJoinClearAndDisconnect(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	line := boardRuler{Type: "rulerChanged", ID: firstID, Start: &rulerPoint{0, 0}, End: &rulerPoint{3, 4}}
+	line := boardRuler{Type: "rulerChanged", ID: firstID, Start: &rulerPoint{X: 0, Y: 0}, End: &rulerPoint{X: 3, Y: 4}}
 	spoof := line
 	spoof.ID = secondID
 	if err := first.WriteJSON(spoof); err != nil {
@@ -72,14 +72,14 @@ func TestSharedRulersLiveUpdatesJoinClearAndDisconnect(t *testing.T) {
 	// New users receive the state of rulers currently displayed.
 	third, _ := connect()
 	read(third, line)
-	line.End = &rulerPoint{6, 8}
+	line.End = &rulerPoint{X: 6, Y: 8}
 	if err := first.WriteJSON(line); err != nil {
 		t.Fatal(err)
 	}
 	for _, conn := range []*websocket.Conn{first, second, third} {
 		read(conn, line)
 	}
-	other := boardRuler{Type: "rulerChanged", ID: secondID, Start: &rulerPoint{2.5, 3}, End: &rulerPoint{4, 5}}
+	other := boardRuler{Type: "rulerChanged", ID: secondID, Start: &rulerPoint{X: 2.5, Y: 3}, End: &rulerPoint{X: 4, Y: 5}}
 	if err := second.WriteJSON(other); err != nil {
 		t.Fatal(err)
 	}

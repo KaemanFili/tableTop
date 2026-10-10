@@ -3,21 +3,13 @@ package handlers
 import (
 	"encoding/json"
 	"math"
+	"tableTop/main/internal/app"
 )
 
 // Coordinates are grid squares so every board uses the same distance and location.
-type rulerPoint struct {
-	X float64 `json:"x"`
-	Y float64 `json:"y"`
-}
+type rulerPoint = app.BoardPoint
 
-type boardRuler struct {
-	Type  string      `json:"type"`
-	ID    string      `json:"id"`
-	Start *rulerPoint `json:"start,omitempty"`
-	End   *rulerPoint `json:"end,omitempty"`
-	Clear bool        `json:"clear,omitempty"`
-}
+type boardRuler = app.BoardRuler
 
 func validRulerPoint(point *rulerPoint) bool {
 	return point != nil && !math.IsNaN(point.X) && !math.IsNaN(point.Y) &&
@@ -39,6 +31,9 @@ func (h *WebSocketHandler) updateRuler(id string, data []byte) {
 	}
 	h.unitCreatedMutex.Lock()
 	defer h.unitCreatedMutex.Unlock()
+	if ruler.Generation != h.boardGeneration {
+		return
+	}
 	if ruler.Clear {
 		delete(h.rulers, id)
 	} else {

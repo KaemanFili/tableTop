@@ -53,6 +53,7 @@
     }
     document.addEventListener('toolChanged', refresh);
     document.addEventListener('viewPanChanged', refresh);
+    document.addEventListener('boardCleared', hide);
     document.addEventListener('scroll', refresh, true);
     document.addEventListener('htmx:afterSwap', refresh);
     window.addEventListener('resize', refresh);

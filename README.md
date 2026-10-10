@@ -77,6 +77,44 @@ GM fog controls appear beneath it. Without `gm=true`, GM controls are omitted
 from the page. This URL flag selects the GM role for now; authenticated roles
 will replace it later.
 
+The GM controls include a square folded-map button with a **Map Options** tooltip.
+Click it to open **Load Map**, **Save Map**, **Create New Map**, and **Clear Map**,
+with Clear Map spaced apart at the bottom. Clear Map removes
+all placed tokens, pen drawings, fog, rulers, and active pings for every connected
+user, including the displayed map background. Saved maps, the unit library, and
+artwork remain available. Load Map opens the saved map library. Selecting a map
+replaces the board for all connected users with its saved image and contents.
+Maps created before saving board content load their image onto an empty board. Click the icon
+again, click outside, or press Escape
+to close the menu.
+
+Clearing advances the board's generation number. Drawing and ping messages carry
+that number so delayed updates from the previous board are discarded instead of
+restoring cleared content. Connected clients cancel active gestures and pending
+drawing batches when they receive `boardCleared`.
+
+**Create New Map** opens a form with a name, image upload, and a grid preview.
+Drag the preview image to align it with the grid, and use the Zoom slider to resize
+it while preserving its proportions, like the unit image editor. Arrow keys move
+the image; Shift moves it farther. Fit image resets the size and position, and
+Center image centers it on the board. The map fits within the current 64 × 64 board
+without preset size categories. **Save and Use Map** stores the
+image and dimensions, then displays it beneath the grid, drawings, and tokens on
+every board. Existing tokens and drawings remain in place. Cancel discards the form.
+PNG, JPEG, and GIF images up to 10 MB and 4096 × 4096 pixels are supported.
+Saved maps live in `data/maps.json` and `data/maps/`; the currently displayed map
+is kept in memory and resets when the server restarts.
+
+**Save Map** updates the currently displayed map's saved entry with all placed
+tokens (including positions, sizes, statuses, and image framing), pen strokes,
+ordered fog paint and erasure, and visible rulers. It retains the map artwork and
+grid alignment. Repeated saves replace the previous board content for that map;
+Clear Map leaves the saved entry intact. Temporary pings and personal UI settings
+are excluded. Create a map before saving. The board content is stored alongside
+its map definition in `data/maps.json`, with the original image in `data/maps/`
+and token artwork in `data/images/` or `static/images/`. Keep these together when
+backing up. Use Load Map to restore this content, including after a server restart.
+
 Use **Hide UI** in the top-right corner to hide Spawn unit, the utilities, and GM
 controls. The button stays visible as **Show UI** to bring them back. This affects
 only your browser and leaves your selected tool active.
@@ -194,3 +232,8 @@ These follow the [D&D Creature Size and Space table](https://www.dndbeyond.com/s
 The built-in Knight is Medium and Goblin is Small. Existing saved definitions
 without a size load as Medium, preserving their previous one-square footprint.
 Sizes persist with the library and are retained when tokens move or reload.
+
+## Todo
+
+- [ ] Add an option to delete saved units from the unit library.
+- [ ] Add an option to delete saved maps from the map library.

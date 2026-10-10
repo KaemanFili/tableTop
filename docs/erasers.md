@@ -111,6 +111,7 @@ The erase action is sent as a brush mark. This example uses a client-local ID:
 ```json
 {
   "type": "fogMark",
+  "generation": 0,
   "id": "7",
   "mode": "erase",
   "width": 1,
@@ -163,6 +164,12 @@ Both systems keep their state in server memory, survive the author's
 disconnection, and reset when the server restarts. Fog stores its operation
 history, which grows with painting and erasing; pen deletion removes the stroke
 data while retaining its removed ID.
+
+**Clear Map** also empties both drawing systems and cancels active drawing on
+connected boards. It advances a board generation number carried by drawing
+messages. The server rejects messages from an earlier generation, so a delayed
+pen or fog batch cannot restore cleared content. The example above uses generation
+zero; after a clear, clients use the new generation sent by the server.
 
 GM and player fog opacity is a CSS setting on the same canvas: 35% for GMs and
 100% for players. It changes how visible the remaining fog is, not which pixels

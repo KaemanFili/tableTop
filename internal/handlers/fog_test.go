@@ -38,7 +38,7 @@ func TestFogGMEditsSharedOrderAndInitialState(t *testing.T) {
 	}
 	gm, gmID := connect("?gm=true")
 	player, _ := connect("")
-	mark := fogMark{Type: "fogMark", ID: "1", Owner: "forged", Mode: "paint", Width: 2, Points: []rulerPoint{{5, 5}, {10, 5}}}
+	mark := fogMark{Type: "fogMark", ID: "1", Owner: "forged", Mode: "paint", Width: 2, Points: []rulerPoint{{X: 5, Y: 5}, {X: 10, Y: 5}}}
 	if err := player.WriteJSON(mark); err != nil {
 		t.Fatal(err)
 	}
@@ -69,7 +69,7 @@ func TestFogGMEditsSharedOrderAndInitialState(t *testing.T) {
 	for i, mode := range []string{"paint", "erase", "paint"} {
 		mark.ID, mark.Mode = []string{"1", "2", "3"}[i], mode
 		if mode == "erase" {
-			mark.Width, mark.Points = 1, []rulerPoint{{7.5, 5}}
+			mark.Width, mark.Points = 1, []rulerPoint{{X: 7.5, Y: 5}}
 		}
 		if err := gm.WriteJSON(mark); err != nil {
 			t.Fatal(err)

@@ -52,7 +52,7 @@ func TestPenLiveStrokesInitialStateAndDisconnect(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	points := []rulerPoint{{1, 1}, {1.5, 2}}
+	points := []rulerPoint{{X: 1, Y: 1}, {X: 1.5, Y: 2}}
 	update := penStroke{Type: "penStroke", ID: "1", Owner: secondID, Points: points, Color: "#ff3344", Width: 12}
 	if err := first.WriteJSON(update); err != nil {
 		t.Fatal(err)
@@ -65,7 +65,7 @@ func TestPenLiveStrokesInitialStateAndDisconnect(t *testing.T) {
 	if err := first.WriteJSON(update); err != nil {
 		t.Fatal(err)
 	}
-	update.Offset, update.Points, update.Finished = 2, []rulerPoint{{3, 4}}, true
+	update.Offset, update.Points, update.Finished = 2, []rulerPoint{{X: 3, Y: 4}}, true
 	// Changing settings during an existing stroke must not restyle it.
 	update.Color, update.Width = "#00ff00", 1
 	if err := first.WriteJSON(update); err != nil {
@@ -75,10 +75,10 @@ func TestPenLiveStrokesInitialStateAndDisconnect(t *testing.T) {
 	read(first, expected)
 	read(second, expected)
 	third, _ := connect()
-	initialStroke := penStroke{Type: "penStroke", ID: firstID + "/1", Owner: firstID, Points: append(points, rulerPoint{3, 4}), Finished: true, Color: expected.Color, Width: expected.Width}
+	initialStroke := penStroke{Type: "penStroke", ID: firstID + "/1", Owner: firstID, Points: append(points, rulerPoint{X: 3, Y: 4}), Finished: true, Color: expected.Color, Width: expected.Width}
 	read(third, initialStroke)
 	// Another user's identical client stroke number produces an independent path.
-	other := penStroke{Type: "penStroke", ID: "1", Points: []rulerPoint{{6, 7}}}
+	other := penStroke{Type: "penStroke", ID: "1", Points: []rulerPoint{{X: 6, Y: 7}}}
 	if err := second.WriteJSON(other); err != nil {
 		t.Fatal(err)
 	}
@@ -128,7 +128,7 @@ func TestEraserSyncsRemovalAndPreventsLateStrokeResurrection(t *testing.T) {
 		}
 	}
 	for _, id := range []string{"1", "2"} {
-		update := penStroke{Type: "penStroke", ID: id, Points: []rulerPoint{{2, 3}}}
+		update := penStroke{Type: "penStroke", ID: id, Points: []rulerPoint{{X: 2, Y: 3}}}
 		if err := first.WriteJSON(update); err != nil {
 			t.Fatal(err)
 		}
@@ -158,7 +158,7 @@ func TestEraserSyncsRemovalAndPreventsLateStrokeResurrection(t *testing.T) {
 		}
 	}
 	for _, offset := range []int{0, 1} {
-		if err := first.WriteJSON(penStroke{Type: "penStroke", ID: "1", Offset: offset, Points: []rulerPoint{{4, 5}}}); err != nil {
+		if err := first.WriteJSON(penStroke{Type: "penStroke", ID: "1", Offset: offset, Points: []rulerPoint{{X: 4, Y: 5}}}); err != nil {
 			t.Fatal(err)
 		}
 	}
