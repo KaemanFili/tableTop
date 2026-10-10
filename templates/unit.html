@@ -1,9 +1,10 @@
 {{ define "unit" }}
 <div class="unit" 
     id="{{.ID}}" 
-    title="{{if .Name}}{{.Name}}{{else}}Unit {{.ID}}{{end}} — {{.Size.Label}}"
+    title="{{if .Name}}{{.Name}}{{else}}Unit {{.ID}}{{end}}&#10;Size: {{.Size.Label}}&#10;Status: {{if .Status}}{{.Status}}{{else}}None{{end}}"
     data-size="{{.Size}}"
-    style="left: {{.Left}}px; top: {{.Top}}px; --unit-squares: {{.Size.Squares}}; --image-zoom: {{.ImageFit.Zoom}}; --image-offset-x: {{.ImageFit.OffsetX}}%; --image-offset-y: {{.ImageFit.OffsetY}}%;">
+    data-status="{{.Status}}"
+    style="left: {{.Left}}px; top: {{.Top}}px; --unit-squares: {{.Size.Squares}}; --image-zoom: {{.ImageFit.Zoom}}; --image-offset-x: {{.ImageFit.OffsetX}}%; --image-offset-y: {{.ImageFit.OffsetY}}%; --unit-status-color: {{.Status.Color}};">
     <img class="unit-image" src="/images/{{.ImageID}}" alt="{{if .Name}}{{.Name}}{{else}}Unit {{.ID}}{{end}}" draggable="false">
 </div>
 {{ end }}

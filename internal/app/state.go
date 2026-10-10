@@ -12,6 +12,7 @@ type UnitData struct {
 	ImageID  string
 	Name     string
 	UnitType string
+	Status   UnitStatus
 	Size     UnitSize
 	ImageFit ImageFit
 }

@@ -35,7 +35,18 @@ The menu stays open beside the resized token. `POST /unit/{id}/size` accepts
 `direction=up` or `direction=down`.
 
 Remove deletes that placed token from server memory and connected boards,
-and closes its menu. Status is currently a UI placeholder. Outside
+and closes its menu. Status toggles a grid of colored D&D condition
+circles above the token (below it when there is no room above). Hover or focus a
+circle to see its name. The grid has six statuses per row, with the remaining
+statuses on the last row. Opening the picker leaves names hidden; press Down on
+Status to focus the first circle, then use Left/Right, Home, and End to move
+between circles. Selecting a circle applies that status to the placed token,
+adds a border in its color, and shows the name, size, and status on separate
+lines on hover. Blinded uses deep blue, Deafened coral, Incapacitated burgundy,
+Invisible pale cyan, and Petrified sandstone to distinguish the former gray tones. Choosing another status replaces it; choosing the selected status again
+clears it. Status changes synchronize across connected boards and page reloads,
+and reset with placed tokens on server restart. Escape closes the status row first and returns focus to
+Status; pressing Escape again closes the action menu. Outside
 clicks, Escape, dragging, scrolling, resizing the window, and board replacement
 close the menu. Removal keeps the saved library entry, shared artwork, and other
 copies available. `DELETE /unit/{id}` removes a placed token; repeating it succeeds.

@@ -54,6 +54,15 @@ body, html {
   cursor: grab;
   pointer-events: auto; /* make it draggable */
 }
+.unit::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border: 3px solid var(--unit-status-color, transparent);
+  border-radius: inherit;
+  box-sizing: border-box;
+  pointer-events: none;
+}
 .unit.dragging {
   transition: none;
 }
@@ -109,6 +118,64 @@ body, html {
   background: #202020;
   color: #fecaca;
   font: 12px/1.4 system-ui, sans-serif;
+}
+
+.token-statuses {
+  position: fixed;
+  z-index: 1110;
+  display: grid;
+  grid-template-columns: repeat(6, 24px);
+  gap: 8px;
+  box-sizing: border-box;
+  width: max-content;
+  max-width: calc(100vw - 16px);
+  overflow-x: auto;
+  padding: 8px;
+  border: 1px solid #555;
+  border-radius: 8px;
+  background: #202020;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+  pointer-events: auto;
+}
+.token-statuses[hidden],
+.token-status-tooltip[hidden] {
+  display: none;
+}
+.status-circle {
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 2px solid rgba(255, 255, 255, 0.5);
+  border-radius: 50%;
+  background: var(--status-color);
+  cursor: pointer;
+}
+.status-circle[aria-pressed="true"] {
+  border-color: white;
+  box-shadow: 0 0 0 2px #202020, 0 0 0 4px var(--status-color);
+}
+.status-circle:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+.status-circle:hover,
+.status-circle:focus-visible {
+  border-color: white;
+  outline: 2px solid #fbbf24;
+  outline-offset: 2px;
+}
+.token-status-tooltip {
+  position: fixed;
+  z-index: 1120;
+  box-sizing: border-box;
+  max-width: calc(100vw - 16px);
+  padding: 5px 8px;
+  border: 1px solid #666;
+  border-radius: 5px;
+  background: #121212;
+  color: #f5f5f5;
+  font: 12px/1.4 system-ui, sans-serif;
+  pointer-events: none;
 }
 
 .unit-image {
