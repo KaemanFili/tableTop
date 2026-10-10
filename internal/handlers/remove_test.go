@@ -35,6 +35,7 @@ func TestRemoveUnitUpdatesStateAndConnectedClients(t *testing.T) {
 			t.Fatal(err)
 		}
 		defer conn.Close()
+		readRulerSession(t, conn)
 		clients = append(clients, conn)
 	}
 	response := httptest.NewRecorder()

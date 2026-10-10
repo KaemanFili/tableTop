@@ -30,6 +30,7 @@ func TestStatusUpdatesConnectedBoardAndReload(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer conn.Close()
+	readRulerSession(t, conn)
 	request := func(id, body string, want int) unitStatusChange {
 		t.Helper()
 		req := httptest.NewRequest("POST", "/unit/"+id+"/status", strings.NewReader(body))
@@ -58,14 +59,14 @@ func TestStatusUpdatesConnectedBoardAndReload(t *testing.T) {
 		return change
 	}
 	change := request(token.ID, "status=Poisoned", 204)
-	if change.ID != token.ID || change.Status != "Poisoned" || change.Color != "#84cc16" {
+	if change.ID != token.ID || change.Status != "Poisoned" || change.Color != app.UnitStatus("Poisoned").Color() {
 		t.Fatalf("wrong status: %+v", change)
 	}
 	state.UpdateUnitPosition(token.ID, 200, 250)
 	state.ResizeUnit(token.ID, "up")
 	board := httptest.NewRecorder()
 	mux.ServeHTTP(board, httptest.NewRequest("GET", "/loadExistingUnits", nil))
-	for _, expected := range []string{`data-status="Poisoned"`, `--unit-status-color: #84cc16`, `Goblin&#10;Size: Medium&#10;Status: Poisoned`} {
+	for _, expected := range []string{`data-status="Poisoned"`, `--unit-status-color: ` + app.UnitStatus("Poisoned").Color(), `Goblin&#10;Size: Medium&#10;Status: Poisoned`} {
 		if !strings.Contains(board.Body.String(), expected) {
 			t.Fatalf("reload missing %q: %s", expected, board.Body.String())
 		}

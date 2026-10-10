@@ -26,7 +26,7 @@ func NewEndpointHandler(state *app.AppState, webSocketHandler *WebSocketHandler,
 		webSocketHandler: webSocketHandler,
 		gridTemplate:     template.Must(template.ParseFiles("templates/grid.html")),
 		unitTemplate:     template.Must(template.ParseFiles("templates/unit.html")),
-		indexTemplate:    template.Must(template.ParseFiles("index.html", "templates/spawn-menu.html")),
+		indexTemplate:    template.Must(template.ParseFiles("index.html", "templates/spawn-menu.html", "templates/utilities.html")),
 	}
 }
 
@@ -39,6 +39,7 @@ func (h *EndpointHandler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("DELETE /unit/{id}", h.removeUnit)
 	mux.HandleFunc("POST /unit/{id}/size", h.resizeUnit)
 	mux.HandleFunc("POST /unit/{id}/status", h.setUnitStatus)
+	mux.HandleFunc("POST /board/ping", h.pingBoard)
 	mux.HandleFunc("GET /spawn-menu", h.spawnMenu)
 	mux.HandleFunc("GET /unit-library/new", h.newUnitForm)
 	mux.HandleFunc("POST /unit-library", h.createUnit)

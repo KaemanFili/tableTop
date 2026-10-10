@@ -20,12 +20,22 @@ and `go vet ./...`.
 - `internal/handlers`: HTTP endpoint handlers and websocket handlers.
 - `static`: browser JavaScript and CSS.
 - `templates`: reusable HTML templates served by handlers.
+- `docs/movement.md`: movement smoothing, progress calculations, and worked examples.
 
 ## UI approach
 
 Prefer HTMX requests and server-rendered HTML templates for UI interactions.
 Keep custom JavaScript for interactions that need it, such as dragging, image
 framing previews, and the existing WebSocket synchronization.
+
+Dragging follows your mouse immediately. Position updates are sent and broadcast
+about 30 times per second; other boards blend between positions over 60 ms.
+Releasing sends the final position immediately, and older snapshots are briefly
+ignored on your board until the server confirms the drop.
+
+See [How movement smoothing works](docs/movement.md) for the before/after code,
+the progress calculation, and how token and ruler animations share
+`static/movement.js` while keeping their own drawing and lifecycle code.
 
 Right-click a placed unit to show a small menu beside it. The ↑ and ↓ arrows
 increase or decrease its size by one existing category, stopping at Tiny and
@@ -54,6 +64,27 @@ copies available. `DELETE /unit/{id}` removes a placed token; repeating it succe
 The base menu shows one **Spawn unit** button. It opens a library with independently
 collapsible PC and NPC lists. Each entry shows a name and image; selecting it
 spawns a copy on the tabletop. Knight (PC) and Goblin (NPC) are included initially.
+
+**Ruler**, **Pen**, **Eraser**, and **Ping** appear as separate square icon buttons
+in a vertical toolbar below Spawn unit, with Eraser immediately below Pen.
+Hover a button to see its name. Select **Ping**, then click the board or a token
+to show a blinking, translucent red glow with soft edges at that board position
+for every connected party. The glow disappears after 2.7 seconds. Ping stays selected for repeated clicks;
+click Ping again, choose another utility, or press Escape to return to moving
+tokens. Ping coordinates stay aligned when boards have different scroll positions.
+Pings are temporary and do not alter tokens or persist on reload. Reduced-motion
+users see a steady glow for the same duration.
+
+Select **Ruler**, press on the board or a token, and drag while holding the mouse
+button to measure a straight line. The label at the midpoint shows feet, using
+5 feet per rendered grid square, including fractional and diagonal distances.
+Release to keep the measurement visible; start another drag to replace it.
+Click Ruler again, choose another tool, or press Escape to clear it. Measurements update live on every connected board, including users who join
+after a line is drawn. Updates are sent about 30 times per second, and receiving
+boards animate between positions over 50 ms to smooth movement. Each user has their own ruler; clearing yours leaves
+other rulers visible. Disconnecting removes your ruler. Coordinates use grid
+squares so all boards show the same distance and position. Rulers do not move tokens. Pen and Eraser interactions will
+be added separately.
 
 **Create new unit** opens a form for a name, unit type (`unitType=pc` or
 `unitType=npc`), D&D size, and optional artwork. Saving returns to the library without

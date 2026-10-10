@@ -32,6 +32,7 @@ func TestResizeHTTPAndConnectedBoardsPreserveLibrary(t *testing.T) {
 			t.Fatal(err)
 		}
 		defer conn.Close()
+		readRulerSession(t, conn)
 		connections = append(connections, conn)
 	}
 	request := func(id, body string, want int) *httptest.ResponseRecorder {

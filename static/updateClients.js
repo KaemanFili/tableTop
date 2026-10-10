@@ -6,6 +6,71 @@ newUnitUpdateSocket = new WebSocket(`${location.protocol === 'https:' ? 'wss:' :
 const removedUnitIDs = new Set();
 const unitSizes = JSON.parse(document.getElementById('unit-sizes').textContent);
 
+const unitAnimations = new Map();
+const pendingUnitPositions = new Map();
+const unitBlendDuration = 60;
+let unitAnimationFrame = null;
+
+function stopUnitAnimation(id) {
+    unitAnimations.delete(id);
+    if (unitAnimations.size === 0) {
+        cancelAnimationFrame(unitAnimationFrame);
+        unitAnimationFrame = null;
+    }
+}
+
+function animateUnits(now) {
+    unitAnimationFrame = null;
+    for (const [id, animation] of unitAnimations) {
+        const {element, fromLeft, fromTop, left, top, started} = animation;
+        if (!element.isConnected || element.classList.contains('dragging') || removedUnitIDs.has(id)) {
+            unitAnimations.delete(id);
+            continue;
+        }
+        const progress = movementMath.progress(now, started, unitBlendDuration);
+        element.style.left = `${movementMath.interpolate(fromLeft, left, progress)}px`;
+        element.style.top = `${movementMath.interpolate(fromTop, top, progress)}px`;
+        if (progress === 1) unitAnimations.delete(id);
+    }
+    if (unitAnimations.size) unitAnimationFrame = requestAnimationFrame(animateUnits);
+}
+
+function updateUnitPosition(element, left, top) {
+    const id = element.id;
+    if (removedUnitIDs.has(id) || element.classList.contains('dragging')) return;
+    const pending = pendingUnitPositions.get(id);
+    if (pending) {
+        if (left === pending.left && top === pending.top) {
+            pendingUnitPositions.delete(id);
+        } else if (performance.now() < pending.expires) {
+            // Wait for the server to observe the final drop before accepting older snapshots.
+            return;
+        } else {
+            pendingUnitPositions.delete(id);
+        }
+    }
+    const previous = unitAnimations.get(id);
+    // Repeated stationary snapshots must let an existing animation finish.
+    if (previous?.element === element && previous.left === left && previous.top === top) return;
+    const fromLeft = parseFloat(element.style.left) || 0;
+    const fromTop = parseFloat(element.style.top) || 0;
+    if (fromLeft === left && fromTop === top) {
+        stopUnitAnimation(id);
+        return;
+    }
+    unitAnimations.set(id, {element, fromLeft, fromTop, left, top, started: performance.now()});
+    if (unitAnimationFrame === null) unitAnimationFrame = requestAnimationFrame(animateUnits);
+}
+
+document.addEventListener('unitDragStarted', event => {
+    stopUnitAnimation(event.detail.id);
+    pendingUnitPositions.delete(event.detail.id);
+});
+document.addEventListener('unitDragFinished', event => {
+    const {id, left, top} = event.detail;
+    pendingUnitPositions.set(id, {left, top, expires: performance.now() + 1000});
+});
+
 function updateUnitTitle(unit) {
     const size = unitSizes.find(option => option.Value === unit.dataset.size);
     unit.title = `${unit.querySelector('.unit-image').alt}\nSize: ${size?.Label || unit.dataset.size}\nStatus: ${unit.dataset.status || 'None'}`;
@@ -38,6 +103,8 @@ document.addEventListener('unitRemoved', event => {
     const id = event.detail.id;
     if (typeof id !== 'string' || !id) return;
     removedUnitIDs.add(id);
+    stopUnitAnimation(id);
+    pendingUnitPositions.delete(id);
     document.getElementById(id)?.remove();
 });
 document.addEventListener('htmx:afterSwap', () => {
@@ -54,10 +121,7 @@ posUpdateSocket.onmessage = function(event) {
         if (el && el.dataset.status !== (unit.Status || '') && !removedUnitIDs.has(unit.ID)) {
             document.dispatchEvent(new CustomEvent('unitStatusChanged', {detail: {id: unit.ID, status: unit.Status || ''}}));
         }
-        if (el && el.style.cursor !== "grabbing") {
-            el.style.left = unit.Left + "px";
-            el.style.top = unit.Top + "px";
-        }
+        if (el) updateUnitPosition(el, unit.Left, unit.Top);
     });
 };
 
@@ -67,6 +131,14 @@ posUpdateSocket.onerror = function(err) {
 
 newUnitUpdateSocket.onmessage = function(event) {
     const message = JSON.parse(event.data);
+    if (['rulerSession', 'rulerChanged'].includes(message.type)) {
+        document.dispatchEvent(new CustomEvent(message.type, {detail: message}));
+        return;
+    }
+    if (message.type === 'boardPing') {
+        document.dispatchEvent(new CustomEvent('boardPing', {detail: message}));
+        return;
+    }
     if (message.type === 'unitRemoved') {
         document.dispatchEvent(new CustomEvent('unitRemoved', {detail: {id: message.id}}));
         return;
@@ -79,3 +151,7 @@ newUnitUpdateSocket.onmessage = function(event) {
          htmx.trigger("#loadExistingUnits", "loadUnits");
     }
 };
+
+newUnitUpdateSocket.addEventListener('close', () => {
+    document.dispatchEvent(new CustomEvent('rulerDisconnected'));
+});

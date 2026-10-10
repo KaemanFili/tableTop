@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"crypto/rand"
 	"encoding/json"
 	"log"
 	"net/http"
@@ -21,6 +22,7 @@ type WebSocketHandler struct {
 	unitCreatedClients map[*websocket.Conn]bool
 	positionMutex      sync.Mutex
 	unitCreatedMutex   sync.Mutex
+	rulers             map[string]boardRuler
 }
 
 func NewWebSocketHandler(state *app.AppState) *WebSocketHandler {
@@ -33,6 +35,7 @@ func NewWebSocketHandler(state *app.AppState) *WebSocketHandler {
 		},
 		positionClients:    make(map[*websocket.Conn]bool),
 		unitCreatedClients: make(map[*websocket.Conn]bool),
+		rulers:             make(map[string]boardRuler),
 	}
 }
 
@@ -44,7 +47,7 @@ func (h *WebSocketHandler) RegisterRoutes(mux *http.ServeMux) {
 
 func (h *WebSocketHandler) StartPositionBroadcast() {
 	go func() {
-		ticker := time.NewTicker(100 * time.Millisecond)
+		ticker := time.NewTicker(33 * time.Millisecond)
 		defer ticker.Stop()
 
 		for range ticker.C {
@@ -87,6 +90,12 @@ func (h *WebSocketHandler) BroadcastUnitRemoved(id string) {
 
 func (h *WebSocketHandler) broadcastUnits(data []byte) {
 	h.unitCreatedMutex.Lock()
+	defer h.unitCreatedMutex.Unlock()
+	h.broadcastUnitsLocked(data)
+}
+
+// broadcastUnitsLocked requires unitCreatedMutex to serialize writes to each socket.
+func (h *WebSocketHandler) broadcastUnitsLocked(data []byte) {
 	for conn := range h.unitCreatedClients {
 		if err := conn.WriteMessage(websocket.TextMessage, data); err != nil {
 			log.Println("Write error, removing client:", err)
@@ -94,7 +103,6 @@ func (h *WebSocketHandler) broadcastUnits(data []byte) {
 			delete(h.unitCreatedClients, conn)
 		}
 	}
-	h.unitCreatedMutex.Unlock()
 }
 
 func (h *WebSocketHandler) updateServer(w http.ResponseWriter, r *http.Request) {
@@ -167,19 +175,32 @@ func (h *WebSocketHandler) updateClientUnits(w http.ResponseWriter, r *http.Requ
 		return
 	}
 	defer conn.Close()
+	conn.SetReadLimit(1024)
+	rulerID := rand.Text()
 
 	h.unitCreatedMutex.Lock()
 	h.unitCreatedClients[conn] = true
+	conn.WriteJSON(map[string]string{"type": "rulerSession", "id": rulerID})
+	for _, ruler := range h.rulers {
+		conn.WriteJSON(ruler)
+	}
 	h.unitCreatedMutex.Unlock()
 
 	for {
-		if _, _, err := conn.ReadMessage(); err != nil {
+		_, data, err := conn.ReadMessage()
+		if err != nil {
 			break
 		}
+		h.updateRuler(rulerID, data)
 	}
 
 	h.unitCreatedMutex.Lock()
 	delete(h.unitCreatedClients, conn)
+	if _, exists := h.rulers[rulerID]; exists {
+		delete(h.rulers, rulerID)
+		data, _ := json.Marshal(boardRuler{Type: "rulerChanged", ID: rulerID, Clear: true})
+		h.broadcastUnitsLocked(data)
+	}
 	h.unitCreatedMutex.Unlock()
 }
 
