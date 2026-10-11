@@ -7,11 +7,17 @@
 <p id="map-picker-error" class="menu-error" role="alert" hidden></p>
 <div class="saved-map-list">
 {{ range . }}
+    <div class="library-entry">
     <button type="button" class="saved-map" data-load-map hx-post="/map-library/{{ .ID }}/load?gm=true"
         hx-target="#map-editor" hx-swap="innerHTML" hx-disabled-elt="#map-editor [data-load-map]">
         <img src="/maps/images/{{ .ID }}" alt="" loading="lazy">
         <span>{{ .Name }}{{ if not .Board }}<small>Image only</small>{{ end }}</span>
     </button>
+    <button type="button" class="library-delete" data-delete-map aria-label="Delete {{ .Name }} permanently"
+        hx-delete="/map-library/{{ .ID }}?gm=true" hx-target="#map-editor" hx-swap="innerHTML"
+        hx-confirm="Permanently delete {{ .Name }} and its saved board? If active, its background will be removed for everyone. This cannot be undone."
+        hx-disabled-elt="#map-editor button">Delete</button>
+    </div>
 {{ else }}
     <p>No saved maps yet. Use Create New Map to add one.</p>
 {{ end }}

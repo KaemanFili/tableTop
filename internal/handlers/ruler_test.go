@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"net/http"
-	"net/http/httptest"
 	"reflect"
 	"strings"
 	"testing"
@@ -31,8 +30,7 @@ func TestSharedRulersLiveUpdatesJoinClearAndDisconnect(t *testing.T) {
 	ws := NewWebSocketHandler(state)
 	mux := http.NewServeMux()
 	ws.RegisterRoutes(mux)
-	server := httptest.NewServer(mux)
-	defer server.Close()
+	server := newTestServer(t, mux)
 	connect := func() (*websocket.Conn, string) {
 		t.Helper()
 		conn, _, err := websocket.DefaultDialer.Dial("ws"+strings.TrimPrefix(server.URL, "http")+"/ws/updateUnitsForClients", nil)
@@ -93,11 +91,11 @@ func TestSharedRulersLiveUpdatesJoinClearAndDisconnect(t *testing.T) {
 	for _, conn := range []*websocket.Conn{first, second, third} {
 		read(conn, clear)
 	}
-	ws.unitCreatedMutex.Lock()
+	ws.boardMutex.Lock()
 	if len(ws.rulers) != 1 || ws.rulers[secondID].ID != secondID {
 		t.Error("clearing changed another user's ruler")
 	}
-	ws.unitCreatedMutex.Unlock()
+	ws.boardMutex.Unlock()
 	second.Close()
 	read(first, boardRuler{Type: "rulerChanged", ID: secondID, Clear: true})
 	read(third, boardRuler{Type: "rulerChanged", ID: secondID, Clear: true})

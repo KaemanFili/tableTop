@@ -99,21 +99,21 @@ func (h *EndpointHandler) createMap(w http.ResponseWriter, r *http.Request) {
 		fail(err.Error())
 		return
 	}
+	ws := h.webSocketHandler
+	ws.boardMutex.Lock()
+	defer ws.boardMutex.Unlock()
 	definition, err := h.mapLibrary.Create(data.MapDefinition, image)
 	if err != nil {
 		log.Println("Save map:", err)
 		fail("The map could not be saved. Please try again.")
 		return
 	}
-	ws := h.webSocketHandler
-	ws.unitCreatedMutex.Lock()
 	ws.currentMap = &definition
 	message, _ := json.Marshal(struct {
 		Type string            `json:"type"`
 		Map  app.MapDefinition `json:"map"`
 	}{"boardMapChanged", definition})
 	ws.broadcastUnitsLocked(message)
-	ws.unitCreatedMutex.Unlock()
 	w.Header().Set("HX-Trigger", "mapSaved")
 	h.renderMapEditor(w, mapEditorData{MapDefinition: definition, Saved: true})
 }
@@ -136,8 +136,8 @@ func (h *EndpointHandler) saveBoard(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	ws := h.webSocketHandler
-	ws.unitCreatedMutex.Lock()
-	defer ws.unitCreatedMutex.Unlock()
+	ws.boardMutex.Lock()
+	defer ws.boardMutex.Unlock()
 	if ws.currentMap == nil {
 		http.Error(w, "Create or load a map before saving.", http.StatusConflict)
 		return

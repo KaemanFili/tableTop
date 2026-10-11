@@ -13,12 +13,22 @@ Use `go fix ./...` to apply Go's automated source modernizations, then
 `go fmt ./...` to format the code. Validate changes with `go test -race ./...`
 and `go vet ./...`.
 
+The full suite runs browser regression checks in headless Firefox when Firefox is
+installed. Run them directly with `go test ./internal/handlers -run TestBrowserSync -v`.
+They check actual dragging, spawning, and deliberately overlapping HTTP responses.
+Use `go test -short ./...` to skip browser checks. Shared test fixtures locate
+project assets without changing the process working directory.
+
+HTMX 2.0.11 is vendored in `static/vendor/`, including its license and checksum.
+The app serves it locally; dependency updates are explicit.
+
 ## Structure
 
 - `main.go`: application entrypoint and route wiring.
 - `internal/app`: shared application state and data types.
 - `internal/handlers`: HTTP endpoint handlers and websocket handlers.
-- `static`: browser JavaScript and CSS.
+- `static`: browser JavaScript and CSS; `boardGeometry.js` shares drawing coordinate calculations.
+- `internal/app/storage.go`: atomic JSON catalog replacement shared by both libraries.
 - `templates`: reusable HTML templates served by handlers.
 - `docs/movement.md`: movement smoothing, progress calculations, and worked examples.
 - [docs/erasers.md](docs/erasers.md): pen stroke deletion versus partial fog erasure,
@@ -38,7 +48,10 @@ available, and the brush outline hides while panning.
 Dragging follows your mouse immediately. Position updates are sent and broadcast
 about 30 times per second; other boards blend between positions over 60 ms.
 Releasing sends the final position immediately, and older position updates are briefly
-ignored on your board until the server confirms the drop.
+ignored on your board until the server confirms the drop. Unit refreshes received
+during dragging are deferred until release, including HTTP responses already in
+flight. Initial loading and subsequent refreshes share one serialized HTMX path;
+spawn responses do not append a second copy of a token.
 
 See [How movement smoothing works](docs/movement.md) for the before/after code,
 the progress calculation, and how token and ruler animations share
@@ -73,7 +86,9 @@ collapsible PC and NPC lists. Each entry shows a name and image; selecting it
 spawns a copy on the tabletop. Knight (PC) and Goblin (NPC) are included initially.
 
 Open `http://localhost:18080/?gm=true` to show the **GM** button below the utilities.
-GM fog controls appear beneath it. Without `gm=true`, GM controls are omitted
+GM fog controls appear beneath it. Click **GM** to hide or show its map and fog
+controls, including an open map editor. This affects only your browser and
+preserves the selected tool and any form input. Without `gm=true`, GM controls are omitted
 from the page. This URL flag selects the GM role for now; authenticated roles
 will replace it later.
 
@@ -82,7 +97,11 @@ Click it to open **Load Map**, **Save Map**, **Create New Map**, and **Clear Map
 with Clear Map spaced apart at the bottom. Clear Map removes
 all placed tokens, pen drawings, fog, rulers, and active pings for every connected
 user, including the displayed map background. Saved maps, the unit library, and
-artwork remain available. Load Map opens the saved map library. Selecting a map
+artwork remain available. Load Map opens the saved map library. Its **Delete**
+buttons permanently remove saved maps, their saved board content, and artwork,
+after confirmation. Deleting the active map removes its background for everyone;
+placed tokens and drawings remain. Map deletion requires GM mode and uses
+`DELETE /map-library/{id}?gm=true`. Selecting a map
 replaces the board for all connected users with its saved image and contents.
 Maps created before saving board content load their image onto an empty board. Click the icon
 again, click outside, or press Escape
@@ -187,6 +206,12 @@ Menus and forms use HTMX and server-rendered `templates/spawn-menu.html`.
 Native HTML `details` elements handle collapsing the lists. `/spawn-menu?open=true`
 opens the library, `/spawn-menu` closes it, and `/unit-library/new` opens the form.
 `POST /unit-library` saves a definition; `POST /unit?unitID=...` spawns a copy.
+Spawning requires POST; GET, HEAD, and other methods return 405 without changing
+the board.
+Each library entry has a **Delete** button with a permanent-deletion confirmation.
+`DELETE /unit-library/{id}` removes its definition across restarts, including
+starter units. Existing placed copies and saved boards keep their artwork.
+Older unit catalogs migrate automatically when the library is next changed.
 Outside clicks, Escape, and successful spawning close the library. The creation
 form stays open on outside clicks so choosing an image or interacting with the
 board does not accidentally discard input; use Cancel, Back, or the main toggle
@@ -198,6 +223,10 @@ Created unit definitions are stored in `data/units.json`, with uploaded artwork
 in `data/images/`. The directory is created automatically and excluded from Git.
 Keep the entire `data` directory to preserve the library across server restarts
 or to back it up. Run one server process per data directory.
+
+WebSockets accept same-host browser origins; clients without an Origin header
+remain supported. Each socket write has a two-second deadline, and stalled
+broadcast clients are disconnected so they cannot hold shared locks indefinitely.
 
 The server validates names, types, upload sizes, image formats, and dimensions.
 Catalog updates use an atomic file replacement; failed saves do not publish an
@@ -235,5 +264,5 @@ Sizes persist with the library and are retained when tokens move or reload.
 
 ## Todo
 
-- [ ] Add an option to delete saved units from the unit library.
-- [ ] Add an option to delete saved maps from the map library.
+- [x] Add an option to delete saved units from the unit library.
+- [x] Add an option to delete saved maps from the map library.

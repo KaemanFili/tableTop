@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"net/http"
-	"net/http/httptest"
 	"reflect"
 	"strings"
 	"testing"
@@ -18,8 +17,7 @@ func TestFogGMEditsSharedOrderAndInitialState(t *testing.T) {
 	handler := NewWebSocketHandler(state)
 	mux := http.NewServeMux()
 	handler.RegisterRoutes(mux)
-	server := httptest.NewServer(mux)
-	defer server.Close()
+	server := newTestServer(t, mux)
 	connect := func(query string) (*websocket.Conn, string) {
 		t.Helper()
 		conn, _, err := websocket.DefaultDialer.Dial("ws"+strings.TrimPrefix(server.URL, "http")+"/ws/updateUnitsForClients"+query, nil)

@@ -29,8 +29,8 @@ func (h *WebSocketHandler) updateRuler(id string, data []byte) {
 	if ruler.Clear {
 		ruler.Start, ruler.End = nil, nil
 	}
-	h.unitCreatedMutex.Lock()
-	defer h.unitCreatedMutex.Unlock()
+	h.boardMutex.Lock()
+	defer h.boardMutex.Unlock()
 	if ruler.Generation != h.boardGeneration {
 		return
 	}

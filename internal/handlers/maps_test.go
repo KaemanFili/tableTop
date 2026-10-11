@@ -14,7 +14,6 @@ import (
 )
 
 func TestMapCreatePersistShareAndClear(t *testing.T) {
-	t.Chdir("../..")
 	dir := t.TempDir()
 	maps, err := app.NewMapLibrary(dir)
 	if err != nil {
@@ -23,12 +22,11 @@ func TestMapCreatePersistShareAndClear(t *testing.T) {
 	state := app.NewState()
 	token := state.AddRandomUnit(app.PCUnitImageID)
 	ws := NewWebSocketHandler(state)
-	handler := NewEndpointHandler(state, ws, newTestLibrary(t), maps)
+	handler := newTestEndpointHandler(t, state, ws, newTestLibrary(t), maps)
 	mux := http.NewServeMux()
 	handler.RegisterRoutes(mux)
 	ws.RegisterRoutes(mux)
-	server := httptest.NewServer(mux)
-	defer server.Close()
+	server := newTestServer(t, mux)
 	connect := func() *websocket.Conn {
 		t.Helper()
 		conn, _, err := websocket.DefaultDialer.Dial("ws"+strings.TrimPrefix(server.URL, "http")+"/ws/updateUnitsForClients", nil)
@@ -123,11 +121,11 @@ func TestMapCreatePersistShareAndClear(t *testing.T) {
 	if cleared.Code != http.StatusNoContent {
 		t.Fatal("clear map failed")
 	}
-	ws.unitCreatedMutex.Lock()
+	ws.boardMutex.Lock()
 	if ws.currentMap != nil {
 		t.Error("clear left map background")
 	}
-	ws.unitCreatedMutex.Unlock()
+	ws.boardMutex.Unlock()
 	if _, exists := maps.MapByID(definition.ID); !exists {
 		t.Fatal("clear removed saved map")
 	}

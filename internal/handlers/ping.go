@@ -31,8 +31,8 @@ func (h *EndpointHandler) pingBoard(w http.ResponseWriter, r *http.Request) {
 		boardPing
 	}{"boardPing", ping})
 	ws := h.webSocketHandler
-	ws.unitCreatedMutex.Lock()
-	defer ws.unitCreatedMutex.Unlock()
+	ws.boardMutex.Lock()
+	defer ws.boardMutex.Unlock()
 	if ping.Generation != ws.boardGeneration {
 		w.WriteHeader(http.StatusConflict)
 		return

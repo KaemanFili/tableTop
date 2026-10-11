@@ -1,7 +1,25 @@
-posUpdateSocket = new WebSocket(`${location.protocol === 'https:' ? 'wss:' : 'ws:'}//${location.host}/ws/updatePosForClients`);
+const posUpdateSocket = new WebSocket(`${location.protocol === 'https:' ? 'wss:' : 'ws:'}//${location.host}/ws/updatePosForClients`);
 let boardGeneration = 0;
 
-newUnitUpdateSocket = new WebSocket(`${location.protocol === 'https:' ? 'wss:' : 'ws:'}//${location.host}/ws/updateUnitsForClients${document.body.dataset.gm === 'true' ? '?gm=true' : ''}`);
+const newUnitUpdateSocket = new WebSocket(`${location.protocol === 'https:' ? 'wss:' : 'ws:'}//${location.host}/ws/updateUnitsForClients${document.body.dataset.gm === 'true' ? '?gm=true' : ''}`);
+
+// Coalesce refreshes during a drag; snapshots must never replace a dragged token.
+let unitsRefreshPending = false;
+function refreshUnits() {
+    unitsRefreshPending = true;
+    if (isDragging) return;
+    unitsRefreshPending = false;
+    htmx.trigger('#loadExistingUnits', 'loadUnits');
+}
+document.addEventListener('unitDragEnded', () => {
+    if (unitsRefreshPending) refreshUnits();
+});
+document.addEventListener('unitSpawned', refreshUnits);
+document.addEventListener('htmx:beforeSwap', event => {
+    if (event.detail.target.id !== 'unitOverlay' || !isDragging) return;
+    event.detail.shouldSwap = false;
+    unitsRefreshPending = true;
+});
 
 // Remember only deleted IDs so an older in-flight HTML response cannot restore them.
 const removedUnitIDs = new Set();
@@ -129,6 +147,12 @@ document.addEventListener('boardCleared', event => {
 document.addEventListener('boardMapChanged', event => {
     const definition = event.detail.map;
     const map = document.getElementById('map-layer');
+    if (!definition) {
+        map.hidden = true;
+        map.removeAttribute('src');
+        map.alt = '';
+        return;
+    }
     map.src = `/maps/images/${encodeURIComponent(definition.id)}`;
     map.alt = definition.name;
     for (const [property, value] of Object.entries({width: definition.width, height: definition.height,
@@ -192,9 +216,7 @@ newUnitUpdateSocket.onmessage = function(event) {
         document.dispatchEvent(new CustomEvent(message.type, {detail: message}));
         return;
     }
-    if(!isDragging){
-         htmx.trigger("#loadExistingUnits", "loadUnits");
-    }
+    if (message === 'unit created') refreshUnits();
 };
 
 newUnitUpdateSocket.addEventListener('close', () => {

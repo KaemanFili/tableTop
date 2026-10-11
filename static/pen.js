@@ -48,13 +48,7 @@
     window.addEventListener('resize', closeSettings);
 
     function boardPoint(event) {
-        const bounds = grid.getBoundingClientRect();
-        const cell = grid.querySelector('.cell')?.getBoundingClientRect();
-        if (!cell?.width || !cell?.height) return null;
-        return {
-            x: Number((Math.max(0, Math.min(bounds.width, event.clientX - bounds.left)) / cell.width).toFixed(3)),
-            y: Number((Math.max(0, Math.min(bounds.height, event.clientY - bounds.top)) / cell.height).toFixed(3)),
-        };
+        return boardGeometry.point(grid, event, 3);
     }
 
     function appendPoints(id, points, style = {}) {
@@ -165,7 +159,7 @@
             error.hidden = false;
             return;
         }
-        const cell = grid.querySelector('.cell')?.getBoundingClientRect();
+        const cell = boardGeometry.cellSize(grid);
         if (!cell?.width || !cell?.height) return;
         const pixels = point => ({x: point.x * cell.width, y: point.y * cell.height});
         const from = pixels(lastErasePoint || point), to = pixels(point);

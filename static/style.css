@@ -391,7 +391,8 @@ body.map-panning * {
   pointer-events: auto;
 }
 
-#ui-overlay[hidden] {
+#ui-overlay[hidden],
+#gm-panel[hidden] {
   display: none;
 }
 
@@ -851,4 +852,33 @@ body.map-panning * {
   font: 600 13px/1.4 system-ui, sans-serif;
   white-space: nowrap;
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+}
+
+.library-entry {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.library-entry > .library-unit,
+.library-entry > .saved-map {
+  flex: 1;
+  min-width: 0;
+}
+#ui-overlay .library-delete {
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-sizing: border-box;
+  border: 1px solid #6a3535;
+  background-color: #3a2222;
+  color: #fecaca;
+}
+#ui-overlay .library-delete:hover {
+  background-color: #542929;
+}
+#ui-overlay .library-delete:focus-visible {
+  outline: 2px solid #fbbf24;
+  outline-offset: 2px;
 }

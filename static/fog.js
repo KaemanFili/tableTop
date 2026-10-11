@@ -81,12 +81,7 @@
     }
 
     function boardPoint(event) {
-        const bounds = grid.getBoundingClientRect();
-        if (!bounds.width || !bounds.height) return null;
-        return {
-            x: Number((Math.max(0, Math.min(64, (event.clientX - bounds.left) / bounds.width * 64))).toFixed(3)),
-            y: Number((Math.max(0, Math.min(64, (event.clientY - bounds.top) / bounds.height * 64))).toFixed(3)),
-        };
+        return boardGeometry.point(grid, event, 3);
     }
 
     function flush() {

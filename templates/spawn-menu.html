@@ -91,6 +91,7 @@
                     <button type="button" id="create-unit-toggle" class="primary-button" hx-get="/unit-library/new" hx-target="#spawn-controls" hx-swap="outerHTML" autofocus>+ Create new unit</button>
                 </div>
                 <p>Select a unit to add it to the tabletop.</p>
+                {{ if .Error }}<p class="menu-error" role="alert">{{ .Error }}</p>{{ end }}
                 {{ if .Notice }}<p class="menu-notice" role="status">{{ .Notice }}</p>{{ end }}
                 <details class="unit-library-group" id="pc-list" open>
                     <summary>PCs <span class="unit-count">{{ len .PCs }}</span></summary>
@@ -111,14 +112,14 @@
 {{ end }}
 
 {{ define "library-unit" }}
-<li>
+<li class="library-entry">
     <button
         type="button"
         class="library-unit"
         aria-label="Spawn {{ .Name }}"
         hx-post="/unit?unitID={{ .ID }}"
         hx-target="#unitOverlay"
-        hx-swap="beforeend"
+        hx-swap="none"
         hx-disabled-elt="this"
     >
         <span class="library-token-preview" style="--image-zoom: {{.ImageFit.Zoom}}; --image-offset-x: {{.ImageFit.OffsetX}}%; --image-offset-y: {{.ImageFit.OffsetY}}%;">
@@ -127,5 +128,9 @@
         <span class="library-unit-name">{{ .Name }}<span class="library-unit-size">{{ .Size.Label }}</span></span>
         <span class="spawn-action" aria-hidden="true">Spawn</span>
     </button>
+    <button type="button" class="library-delete" aria-label="Delete {{ .Name }} permanently"
+        hx-delete="/unit-library/{{ .ID }}" hx-target="#spawn-controls" hx-swap="outerHTML"
+        hx-confirm="Permanently delete {{ .Name }} from the unit library? Existing copies on boards will remain. This cannot be undone."
+        hx-disabled-elt="this">Delete</button>
 </li>
 {{ end }}

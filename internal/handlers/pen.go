@@ -32,8 +32,8 @@ func (h *WebSocketHandler) updatePen(owner string, data []byte) {
 	}
 	update.ID = owner + "/" + update.ID
 	update.Owner = owner
-	h.unitCreatedMutex.Lock()
-	defer h.unitCreatedMutex.Unlock()
+	h.boardMutex.Lock()
+	defer h.boardMutex.Unlock()
 	if update.Generation != h.boardGeneration {
 		return
 	}
@@ -76,8 +76,8 @@ func (h *WebSocketHandler) erasePen(data []byte) {
 	if json.Unmarshal(data, &request) != nil || request.Type != "penErase" || len(request.IDs) == 0 || len(request.IDs) > 16 {
 		return
 	}
-	h.unitCreatedMutex.Lock()
-	defer h.unitCreatedMutex.Unlock()
+	h.boardMutex.Lock()
+	defer h.boardMutex.Unlock()
 	ids := make([]string, 0, len(request.IDs))
 	seen := make(map[string]bool)
 	for _, id := range request.IDs {

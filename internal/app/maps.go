@@ -165,27 +165,40 @@ func (l *MapLibrary) Create(definition MapDefinition, pngImage []byte) (MapDefin
 }
 
 func (l *MapLibrary) save(definition MapDefinition) error {
-	file, err := os.CreateTemp(l.dir, ".maps-*.json")
-	if err != nil {
-		return err
-	}
-	defer os.Remove(file.Name())
-	defer file.Close()
 	maps := []MapDefinition{definition}
 	for _, existing := range l.maps {
-		if existing.ID == definition.ID {
-			continue
+		if existing.ID != definition.ID {
+			maps = append(maps, existing)
 		}
-		maps = append(maps, existing)
 	}
-	if err := json.NewEncoder(file).Encode(maps); err != nil {
+	return l.saveMaps(maps)
+}
+
+func (l *MapLibrary) saveMaps(maps []MapDefinition) error {
+	return writeJSONFile(filepath.Join(l.dir, "maps.json"), maps)
+}
+
+// Delete removes a saved map and its artwork, preserving the entry on failure.
+func (l *MapLibrary) Delete(id string) error {
+	l.mutex.Lock()
+	defer l.mutex.Unlock()
+	if _, exists := l.maps[id]; !exists {
+		return nil
+	}
+	remaining := make([]MapDefinition, 0, len(l.maps)-1)
+	original := make([]MapDefinition, 0, len(l.maps))
+	for _, definition := range l.maps {
+		original = append(original, definition)
+		if definition.ID != id {
+			remaining = append(remaining, definition)
+		}
+	}
+	if err := l.saveMaps(remaining); err != nil {
 		return err
 	}
-	if err := file.Sync(); err != nil {
-		return err
+	if err := os.Remove(filepath.Join(l.dir, "maps", id+".png")); err != nil && !errors.Is(err, os.ErrNotExist) {
+		return errors.Join(err, l.saveMaps(original))
 	}
-	if err := file.Close(); err != nil {
-		return err
-	}
-	return os.Rename(file.Name(), filepath.Join(l.dir, "maps.json"))
+	delete(l.maps, id)
+	return nil
 }

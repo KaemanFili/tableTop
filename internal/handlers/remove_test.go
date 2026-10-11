@@ -13,19 +13,17 @@ import (
 )
 
 func TestRemoveUnitUpdatesStateAndConnectedClients(t *testing.T) {
-	t.Chdir("../..")
 	state := app.NewState()
 	ws := NewWebSocketHandler(state)
 	library := newTestLibrary(t)
-	handler := NewEndpointHandler(state, ws, library)
+	handler := newTestEndpointHandler(t, state, ws, library)
 	mux := http.NewServeMux()
 	handler.RegisterRoutes(mux)
 	ws.RegisterRoutes(mux)
 	definition, _ := library.UnitByID("goblin")
 	removed := state.AddUnit(definition)
 	other := state.AddUnit(definition)
-	server := httptest.NewServer(mux)
-	defer server.Close()
+	server := newTestServer(t, mux)
 
 	// Both browsers must receive the removed placed-token ID.
 	var clients []*websocket.Conn

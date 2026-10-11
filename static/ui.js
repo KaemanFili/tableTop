@@ -3,6 +3,8 @@
     const toggle = document.getElementById('toggle-ui-controls');
     const mapButton = document.getElementById('utility-map');
     const mapOptions = document.getElementById('map-options');
+    const gmButton = document.getElementById('gm-button');
+    const gmPanel = document.getElementById('gm-panel');
 
     function closeMapOptions() {
         if (!mapOptions) return;
@@ -16,6 +18,30 @@
         toggle.textContent = controls.hidden ? 'Show UI' : 'Hide UI';
         toggle.title = controls.hidden ? 'Show controls' : 'Hide controls';
         toggle.setAttribute('aria-expanded', String(!controls.hidden));
+    });
+
+    gmButton?.addEventListener('click', () => {
+        gmPanel.hidden = !gmPanel.hidden;
+        if (gmPanel.hidden) closeMapOptions();
+        const label = gmPanel.hidden ? 'Show GM controls' : 'Hide GM controls';
+        gmButton.title = label;
+        gmButton.setAttribute('aria-label', label);
+        gmButton.setAttribute('aria-expanded', String(!gmPanel.hidden));
+    });
+
+    document.addEventListener('htmx:afterRequest', event => {
+        if (!event.detail.elt?.matches('[hx-delete^="/unit-library/"]') || event.detail.successful) return;
+        const menu = document.getElementById('spawn-menu');
+        if (!menu) return;
+        let message = menu.querySelector('[data-delete-error]');
+        if (!message) {
+            message = document.createElement('p');
+            message.className = 'menu-error';
+            message.dataset.deleteError = '';
+            message.setAttribute('role', 'alert');
+            menu.append(message);
+        }
+        message.textContent = 'Could not delete the unit. Try again.';
     });
 
     if (!mapButton || !mapOptions) return;
@@ -69,10 +95,11 @@
         }
     });
     editor.addEventListener('htmx:afterRequest', event => {
-        if (!event.detail.elt?.matches('[data-load-map]') || event.detail.successful) return;
+        if (!event.detail.elt?.matches('[data-load-map], [data-delete-map]') || event.detail.successful) return;
         const message = document.getElementById('map-picker-error');
         if (!message) return;
-        message.textContent = 'Could not load the saved map. Try again.';
+        message.textContent = event.detail.elt.matches('[data-delete-map]')
+            ? 'Could not delete the saved map. Try again.' : 'Could not load the saved map. Try again.';
         message.hidden = false;
     });
     editor.addEventListener('click', event => {

@@ -1,6 +1,7 @@
 package app
 
 import (
+	"bytes"
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
@@ -30,39 +31,36 @@ type UnitLibrary struct {
 	units map[string]UnitDefinition
 }
 
+const unitCatalogVersion = 1
+
+type unitCatalog struct {
+	Version int              `json:"version"`
+	Units   []UnitDefinition `json:"units"`
+}
+
 func NewUnitLibrary(dir string) (*UnitLibrary, error) {
-	library := &UnitLibrary{dir: dir, units: map[string]UnitDefinition{
-		"knight": {ID: "knight", Name: "Knight", UnitType: "pc", ImageID: PCUnitImageID, Size: SizeMedium, ImageFit: DefaultImageFit()},
-		"goblin": {ID: "goblin", Name: "Goblin", UnitType: "npc", ImageID: NPCUnitImageID, Size: SizeSmall, ImageFit: DefaultImageFit()},
-	}}
 	if err := os.MkdirAll(filepath.Join(dir, "images"), 0755); err != nil {
 		return nil, err
 	}
 	data, err := os.ReadFile(filepath.Join(dir, "units.json"))
-	if errors.Is(err, os.ErrNotExist) {
-		return library, nil
-	}
-	if err != nil {
-		return nil, err
-	}
 	var saved []UnitDefinition
-	if err := json.Unmarshal(data, &saved); err != nil {
-		return nil, fmt.Errorf("read unit library: %w", err)
+	switch {
+	case errors.Is(err, os.ErrNotExist):
+		saved = starterUnits()
+	case err != nil:
+		return nil, err
+	default:
+		saved, err = decodeUnitCatalog(data)
+		if err != nil {
+			return nil, fmt.Errorf("read unit library: %w", err)
+		}
 	}
-	for _, unit := range saved {
-		// Entries created before sizes were introduced occupied one grid square.
-		if unit.Size == "" {
-			unit.Size = SizeMedium
-		}
-		if unit.ImageFit == (ImageFit{}) {
-			unit.ImageFit = DefaultImageFit()
-		}
-		id, err := hex.DecodeString(unit.ID)
-		if err != nil || len(id) != 16 || ValidateUnitDefinition(unit.Name, unit.UnitType, unit.Size) != nil || unit.ImageFit.Validate() != nil {
-			return nil, fmt.Errorf("invalid saved unit %q", unit.ID)
-		}
-		if unit.ImageID != unit.ID && unit.ImageID != PCUnitImageID && unit.ImageID != NPCUnitImageID {
-			return nil, fmt.Errorf("invalid image for unit %q", unit.ID)
+
+	library := &UnitLibrary{dir: dir, units: make(map[string]UnitDefinition, len(saved))}
+	for _, entry := range saved {
+		unit, err := normalizeSavedUnit(entry)
+		if err != nil {
+			return nil, fmt.Errorf("invalid saved unit %q: %w", entry.ID, err)
 		}
 		if _, exists := library.units[unit.ID]; exists {
 			return nil, fmt.Errorf("duplicate saved unit %q", unit.ID)
@@ -70,6 +68,64 @@ func NewUnitLibrary(dir string) (*UnitLibrary, error) {
 		library.units[unit.ID] = unit
 	}
 	return library, nil
+}
+
+func starterUnits() []UnitDefinition {
+	return []UnitDefinition{
+		{ID: "knight", Name: "Knight", UnitType: "pc", ImageID: PCUnitImageID, Size: SizeMedium, ImageFit: DefaultImageFit()},
+		{ID: "goblin", Name: "Goblin", UnitType: "npc", ImageID: NPCUnitImageID, Size: SizeSmall, ImageFit: DefaultImageFit()},
+	}
+}
+
+func decodeUnitCatalog(data []byte) ([]UnitDefinition, error) {
+	data = bytes.TrimSpace(data)
+	if len(data) == 0 {
+		return nil, errors.New("empty unit catalog")
+	}
+	if data[0] == '[' {
+		// Legacy catalogs contain custom entries only; supply their starter units.
+		var units []UnitDefinition
+		if err := json.Unmarshal(data, &units); err != nil {
+			return nil, err
+		}
+		return append(starterUnits(), units...), nil
+	}
+
+	var catalog unitCatalog
+	if err := json.Unmarshal(data, &catalog); err != nil {
+		return nil, err
+	}
+	if catalog.Version != unitCatalogVersion {
+		return nil, fmt.Errorf("unsupported unit catalog version %d", catalog.Version)
+	}
+	// Versioned catalogs contain the entire library, including starter deletions.
+	return catalog.Units, nil
+}
+
+func normalizeSavedUnit(unit UnitDefinition) (UnitDefinition, error) {
+	// Entries created before sizes and image framing occupied one grid square.
+	if unit.Size == "" {
+		unit.Size = SizeMedium
+	}
+	if unit.ImageFit == (ImageFit{}) {
+		unit.ImageFit = DefaultImageFit()
+	}
+	if unit.ID != "knight" && unit.ID != "goblin" {
+		id, err := hex.DecodeString(unit.ID)
+		if err != nil || len(id) != 16 {
+			return UnitDefinition{}, errors.New("invalid unit ID")
+		}
+	}
+	if err := ValidateUnitDefinition(unit.Name, unit.UnitType, unit.Size); err != nil {
+		return UnitDefinition{}, err
+	}
+	if err := unit.ImageFit.Validate(); err != nil {
+		return UnitDefinition{}, err
+	}
+	if unit.ImageID != unit.ID && unit.ImageID != PCUnitImageID && unit.ImageID != NPCUnitImageID {
+		return UnitDefinition{}, errors.New("invalid image ID")
+	}
+	return unit, nil
 }
 
 func ValidateUnitDefinition(name, unitType string, size UnitSize) error {
@@ -112,8 +168,9 @@ func (l *UnitLibrary) UnitByID(id string) (UnitDefinition, bool) {
 func (l *UnitLibrary) ImagePath(id string) (string, bool) {
 	l.mutex.RLock()
 	defer l.mutex.RUnlock()
-	unit, exists := l.units[id]
-	if !exists || unit.ImageID != id || id == "knight" || id == "goblin" {
+	// Artwork remains available for placed tokens and saved boards after deletion.
+	decoded, err := hex.DecodeString(id)
+	if err != nil || len(decoded) != 16 {
 		return "", false
 	}
 	return filepath.Join(l.dir, "images", id+".png"), true
@@ -149,9 +206,7 @@ func (l *UnitLibrary) Create(name, unitType string, size UnitSize, fit ImageFit,
 	}
 	saved := []UnitDefinition{unit}
 	for _, existing := range l.units {
-		if existing.ID != "knight" && existing.ID != "goblin" {
-			saved = append(saved, existing)
-		}
+		saved = append(saved, existing)
 	}
 	if err := l.save(saved); err != nil {
 		if imagePath != "" {
@@ -164,20 +219,25 @@ func (l *UnitLibrary) Create(name, unitType string, size UnitSize, fit ImageFit,
 }
 
 func (l *UnitLibrary) save(units []UnitDefinition) error {
-	file, err := os.CreateTemp(l.dir, ".units-*.json")
-	if err != nil {
+	return writeJSONFile(filepath.Join(l.dir, "units.json"), unitCatalog{Version: unitCatalogVersion, Units: units})
+}
+
+// Delete removes a reusable definition; placed copies retain their artwork.
+func (l *UnitLibrary) Delete(id string) error {
+	l.mutex.Lock()
+	defer l.mutex.Unlock()
+	if _, exists := l.units[id]; !exists {
+		return nil
+	}
+	units := make([]UnitDefinition, 0, len(l.units)-1)
+	for _, unit := range l.units {
+		if unit.ID != id {
+			units = append(units, unit)
+		}
+	}
+	if err := l.save(units); err != nil {
 		return err
 	}
-	defer os.Remove(file.Name())
-	defer file.Close()
-	if err := json.NewEncoder(file).Encode(units); err != nil {
-		return err
-	}
-	if err := file.Sync(); err != nil {
-		return err
-	}
-	if err := file.Close(); err != nil {
-		return err
-	}
-	return os.Rename(file.Name(), filepath.Join(l.dir, "units.json"))
+	delete(l.units, id)
+	return nil
 }

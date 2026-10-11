@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"net/http"
+	"path/filepath"
 
 	"tableTop/main/internal/app"
 )
@@ -16,7 +17,9 @@ var unitImages = map[string]string{
 
 func (h *EndpointHandler) unitImage(w http.ResponseWriter, r *http.Request) {
 	path, exists := unitImages[r.PathValue("id")]
-	if !exists {
+	if exists {
+		path = filepath.Join(h.assetRoot, path)
+	} else {
 		path, exists = h.library.ImagePath(r.PathValue("id"))
 	}
 	if !exists {

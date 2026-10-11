@@ -59,6 +59,7 @@ document.addEventListener("mousedown", function (e) {
             document.dispatchEvent(new CustomEvent('unitDragFinished', {detail: {id: target.id, left, top}}));
             updateUnitPositionOnServer();
         }
+        document.dispatchEvent(new CustomEvent('unitDragEnded', {detail: {id: target.id}}));
     }
 
     function updateUnitPositionOnServer() {

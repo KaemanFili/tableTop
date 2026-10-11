@@ -12,16 +12,14 @@ import (
 )
 
 func TestPingBroadcastsToAllBoardsWithoutChangingTokens(t *testing.T) {
-	t.Chdir("../..")
 	state := app.NewState()
 	token := state.AddRandomUnit(app.DefaultUnitImageID)
 	ws := NewWebSocketHandler(state)
-	handler := NewEndpointHandler(state, ws, newTestLibrary(t))
+	handler := newTestEndpointHandler(t, state, ws, newTestLibrary(t))
 	mux := http.NewServeMux()
 	handler.RegisterRoutes(mux)
 	ws.RegisterRoutes(mux)
-	server := httptest.NewServer(mux)
-	defer server.Close()
+	server := newTestServer(t, mux)
 	var clients []*websocket.Conn
 	for range 2 {
 		conn, _, err := websocket.DefaultDialer.Dial("ws"+strings.TrimPrefix(server.URL, "http")+"/ws/updateUnitsForClients", nil)

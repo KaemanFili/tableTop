@@ -12,13 +12,13 @@ func (h *EndpointHandler) clearBoard(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	ws := h.webSocketHandler
-	ws.unitCreatedMutex.Lock()
-	defer ws.unitCreatedMutex.Unlock()
+	ws.boardMutex.Lock()
+	defer ws.boardMutex.Unlock()
 	ws.clearBoardLocked()
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// clearBoardLocked requires unitCreatedMutex, including when loading another map.
+// clearBoardLocked requires boardMutex, including when loading another map.
 func (ws *WebSocketHandler) clearBoardLocked() {
 	ids := ws.state.ClearUnits()
 	clear(ws.rulers)

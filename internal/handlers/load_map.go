@@ -28,6 +28,9 @@ func (h *EndpointHandler) loadMap(w http.ResponseWriter, r *http.Request) {
 	if !h.requireMapGM(w, r) {
 		return
 	}
+	ws := h.webSocketHandler
+	ws.boardMutex.Lock()
+	defer ws.boardMutex.Unlock()
 	definition, exists := h.mapLibrary.MapByID(r.PathValue("id"))
 	if !exists {
 		http.Error(w, "Saved map not found.", http.StatusNotFound)
@@ -41,9 +44,6 @@ func (h *EndpointHandler) loadMap(w http.ResponseWriter, r *http.Request) {
 	board := definition.Board
 	// Send only the image and fit in boardMapChanged; utilities have their own messages.
 	definition.Board = nil
-	ws := h.webSocketHandler
-	ws.unitCreatedMutex.Lock()
-	defer ws.unitCreatedMutex.Unlock()
 	ws.clearBoardLocked()
 	ws.currentMap = &definition
 	ws.broadcastValueLocked(map[string]any{"type": "boardMapChanged", "map": definition})
@@ -76,4 +76,25 @@ func (h *EndpointHandler) loadMap(w http.ResponseWriter, r *http.Request) {
 func (ws *WebSocketHandler) broadcastValueLocked(value any) {
 	message, _ := json.Marshal(value)
 	ws.broadcastUnitsLocked(message)
+}
+
+func (h *EndpointHandler) deleteMap(w http.ResponseWriter, r *http.Request) {
+	if !h.requireMapGM(w, r) {
+		return
+	}
+	ws := h.webSocketHandler
+	ws.boardMutex.Lock()
+	id := r.PathValue("id")
+	if err := h.mapLibrary.Delete(id); err != nil {
+		ws.boardMutex.Unlock()
+		log.Println("Delete map:", err)
+		http.Error(w, "The map could not be deleted. Please try again.", http.StatusInternalServerError)
+		return
+	}
+	if ws.currentMap != nil && ws.currentMap.ID == id {
+		ws.currentMap = nil
+		ws.broadcastValueLocked(map[string]any{"type": "boardMapChanged", "map": nil})
+	}
+	ws.boardMutex.Unlock()
+	h.mapPicker(w, r)
 }

@@ -85,17 +85,11 @@
     });
 
     function cellSize() {
-        return grid.querySelector('.cell')?.getBoundingClientRect();
+        return boardGeometry.cellSize(grid);
     }
 
     function boardPoint(event) {
-        const bounds = grid.getBoundingClientRect();
-        const cell = cellSize();
-        if (!cell?.width || !cell?.height) return null;
-        return {
-            x: Math.max(0, Math.min(bounds.width, event.clientX - bounds.left)) / cell.width,
-            y: Math.max(0, Math.min(bounds.height, event.clientY - bounds.top)) / cell.height,
-        };
+        return boardGeometry.point(grid, event);
     }
 
     function drawMeasurement(measurement, cell = cellSize()) {

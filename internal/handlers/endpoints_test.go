@@ -11,9 +11,8 @@ import (
 )
 
 func TestIndexRendersSpawnControls(t *testing.T) {
-	t.Chdir("../..")
 	state := app.NewState()
-	handler := NewEndpointHandler(state, NewWebSocketHandler(state), newTestLibrary(t))
+	handler := newTestEndpointHandler(t, state, NewWebSocketHandler(state), newTestLibrary(t))
 	mux := http.NewServeMux()
 	handler.RegisterRoutes(mux)
 	response := httptest.NewRecorder()
@@ -34,9 +33,8 @@ func TestIndexRendersSpawnControls(t *testing.T) {
 }
 
 func TestGMButtonVisibilityIsPerRequest(t *testing.T) {
-	t.Chdir("../..")
 	state := app.NewState()
-	handler := NewEndpointHandler(state, NewWebSocketHandler(state), newTestLibrary(t))
+	handler := newTestEndpointHandler(t, state, NewWebSocketHandler(state), newTestLibrary(t))
 	mux := http.NewServeMux()
 	handler.RegisterRoutes(mux)
 	for _, test := range []struct {
@@ -90,5 +88,23 @@ func TestMenuRenderFailureDoesNotReturnPartialForm(t *testing.T) {
 	}
 	if !strings.Contains(response.Body.String(), "Restart the server") {
 		t.Fatal("render failure should explain how to recover")
+	}
+}
+
+func TestUnitSpawningRequiresPost(t *testing.T) {
+	state := app.NewState()
+	mux := http.NewServeMux()
+	newTestEndpointHandler(t, state, NewWebSocketHandler(state), newTestLibrary(t)).RegisterRoutes(mux)
+	for _, method := range []string{http.MethodGet, http.MethodHead, http.MethodPut} {
+		response := httptest.NewRecorder()
+		mux.ServeHTTP(response, httptest.NewRequest(method, "/unit?unitID=knight", nil))
+		if response.Code != http.StatusMethodNotAllowed || response.Header().Get("Allow") != "POST" || state.UnitCount() != 0 {
+			t.Fatalf("%s mutated the board or returned an incorrect response: %d", method, response.Code)
+		}
+	}
+	response := httptest.NewRecorder()
+	mux.ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/unit?unitID=knight", nil))
+	if response.Code != http.StatusOK || state.UnitCount() != 1 {
+		t.Fatal("POST did not spawn a unit")
 	}
 }

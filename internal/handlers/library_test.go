@@ -56,7 +56,6 @@ func testPNG(t *testing.T, width, height int) []byte {
 }
 
 func TestUnitLibraryCreateRestartAndSpawn(t *testing.T) {
-	t.Chdir("../..")
 	dir := t.TempDir()
 	library, err := app.NewUnitLibrary(dir)
 	if err != nil {
@@ -64,7 +63,7 @@ func TestUnitLibraryCreateRestartAndSpawn(t *testing.T) {
 	}
 	state := app.NewState()
 	mux := http.NewServeMux()
-	NewEndpointHandler(state, NewWebSocketHandler(state), library).RegisterRoutes(mux)
+	newTestEndpointHandler(t, state, NewWebSocketHandler(state), library).RegisterRoutes(mux)
 	for _, unitType := range []string{"pc", "npc"} {
 		response := httptest.NewRecorder()
 		mux.ServeHTTP(response, libraryRequest(t, "  Scout <script>  ", unitType, "large", testPNG(t, 2, 2), map[string]string{"imageZoom": "2", "imageOffsetX": "10", "imageOffsetY": "-20"}))
@@ -85,7 +84,7 @@ func TestUnitLibraryCreateRestartAndSpawn(t *testing.T) {
 		t.Fatal(err)
 	}
 	mux = http.NewServeMux()
-	NewEndpointHandler(state, NewWebSocketHandler(state), library).RegisterRoutes(mux)
+	newTestEndpointHandler(t, state, NewWebSocketHandler(state), library).RegisterRoutes(mux)
 	if len(library.Units()) != 4 {
 		t.Fatal("custom entries were not restored")
 	}
@@ -128,7 +127,6 @@ func TestUnitLibraryCreateRestartAndSpawn(t *testing.T) {
 }
 
 func TestCreateUnitValidation(t *testing.T) {
-	t.Chdir("../..")
 	for _, test := range []struct {
 		label, name, unitType, message string
 		image                          []byte
@@ -144,7 +142,7 @@ func TestCreateUnitValidation(t *testing.T) {
 			library := newTestLibrary(t)
 			state := app.NewState()
 			mux := http.NewServeMux()
-			NewEndpointHandler(state, NewWebSocketHandler(state), library).RegisterRoutes(mux)
+			newTestEndpointHandler(t, state, NewWebSocketHandler(state), library).RegisterRoutes(mux)
 			response := httptest.NewRecorder()
 			mux.ServeHTTP(response, libraryRequest(t, test.name, test.unitType, "huge", test.image))
 			body := response.Body.String()
@@ -162,11 +160,10 @@ func TestCreateUnitValidation(t *testing.T) {
 }
 
 func TestUnitMenusAndDefaultArtwork(t *testing.T) {
-	t.Chdir("../..")
 	library := newTestLibrary(t)
 	state := app.NewState()
 	mux := http.NewServeMux()
-	NewEndpointHandler(state, NewWebSocketHandler(state), library).RegisterRoutes(mux)
+	newTestEndpointHandler(t, state, NewWebSocketHandler(state), library).RegisterRoutes(mux)
 	for _, test := range []struct {
 		path string
 		want []string
@@ -204,11 +201,10 @@ func TestUnitMenusAndDefaultArtwork(t *testing.T) {
 }
 
 func TestSizeControlsSpawnAndReloadFootprint(t *testing.T) {
-	t.Chdir("../..")
 	library := newTestLibrary(t)
 	state := app.NewState()
 	mux := http.NewServeMux()
-	NewEndpointHandler(state, NewWebSocketHandler(state), library).RegisterRoutes(mux)
+	newTestEndpointHandler(t, state, NewWebSocketHandler(state), library).RegisterRoutes(mux)
 	for _, test := range []struct{ size, squares string }{
 		{"tiny", "0.5"}, {"small", "1"}, {"medium", "1"},
 		{"large", "2"}, {"huge", "3"}, {"gargantuan", "4"},
@@ -253,11 +249,10 @@ func TestSizeControlsSpawnAndReloadFootprint(t *testing.T) {
 }
 
 func TestRejectInvalidUnitSizes(t *testing.T) {
-	t.Chdir("../..")
 	library := newTestLibrary(t)
 	state := app.NewState()
 	mux := http.NewServeMux()
-	NewEndpointHandler(state, NewWebSocketHandler(state), library).RegisterRoutes(mux)
+	newTestEndpointHandler(t, state, NewWebSocketHandler(state), library).RegisterRoutes(mux)
 	for _, size := range []string{"", "gigantic", "2", "large; color:red"} {
 		response := httptest.NewRecorder()
 		mux.ServeHTTP(response, libraryRequest(t, "Scout", "npc", size, nil))
@@ -271,11 +266,10 @@ func TestRejectInvalidUnitSizes(t *testing.T) {
 }
 
 func TestRejectInvalidImageFraming(t *testing.T) {
-	t.Chdir("../..")
 	library := newTestLibrary(t)
 	state := app.NewState()
 	mux := http.NewServeMux()
-	NewEndpointHandler(state, NewWebSocketHandler(state), library).RegisterRoutes(mux)
+	newTestEndpointHandler(t, state, NewWebSocketHandler(state), library).RegisterRoutes(mux)
 	for _, fields := range []map[string]string{
 		{"imageZoom": "NaN"}, {"imageZoom": "+Inf"}, {"imageZoom": "0"},
 		{"imageZoom": "4.1"}, {"imageZoom": "invalid"},
@@ -290,10 +284,9 @@ func TestRejectInvalidImageFraming(t *testing.T) {
 }
 
 func TestFormErrorsPreserveImageFraming(t *testing.T) {
-	t.Chdir("../..")
 	state := app.NewState()
 	mux := http.NewServeMux()
-	NewEndpointHandler(state, NewWebSocketHandler(state), newTestLibrary(t)).RegisterRoutes(mux)
+	newTestEndpointHandler(t, state, NewWebSocketHandler(state), newTestLibrary(t)).RegisterRoutes(mux)
 	response := httptest.NewRecorder()
 	mux.ServeHTTP(response, libraryRequest(t, "Scout", "npc", "huge", []byte("broken image"), map[string]string{
 		"imageZoom": "1.75", "imageOffsetX": "12.5", "imageOffsetY": "-25",

@@ -14,7 +14,6 @@ import (
 )
 
 func TestLoadSavedMapRestoresSharedBoard(t *testing.T) {
-	t.Chdir("../..")
 	dir := t.TempDir()
 	maps, err := app.NewMapLibrary(dir)
 	if err != nil {
@@ -43,12 +42,11 @@ func TestLoadSavedMapRestoresSharedBoard(t *testing.T) {
 	state := app.NewState()
 	oldToken := state.AddRandomUnit(app.DefaultUnitImageID)
 	ws := NewWebSocketHandler(state)
-	handler := NewEndpointHandler(state, ws, newTestLibrary(t), maps)
+	handler := newTestEndpointHandler(t, state, ws, newTestLibrary(t), maps)
 	mux := http.NewServeMux()
 	handler.RegisterRoutes(mux)
 	ws.RegisterRoutes(mux)
-	server := httptest.NewServer(mux)
-	defer server.Close()
+	server := newTestServer(t, mux)
 	connect := func() *websocket.Conn {
 		t.Helper()
 		conn, _, err := websocket.DefaultDialer.Dial("ws"+strings.TrimPrefix(server.URL, "http")+"/ws/updateUnitsForClients", nil)
@@ -157,11 +155,11 @@ func TestLoadSavedMapRestoresSharedBoard(t *testing.T) {
 	}
 	// Old-generation drawings cannot reappear after load.
 	ws.updatePen("old", []byte(`{"type":"penStroke","id":"9","points":[{"x":1,"y":1}],"generation":0}`))
-	ws.unitCreatedMutex.Lock()
+	ws.boardMutex.Lock()
 	if len(ws.strokes) != 1 {
 		t.Error("late stroke changed restored board")
 	}
-	ws.unitCreatedMutex.Unlock()
+	ws.boardMutex.Unlock()
 	// The original saved record remains reusable and gets overwritten by Save Map.
 	request(http.MethodPost, "/board/save?gm=true", http.StatusNoContent)
 	reloaded, err := app.NewMapLibrary(dir)
@@ -175,7 +173,6 @@ func TestLoadSavedMapRestoresSharedBoard(t *testing.T) {
 }
 
 func TestLoadImageOnlyMapAndUnavailableArtwork(t *testing.T) {
-	t.Chdir("../..")
 	maps, err := app.NewMapLibrary(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
@@ -187,7 +184,7 @@ func TestLoadImageOnlyMapAndUnavailableArtwork(t *testing.T) {
 	state := app.NewState()
 	state.AddRandomUnit(app.DefaultUnitImageID)
 	ws := NewWebSocketHandler(state)
-	handler := NewEndpointHandler(state, ws, newTestLibrary(t), maps)
+	handler := newTestEndpointHandler(t, state, ws, newTestLibrary(t), maps)
 	mux := http.NewServeMux()
 	handler.RegisterRoutes(mux)
 	response := httptest.NewRecorder()

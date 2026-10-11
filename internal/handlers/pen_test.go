@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"net/http"
-	"net/http/httptest"
 	"reflect"
 	"strings"
 	"testing"
@@ -18,8 +17,7 @@ func TestPenLiveStrokesInitialStateAndDisconnect(t *testing.T) {
 	ws := NewWebSocketHandler(state)
 	mux := http.NewServeMux()
 	ws.RegisterRoutes(mux)
-	server := httptest.NewServer(mux)
-	defer server.Close()
+	server := newTestServer(t, mux)
 	connect := func() (*websocket.Conn, string) {
 		t.Helper()
 		conn, _, err := websocket.DefaultDialer.Dial("ws"+strings.TrimPrefix(server.URL, "http")+"/ws/updateUnitsForClients", nil)
@@ -91,11 +89,11 @@ func TestPenLiveStrokesInitialStateAndDisconnect(t *testing.T) {
 	completed := penStroke{Type: "penStroke", ID: other.ID, Owner: secondID, Offset: 1, Finished: true, Color: other.Color, Width: other.Width}
 	read(first, completed)
 	read(third, completed)
-	ws.unitCreatedMutex.Lock()
+	ws.boardMutex.Lock()
 	if len(ws.strokes) != 2 || !ws.strokes[other.ID].Finished || len(ws.strokes[initialStroke.ID].Points) != 3 {
 		t.Error("disconnect lost or corrupted drawings")
 	}
-	ws.unitCreatedMutex.Unlock()
+	ws.boardMutex.Unlock()
 	if got, _ := state.UnitByID(token.ID); got != token {
 		t.Fatal("drawing moved a token")
 	}
@@ -107,8 +105,7 @@ func TestEraserSyncsRemovalAndPreventsLateStrokeResurrection(t *testing.T) {
 	ws := NewWebSocketHandler(state)
 	mux := http.NewServeMux()
 	ws.RegisterRoutes(mux)
-	server := httptest.NewServer(mux)
-	defer server.Close()
+	server := newTestServer(t, mux)
 	connect := func() (*websocket.Conn, string) {
 		t.Helper()
 		conn, _, err := websocket.DefaultDialer.Dial("ws"+strings.TrimPrefix(server.URL, "http")+"/ws/updateUnitsForClients", nil)
@@ -179,11 +176,11 @@ func TestEraserSyncsRemovalAndPreventsLateStrokeResurrection(t *testing.T) {
 	if initialStroke.ID != firstID+"/2" {
 		t.Fatal("initial board state includes erased stroke")
 	}
-	ws.unitCreatedMutex.Lock()
+	ws.boardMutex.Lock()
 	if len(ws.strokes) != 1 || len(ws.erasedStrokes) != 1 || !ws.erasedStrokes[removedID] {
 		t.Error("incorrect eraser state")
 	}
-	ws.unitCreatedMutex.Unlock()
+	ws.boardMutex.Unlock()
 	if got, _ := state.UnitByID(token.ID); got != token {
 		t.Fatal("eraser changed token")
 	}

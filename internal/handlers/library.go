@@ -162,3 +162,15 @@ func normalizeUnitImage(upload []byte) ([]byte, error) {
 	}
 	return output.Bytes(), nil
 }
+
+func (h *EndpointHandler) deleteLibraryUnit(w http.ResponseWriter, r *http.Request) {
+	menu := h.menuData(true)
+	if err := h.library.Delete(r.PathValue("id")); err != nil {
+		log.Println("Delete unit:", err)
+		menu.Error = "The unit could not be deleted. Please try again."
+	} else {
+		menu = h.menuData(true)
+		menu.Notice = "Unit permanently deleted from the library."
+	}
+	h.renderSpawnMenu(w, menu)
+}

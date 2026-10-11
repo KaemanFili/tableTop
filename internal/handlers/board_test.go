@@ -12,18 +12,16 @@ import (
 )
 
 func TestClearBoardSharedStateAndDelayedUpdates(t *testing.T) {
-	t.Chdir("../..")
 	state := app.NewState()
 	firstToken := state.AddRandomUnit(app.DefaultUnitImageID)
 	secondToken := state.AddRandomUnit(app.PCUnitImageID)
 	ws := NewWebSocketHandler(state)
 	library := newTestLibrary(t)
-	handler := NewEndpointHandler(state, ws, library)
+	handler := newTestEndpointHandler(t, state, ws, library)
 	mux := http.NewServeMux()
 	handler.RegisterRoutes(mux)
 	ws.RegisterRoutes(mux)
-	server := httptest.NewServer(mux)
-	defer server.Close()
+	server := newTestServer(t, mux)
 	read := func(conn *websocket.Conn, target any) {
 		t.Helper()
 		conn.SetReadDeadline(time.Now().Add(3 * time.Second))
@@ -50,12 +48,12 @@ func TestClearBoardSharedStateAndDelayedUpdates(t *testing.T) {
 	}
 	gm, owner := connect("?gm=true", 0)
 	player, _ := connect("", 0)
-	ws.unitCreatedMutex.Lock()
+	ws.boardMutex.Lock()
 	ws.strokes[owner+"/1"] = penStroke{Type: "penStroke", ID: owner + "/1", Owner: owner, Points: []rulerPoint{{X: 1, Y: 1}}}
 	ws.erasedStrokes[owner+"/2"] = true
 	ws.rulers[owner] = boardRuler{Type: "rulerChanged", ID: owner, Start: &rulerPoint{X: 1, Y: 1}, End: &rulerPoint{X: 2, Y: 2}}
 	ws.fogMarks = []fogMark{{Type: "fogMark", ID: owner + "/1", Mode: "paint", Width: 2, Points: []rulerPoint{{X: 1, Y: 1}}}}
-	ws.unitCreatedMutex.Unlock()
+	ws.boardMutex.Unlock()
 	request := func(path string, want int) {
 		t.Helper()
 		response := httptest.NewRecorder()
@@ -84,11 +82,11 @@ func TestClearBoardSharedStateAndDelayedUpdates(t *testing.T) {
 			t.Fatalf("incorrect clear event: %+v", message)
 		}
 	}
-	ws.unitCreatedMutex.Lock()
+	ws.boardMutex.Lock()
 	if len(ws.strokes)+len(ws.erasedStrokes)+len(ws.rulers)+len(ws.fogMarks) != 0 {
 		t.Error("clear left utility state behind")
 	}
-	ws.unitCreatedMutex.Unlock()
+	ws.boardMutex.Unlock()
 	if state.UnitCount() != 0 || state.UpdateUnitPosition(firstToken.ID, 100, 100) {
 		t.Fatal("clear left tokens behind")
 	}

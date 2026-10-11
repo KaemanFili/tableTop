@@ -27,8 +27,8 @@ func (h *WebSocketHandler) updateFog(owner string, data []byte) {
 		}
 	}
 	mark.ID, mark.Owner = owner+"/"+mark.ID, owner
-	h.unitCreatedMutex.Lock()
-	defer h.unitCreatedMutex.Unlock()
+	h.boardMutex.Lock()
+	defer h.boardMutex.Unlock()
 	if mark.Generation != h.boardGeneration {
 		return
 	}

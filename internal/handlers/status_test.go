@@ -13,18 +13,16 @@ import (
 )
 
 func TestStatusUpdatesConnectedBoardAndReload(t *testing.T) {
-	t.Chdir("../..")
 	state := app.NewState()
 	library := newTestLibrary(t)
 	ws := NewWebSocketHandler(state)
-	handler := NewEndpointHandler(state, ws, library)
+	handler := newTestEndpointHandler(t, state, ws, library)
 	mux := http.NewServeMux()
 	handler.RegisterRoutes(mux)
 	ws.RegisterRoutes(mux)
 	definition, _ := library.UnitByID("goblin")
 	token, other := state.AddUnit(definition), state.AddUnit(definition)
-	server := httptest.NewServer(mux)
-	defer server.Close()
+	server := newTestServer(t, mux)
 	conn, _, err := websocket.DefaultDialer.Dial("ws"+strings.TrimPrefix(server.URL, "http")+"/ws/updateUnitsForClients", nil)
 	if err != nil {
 		t.Fatal(err)

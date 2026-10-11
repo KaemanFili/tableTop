@@ -4,21 +4,15 @@
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>VTT</title>
-        <script src="https://unpkg.com/htmx.org"></script>
-        <link rel="stylesheet" href="/static/style.css?v=33">
+        <script src="/static/vendor/htmx-2.0.11.min.js"></script>
+        <link rel="stylesheet" href="/static/style.css?v=36">
     </head>
     <body data-gm="{{ .IsGM }}">
         <div 
             id="loadExistingUnits"
             hx-get="/loadExistingUnits"
-            hx-trigger="loadUnits"
-            hx-target="#unitOverlay"
-            hx-swap="innerHTML">
-        </div>
-        <div 
-            id="loadUnitsOnStart"
-            hx-get="/loadExistingUnits"
-            hx-trigger="load"
+            hx-trigger="load, loadUnits"
+            hx-sync="this:queue last"
             hx-target="#unitOverlay"
             hx-swap="innerHTML">
         </div>
@@ -34,39 +28,41 @@
             {{ template "spawn-controls" . }}
             {{ template "utilities-controls" false }}
             {{ if .IsGM }}
-            <button type="button" id="gm-button" title="GM">GM</button>
-            <div id="gm-controls" role="group" aria-label="GM utilities">
-                <button type="button" id="utility-map" class="utility-button" title="Map Options" aria-label="Map Options" aria-expanded="false" aria-controls="map-options">
-                    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                        <path d="m3 5 6-2 6 2 6-2v16l-6 2-6-2-6 2zM9 3v16M15 5v16"/>
-                    </svg>
-                </button>
-                <div id="map-options" role="group" aria-label="Map Options" hidden>
-                    <button type="button" id="load-map" hx-get="/map-library?gm=true" hx-target="#map-editor" hx-swap="innerHTML">Load Map</button>
-                    <button type="button" id="save-map" hx-post="/board/save?gm=true" hx-swap="none" hx-disabled-elt="this">Save Map</button>
-                    <button type="button" id="create-map" hx-get="/map-library/new?gm=true" hx-target="#map-editor" hx-swap="innerHTML">Create New Map</button>
-                    <button type="button" id="clear-map" hx-post="/board/clear?gm=true" hx-swap="none" hx-disabled-elt="this">Clear Map</button>
-                    <span id="map-options-error" role="alert" hidden></span>
-                    <span id="map-options-success" role="status" hidden></span>
+            <button type="button" id="gm-button" title="Hide GM controls" aria-label="Hide GM controls" aria-expanded="true" aria-controls="gm-panel">GM</button>
+            <div id="gm-panel">
+                <div id="gm-controls" role="group" aria-label="GM utilities">
+                    <button type="button" id="utility-map" class="utility-button" title="Map Options" aria-label="Map Options" aria-expanded="false" aria-controls="map-options">
+                        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                            <path d="m3 5 6-2 6 2 6-2v16l-6 2-6-2-6 2zM9 3v16M15 5v16"/>
+                        </svg>
+                    </button>
+                    <div id="map-options" role="group" aria-label="Map Options" hidden>
+                        <button type="button" id="load-map" hx-get="/map-library?gm=true" hx-target="#map-editor" hx-swap="innerHTML">Load Map</button>
+                        <button type="button" id="save-map" hx-post="/board/save?gm=true" hx-swap="none" hx-disabled-elt="this">Save Map</button>
+                        <button type="button" id="create-map" hx-get="/map-library/new?gm=true" hx-target="#map-editor" hx-swap="innerHTML">Create New Map</button>
+                        <button type="button" id="clear-map" hx-post="/board/clear?gm=true" hx-swap="none" hx-disabled-elt="this">Clear Map</button>
+                        <span id="map-options-error" role="alert" hidden></span>
+                        <span id="map-options-success" role="status" hidden></span>
+                    </div>
+                    <button type="button" id="utility-fog" class="utility-button" title="Fog of war (right-click for settings)" aria-label="Fog of war" aria-pressed="false" aria-expanded="false" aria-controls="fog-settings">
+                        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                            <path d="M5 11a4 4 0 0 1 1-8 5 5 0 0 1 9 1 3.5 3.5 0 1 1 3 7M3 15h18M5 19h14M8 23h8"/>
+                        </svg>
+                    </button>
+                    <button type="button" id="utility-fog-eraser" class="utility-button" title="Erase fog (right-click for settings)" aria-label="Erase fog" aria-pressed="false" aria-expanded="false" aria-controls="fog-settings">
+                        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                            <path d="M3 5h18M5 9h14m-7 12-6-6 8-8 7 7-7 7zM11 11l7 7M12 21h9"/>
+                        </svg>
+                    </button>
+                    <div id="fog-settings" role="group" aria-label="Fog brush settings" hidden>
+                        <label for="fog-width">Brush thickness <output id="fog-width-value" for="fog-width">80 px</output></label>
+                        <input type="range" id="fog-width" min="20" max="240" step="10" value="80">
+                        <label for="fog-eraser-width">Eraser thickness <output id="fog-eraser-width-value" for="fog-eraser-width">40 px</output></label>
+                        <input type="range" id="fog-eraser-width" min="10" max="120" step="10" value="40">
+                    </div>
                 </div>
-                <button type="button" id="utility-fog" class="utility-button" title="Fog of war (right-click for settings)" aria-label="Fog of war" aria-pressed="false" aria-expanded="false" aria-controls="fog-settings">
-                    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                        <path d="M5 11a4 4 0 0 1 1-8 5 5 0 0 1 9 1 3.5 3.5 0 1 1 3 7M3 15h18M5 19h14M8 23h8"/>
-                    </svg>
-                </button>
-                <button type="button" id="utility-fog-eraser" class="utility-button" title="Erase fog (right-click for settings)" aria-label="Erase fog" aria-pressed="false" aria-expanded="false" aria-controls="fog-settings">
-                    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                        <path d="M3 5h18M5 9h14m-7 12-6-6 8-8 7 7-7 7zM11 11l7 7M12 21h9"/>
-                    </svg>
-                </button>
-                <div id="fog-settings" role="group" aria-label="Fog brush settings" hidden>
-                    <label for="fog-width">Brush thickness <output id="fog-width-value" for="fog-width">80 px</output></label>
-                    <input type="range" id="fog-width" min="20" max="240" step="10" value="80">
-                    <label for="fog-eraser-width">Eraser thickness <output id="fog-eraser-width-value" for="fog-eraser-width">40 px</output></label>
-                    <input type="range" id="fog-eraser-width" min="10" max="120" step="10" value="40">
-                </div>
+                <section id="map-editor" class="spawn-menu" aria-label="Create New Map" hidden></section>
             </div>
-            <section id="map-editor" class="spawn-menu" aria-label="Create New Map" hidden></section>
             {{ end }}
         </div>
         <div class="grid-wrapper">
@@ -98,13 +94,14 @@
         <script src="/static/pan.js?v=1"></script>
         <script src="/static/tokenMenu.js?v=7"></script>
         <script src="/static/movement.js?v=1"></script>
-        <script src="/static/drag.js?v=10"></script>
-        <script src="/static/updateClients.js?v=15"></script>
-        <script src="/static/utilities.js?v=11"></script>
-        <script src="/static/pen.js?v=4"></script>
-        <script src="/static/fog.js?v=2"></script>
+        <script src="/static/drag.js?v=11"></script>
+        <script src="/static/updateClients.js?v=16"></script>
+        <script src="/static/boardGeometry.js?v=1"></script>
+        <script src="/static/utilities.js?v=12"></script>
+        <script src="/static/pen.js?v=5"></script>
+        <script src="/static/fog.js?v=3"></script>
         <script src="/static/brushCursor.js?v=3"></script>
-        <script src="/static/ui.js?v=5"></script>
+        <script src="/static/ui.js?v=7"></script>
         <script src="/static/mapEditor.js?v=2"></script>
         <script src="/static/imageFit.js?v=2"></script>
     </body>

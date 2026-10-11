@@ -5,6 +5,7 @@ import (
 	"html/template"
 	"log"
 	"net/http"
+	"os"
 	"strconv"
 
 	"tableTop/main/internal/app"
@@ -18,16 +19,23 @@ type EndpointHandler struct {
 	indexTemplate    *template.Template
 	library          *app.UnitLibrary
 	mapLibrary       *app.MapLibrary
+	assetRoot        string
 }
 
 func NewEndpointHandler(state *app.AppState, webSocketHandler *WebSocketHandler, library *app.UnitLibrary, maps ...*app.MapLibrary) *EndpointHandler {
+	return newEndpointHandler(state, webSocketHandler, library, ".", maps...)
+}
+
+func newEndpointHandler(state *app.AppState, webSocketHandler *WebSocketHandler, library *app.UnitLibrary, assetRoot string, maps ...*app.MapLibrary) *EndpointHandler {
+	assets := os.DirFS(assetRoot)
 	handler := &EndpointHandler{
 		library:          library,
+		assetRoot:        assetRoot,
 		state:            state,
 		webSocketHandler: webSocketHandler,
-		gridTemplate:     template.Must(template.ParseFiles("templates/grid.html")),
-		unitTemplate:     template.Must(template.ParseFiles("templates/unit.html")),
-		indexTemplate:    template.Must(template.ParseFiles("index.html", "templates/spawn-menu.html", "templates/utilities.html", "templates/map-editor.html", "templates/map-picker.html")),
+		gridTemplate:     template.Must(template.ParseFS(assets, "templates/grid.html")),
+		unitTemplate:     template.Must(template.ParseFS(assets, "templates/unit.html")),
+		indexTemplate:    template.Must(template.ParseFS(assets, "index.html", "templates/spawn-menu.html", "templates/utilities.html", "templates/map-editor.html", "templates/map-picker.html")),
 	}
 	if len(maps) > 0 {
 		handler.mapLibrary = maps[0]
@@ -39,7 +47,10 @@ func (h *EndpointHandler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/", h.index)
 	mux.HandleFunc("/loadExistingUnits", h.existingUnit)
 	mux.HandleFunc("/grid", h.grid)
-	mux.HandleFunc("GET /unit", h.newUnit)
+	mux.HandleFunc("/unit", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Allow", "POST")
+		http.Error(w, "Use POST to spawn a unit.", http.StatusMethodNotAllowed)
+	})
 	mux.HandleFunc("POST /unit", h.newUnit)
 	mux.HandleFunc("DELETE /unit/{id}", h.removeUnit)
 	mux.HandleFunc("POST /unit/{id}/size", h.resizeUnit)
@@ -51,10 +62,12 @@ func (h *EndpointHandler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /map-library", h.mapPicker)
 	mux.HandleFunc("POST /map-library/{id}/load", h.loadMap)
 	mux.HandleFunc("POST /map-library", h.createMap)
+	mux.HandleFunc("DELETE /map-library/{id}", h.deleteMap)
 	mux.HandleFunc("GET /maps/images/{id}", h.mapImage)
 	mux.HandleFunc("GET /spawn-menu", h.spawnMenu)
 	mux.HandleFunc("GET /unit-library/new", h.newUnitForm)
 	mux.HandleFunc("POST /unit-library", h.createUnit)
+	mux.HandleFunc("DELETE /unit-library/{id}", h.deleteLibraryUnit)
 	mux.HandleFunc("GET /images/{id}", h.unitImage)
 }
 
@@ -100,9 +113,9 @@ func (h *EndpointHandler) newUnit(w http.ResponseWriter, r *http.Request) {
 		case "":
 			// Keep the original /unit endpoint's neutral default.
 		case "npc":
-			definition, _ = h.library.UnitByID("goblin")
+			definition = app.UnitDefinition{ImageID: app.NPCUnitImageID, Size: app.SizeSmall, ImageFit: app.DefaultImageFit()}
 		case "pc":
-			definition, _ = h.library.UnitByID("knight")
+			definition = app.UnitDefinition{ImageID: app.PCUnitImageID, Size: app.SizeMedium, ImageFit: app.DefaultImageFit()}
 		default:
 			http.Error(w, "unknown unit type", http.StatusBadRequest)
 			return
@@ -110,7 +123,7 @@ func (h *EndpointHandler) newUnit(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "text/html")
-	w.Header().Set("HX-Trigger-After-Swap", "unitSpawned")
+	w.Header().Set("HX-Trigger", "unitSpawned")
 	w.Header().Set("Cache-Control", "no-store")
 
 	data := h.state.AddUnit(definition)

@@ -12,7 +12,6 @@ import (
 )
 
 func TestSaveMapPreservesBoardAndArtwork(t *testing.T) {
-	t.Chdir("../..")
 	dir := t.TempDir()
 	maps, err := app.NewMapLibrary(dir)
 	if err != nil {
@@ -27,7 +26,7 @@ func TestSaveMapPreservesBoardAndArtwork(t *testing.T) {
 	token := state.AddRandomUnit(app.PCUnitImageID)
 	state.UpdateUnitPosition(token.ID, 240, 320)
 	ws := NewWebSocketHandler(state)
-	handler := NewEndpointHandler(state, ws, newTestLibrary(t), maps)
+	handler := newTestEndpointHandler(t, state, ws, newTestLibrary(t), maps)
 	mux := http.NewServeMux()
 	handler.RegisterRoutes(mux)
 	request := func(path string, want int) {
