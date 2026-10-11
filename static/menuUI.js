@@ -15,7 +15,7 @@ const menuUI = Object.freeze({
         panel.style.top = `${Math.max(margin, Math.min(top, window.innerHeight - bounds.height - margin))}px`;
     },
 
-    popover(panel, buttons) {
+    popover(panel, buttons, positionOptions = {}) {
         let activeButton = null;
         function close() {
             if (panel) panel.hidden = true;
@@ -28,7 +28,7 @@ const menuUI = Object.freeze({
             activeButton = button;
             panel.hidden = false;
             button.setAttribute('aria-expanded', 'true');
-            menuUI.position(panel, button);
+            menuUI.position(panel, button, positionOptions);
             focusTarget?.focus({preventScroll: true});
         }
         if (panel) {

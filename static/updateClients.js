@@ -205,6 +205,10 @@ newUnitUpdateSocket.onmessage = function(event) {
         document.dispatchEvent(new CustomEvent(message.type, {detail: message}));
         return;
     }
+    if (message.type === 'diceRolled') {
+        document.dispatchEvent(new CustomEvent('diceRolled', {detail: message}));
+        return;
+    }
     if (message.type === 'boardPing') {
         document.dispatchEvent(new CustomEvent('boardPing', {detail: message}));
         return;

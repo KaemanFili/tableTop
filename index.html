@@ -5,7 +5,7 @@
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>VTT</title>
         <script src="/static/vendor/htmx-2.0.11.min.js"></script>
-        <link rel="stylesheet" href="/static/style.css?v=36">
+        <link rel="stylesheet" href="/static/style.css?v=41">
     </head>
     <body data-gm="{{ .IsGM }}">
         <div 
@@ -23,7 +23,50 @@
             hx-target = "#grid-container" 
             hx-swap="beforeend">
         </div>
-        <button type="button" id="toggle-ui-controls" aria-expanded="true" aria-controls="ui-overlay" title="Hide controls">Hide UI</button>
+        <div id="board-controls">
+            <button type="button" id="toggle-ui-controls" aria-expanded="true" aria-controls="ui-overlay" title="Hide controls">Hide UI</button>
+            <button type="button" id="roll-dice" class="utility-button" title="Roll dice" aria-label="Roll dice" aria-expanded="false" aria-controls="dice-menu">
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                    <path d="m12 2 9 5v10l-9 5-9-5V7zM12 6 6 16h12zM12 2v4M3 7l9-1 9 1M3 7l3 9-3 1M21 7l-3 9 3 1M6 16l6 6 6-6"/>
+                </svg>
+            </button>
+            <div id="dice-menu" role="group" aria-label="Dice roller" hidden>
+                <form id="dice-form">
+                    <fieldset id="dice-inputs">
+                        <legend>Dice to roll</legend>
+                        {{ if .IsGM }}
+                        <label class="dice-visibility"><input type="checkbox" id="share-dice-rolls" checked aria-describedby="dice-visibility-hint"> Share my rolls with everyone</label>
+                        <p id="dice-visibility-hint" class="dice-help">Everyone sees your results and animations.</p>
+                        {{ end }}
+                        <div id="dice-groups"></div>
+                        <div class="dice-actions">
+                            <button type="button" id="add-dice-group">Add dice</button>
+                            <button type="submit" id="roll-all-dice">Roll all</button>
+                        </div>
+                    </fieldset>
+                    <p class="dice-help">Each modifier applies once to its group. Up to 100 dice per roll.</p>
+                    <span id="dice-error" role="alert" hidden></span>
+                </form>
+                <template id="dice-group-template">
+                    <div class="dice-group">
+                        <label>Count<input name="quantity" type="number" min="1" max="100" step="1" value="1" required></label>
+                        <label>Die<select name="sides">
+                            <option value="4">d4</option>
+                            <option value="6">d6</option>
+                            <option value="8">d8</option>
+                            <option value="10">d10</option>
+                            <option value="12">d12</option>
+                            <option value="20" selected>d20</option>
+                            <option value="100">d100</option>
+                        </select></label>
+                        <label>Modifier<input name="modifier" type="number" min="-1000000" max="1000000" step="1" value="0" required></label>
+                        <button type="button" data-remove-dice aria-label="Remove dice group" title="Remove dice group">×</button>
+                    </div>
+                </template>
+                <output id="dice-result" aria-live="polite" aria-atomic="true">No rolls yet.</output>
+                <span id="dice-status" role="status"></span>
+            </div>
+        </div>
         <div id="ui-overlay">
             {{ template "spawn-controls" . }}
             {{ template "utilities-controls" false }}
@@ -65,6 +108,15 @@
             </div>
             {{ end }}
         </div>
+        <section id="dice-notifications" aria-label="Dice rolls" aria-live="polite" aria-relevant="additions"></section>
+        <template id="notification-template">
+            <article class="dice-notification">
+                <strong data-notification-title></strong>
+                <button type="button" data-dismiss-notification aria-label="Dismiss notification">×</button>
+                <div data-notification-content></div>
+            </article>
+        </template>
+        <div id="dice-layer" aria-hidden="true"></div>
         <div class="grid-wrapper">
             <img id="map-layer" alt="" draggable="false" hidden>
             <svg id="drawing-layer" viewBox="0 0 64 64" preserveAspectRatio="none" aria-hidden="true" focusable="false"></svg>
@@ -92,17 +144,20 @@
         <div id="token-status-tooltip" class="token-status-tooltip" role="tooltip" hidden></div>
         <script type="application/json" id="unit-sizes">{{ .UnitSizes }}</script>
         <script src="/static/pan.js?v=1"></script>
-        <script src="/static/menuUI.js?v=1"></script>
+        <script src="/static/menuUI.js?v=2"></script>
         <script src="/static/tokenMenu.js?v=9"></script>
         <script src="/static/movement.js?v=1"></script>
         <script src="/static/drag.js?v=11"></script>
-        <script src="/static/updateClients.js?v=17"></script>
+        <script src="/static/updateClients.js?v=18"></script>
         <script src="/static/boardGeometry.js?v=1"></script>
         <script src="/static/utilities.js?v=12"></script>
         <script src="/static/pen.js?v=6"></script>
         <script src="/static/fog.js?v=4"></script>
         <script src="/static/brushCursor.js?v=3"></script>
         <script src="/static/ui.js?v=8"></script>
+        <script src="/static/notifications.js?v=1"></script>
+        <script src="/static/diceAnimation.js?v=1"></script>
+        <script src="/static/dice.js?v=7"></script>
         <script src="/static/mapEditor.js?v=2"></script>
         <script src="/static/imageFit.js?v=2"></script>
     </body>

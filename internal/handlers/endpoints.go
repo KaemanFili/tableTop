@@ -56,6 +56,7 @@ func (h *EndpointHandler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /unit/{id}/size", h.resizeUnit)
 	mux.HandleFunc("POST /unit/{id}/status", h.setUnitStatus)
 	mux.HandleFunc("POST /board/ping", h.pingBoard)
+	mux.HandleFunc("POST /dice/roll", h.rollDice)
 	mux.HandleFunc("POST /board/clear", h.clearBoard)
 	mux.HandleFunc("POST /board/save", h.saveBoard)
 	mux.HandleFunc("GET /map-library/new", h.newMapForm)
