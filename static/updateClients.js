@@ -3,7 +3,7 @@ let boardGeneration = 0;
 
 const newUnitUpdateSocket = new WebSocket(`${location.protocol === 'https:' ? 'wss:' : 'ws:'}//${location.host}/ws/updateUnitsForClients${document.body.dataset.gm === 'true' ? '?gm=true' : ''}`);
 
-// Coalesce refreshes during a drag; snapshots must never replace a dragged token.
+// Coalesce refreshes during a drag; unit refreshes must never replace a dragged token.
 let unitsRefreshPending = false;
 function refreshUnits() {
     unitsRefreshPending = true;
@@ -49,6 +49,7 @@ function animateUnits(now) {
         const progress = movementMath.progress(now, started, unitBlendDuration);
         element.style.left = `${movementMath.interpolate(fromLeft, left, progress)}px`;
         element.style.top = `${movementMath.interpolate(fromTop, top, progress)}px`;
+        document.dispatchEvent(new CustomEvent('unitPositionChanged', {detail: {id}}));
         if (progress === 1) unitAnimations.delete(id);
     }
     if (unitAnimations.size) unitAnimationFrame = requestAnimationFrame(animateUnits);

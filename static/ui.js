@@ -6,11 +6,8 @@
     const gmButton = document.getElementById('gm-button');
     const gmPanel = document.getElementById('gm-panel');
 
-    function closeMapOptions() {
-        if (!mapOptions) return;
-        mapOptions.hidden = true;
-        mapButton.setAttribute('aria-expanded', 'false');
-    }
+    const mapMenu = menuUI.popover(mapOptions, mapButton ? [mapButton] : []);
+    const closeMapOptions = mapMenu.close;
 
     toggle.addEventListener('click', () => {
         controls.hidden = !controls.hidden;
@@ -130,26 +127,8 @@
             closeMapOptions();
             return;
         }
-        mapOptions.hidden = false;
         error.hidden = true;
         success.hidden = true;
-        mapButton.setAttribute('aria-expanded', 'true');
-        const bounds = mapButton.getBoundingClientRect();
-        mapOptions.style.left = `${Math.max(8, Math.min(bounds.right + 8, window.innerWidth - mapOptions.offsetWidth - 8))}px`;
-        mapOptions.style.top = `${Math.max(8, Math.min(bounds.top, window.innerHeight - mapOptions.offsetHeight - 8))}px`;
-        mapOptions.querySelector('button').focus({preventScroll: true});
+        mapMenu.open(mapButton, mapOptions.querySelector('button'));
     });
-    document.addEventListener('mousedown', event => {
-        if (!mapButton.contains(event.target) && !mapOptions.contains(event.target)) closeMapOptions();
-    });
-    document.addEventListener('keydown', event => {
-        if (event.key === 'Escape' && !mapOptions.hidden) {
-            event.preventDefault();
-            closeMapOptions();
-            mapButton.focus({preventScroll: true});
-        }
-    });
-    document.addEventListener('scroll', closeMapOptions, true);
-    document.addEventListener('toolChanged', closeMapOptions);
-    window.addEventListener('resize', closeMapOptions);
 })();

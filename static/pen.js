@@ -16,36 +16,16 @@
     let erasing = false;
     let lastErasePoint = null;
 
-    function closeSettings() {
-        settings.hidden = true;
-        button.setAttribute('aria-expanded', 'false');
-    }
-
+    const settingsMenu = menuUI.popover(settings, [button]);
+    const closeSettings = settingsMenu.close;
     button.addEventListener('contextmenu', event => {
         event.preventDefault();
         finishStroke();
-        settings.hidden = false;
-        button.setAttribute('aria-expanded', 'true');
-        const bounds = button.getBoundingClientRect();
-        settings.style.left = `${Math.max(8, Math.min(bounds.right + 8, window.innerWidth - settings.offsetWidth - 8))}px`;
-        settings.style.top = `${Math.max(8, Math.min(bounds.top, window.innerHeight - settings.offsetHeight - 8))}px`;
-        colorInput.focus();
+        settingsMenu.open(button, colorInput);
     });
     widthInput.addEventListener('input', () => {
         widthValue.textContent = `${widthInput.value} px`;
     });
-    document.addEventListener('mousedown', event => {
-        if (!settings.contains(event.target) && !button.contains(event.target)) closeSettings();
-    });
-    document.addEventListener('keydown', event => {
-        if (event.key === 'Escape' && !settings.hidden) {
-            closeSettings();
-            button.focus();
-        }
-    });
-    document.addEventListener('toolChanged', closeSettings);
-    document.addEventListener('scroll', closeSettings, true);
-    window.addEventListener('resize', closeSettings);
 
     function boardPoint(event) {
         return boardGeometry.point(grid, event, 3);

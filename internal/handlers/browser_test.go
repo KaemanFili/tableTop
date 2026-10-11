@@ -49,13 +49,29 @@ func TestBrowserSync(t *testing.T) {
 	})
 	mux.HandleFunc("/browser/progress", func(w http.ResponseWriter, r *http.Request) { t.Log(r.URL.Query().Get("stage")) })
 	mux.HandleFunc("/browser/state", func(w http.ResponseWriter, r *http.Request) { json.NewEncoder(w).Encode(state.Units()) })
+	// Send one production-format position update without starting a permanent ticker.
+	mux.HandleFunc("/browser/positions", func(w http.ResponseWriter, r *http.Request) {
+		data, err := json.Marshal(state.Units())
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		ws.positionMutex.Lock()
+		defer ws.positionMutex.Unlock()
+		for conn := range ws.positionClients {
+			if err := writeSocket(conn, data); err != nil {
+				conn.Close()
+				delete(ws.positionClients, conn)
+			}
+		}
+	})
 	mux.HandleFunc("/browser/test.js", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/javascript")
 		w.Write([]byte(browserTests))
 	})
 	mux.HandleFunc("/browser", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/html")
-		w.Write([]byte(`<iframe id="app" src="/" style="width:1200px;height:800px"></iframe><script src="/browser/test.js"></script>`))
+		w.Write([]byte(`<iframe id="app" src="/?gm=true" style="width:1200px;height:800px"></iframe><script src="/browser/test.js"></script>`))
 	})
 	// Hold a response after it captures state, allowing deterministic response ordering.
 	var gateMutex sync.Mutex
@@ -83,7 +99,7 @@ func TestBrowserSync(t *testing.T) {
 	})
 	server := newTestServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		gateMutex.Lock()
-		hold := kind != "" && ((kind == "spawn" && r.Method == http.MethodPost && r.URL.Path == "/unit") || (kind == "snapshot" && r.URL.Path == "/loadExistingUnits"))
+		hold := kind != "" && ((kind == "spawn" && r.Method == http.MethodPost && r.URL.Path == "/unit") || (kind == "refresh" && r.URL.Path == "/loadExistingUnits"))
 		signal, unblock := ready, release
 		if hold {
 			kind = ""

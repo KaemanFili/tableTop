@@ -19,13 +19,7 @@
         tooltip.hidden = statuses.hidden || !circle;
         if (tooltip.hidden) return;
         tooltip.textContent = circle.getAttribute('aria-label');
-        const token = circle.getBoundingClientRect();
-        const bounds = tooltip.getBoundingClientRect();
-        const above = token.top - bounds.height - 6;
-        const top = above >= 8 ? above : token.bottom + 6;
-        tooltip.style.left = `${Math.max(8, Math.min(token.left + (token.width - bounds.width) / 2,
-            window.innerWidth - bounds.width - 8))}px`;
-        tooltip.style.top = `${Math.max(8, Math.min(top, window.innerHeight - bounds.height - 8))}px`;
+        menuUI.position(tooltip, circle, {placement: 'above', gap: 6});
     }
 
     function closeStatuses(restoreFocus = false) {
@@ -38,14 +32,7 @@
 
     function positionStatuses(unit) {
         if (statuses.hidden) return;
-        const token = unit.getBoundingClientRect();
-        const bounds = statuses.getBoundingClientRect();
-        const above = token.top - bounds.height - 8;
-        // If there is no room above the token, keep the row visible below it.
-        const top = above >= 8 ? above : token.bottom + 8;
-        statuses.style.left = `${Math.max(8, Math.min(token.left + (token.width - bounds.width) / 2,
-            window.innerWidth - bounds.width - 8))}px`;
-        statuses.style.top = `${Math.max(8, Math.min(top, window.innerHeight - bounds.height - 8))}px`;
+        menuUI.position(statuses, unit, {placement: 'above'});
         updateTooltip();
     }
 
@@ -113,14 +100,7 @@
     }
 
     function position(unit) {
-        const token = unit.getBoundingClientRect();
-        const bounds = menu.getBoundingClientRect();
-        const margin = 8;
-        const left = Math.min(token.right + 6, window.innerWidth - bounds.width - margin);
-        const top = Math.min(token.top + (token.height - bounds.height) / 2,
-            window.innerHeight - bounds.height - margin);
-        menu.style.left = `${Math.max(margin, left)}px`;
-        menu.style.top = `${Math.max(margin, top)}px`;
+        menuUI.position(menu, unit, {align: 'center', gap: 6});
         positionStatuses(unit);
     }
 
@@ -220,6 +200,11 @@
         });
     }
     document.addEventListener('unitStatusChanged', () => queueMicrotask(updateControls));
+    document.addEventListener('unitPositionChanged', event => {
+        if (menu.hidden || menu.dataset.unitId !== event.detail.id) return;
+        const unit = document.getElementById(event.detail.id);
+        if (unit) position(unit);
+    });
     document.addEventListener('unitSizeChanged', event => {
         // The display listener applies the new size before this task runs.
         queueMicrotask(() => {

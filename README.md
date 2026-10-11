@@ -28,6 +28,7 @@ The app serves it locally; dependency updates are explicit.
 - `internal/app`: shared application state and data types.
 - `internal/handlers`: HTTP endpoint handlers and websocket handlers.
 - `static`: browser JavaScript and CSS; `boardGeometry.js` shares drawing coordinate calculations.
+- [docs/menus.md](docs/menus.md): shared floating-menu positioning, dismissal, and focus handling.
 - `internal/app/storage.go`: atomic JSON catalog replacement shared by both libraries.
 - `templates`: reusable HTML templates served by handlers.
 - `docs/movement.md`: movement smoothing, progress calculations, and worked examples.
