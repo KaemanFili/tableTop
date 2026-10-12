@@ -60,8 +60,11 @@
             success.textContent = 'Map saved.';
             success.hidden = false;
         } else {
-            error.textContent = event.detail.xhr?.status === 409
-                ? 'Create or load a map before saving.' : 'Could not save the map. Try again.';
+            const response = event.detail.xhr;
+            error.textContent = response?.status === 507
+                ? response.responseText.trim()
+                : response?.status === 409
+                    ? response.responseText.trim() : 'Could not save the map. Try again.';
             error.hidden = false;
         }
     });

@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"tableTop/main/internal/app"
 )
 
 func (h *EndpointHandler) mapPicker(w http.ResponseWriter, r *http.Request) {
@@ -42,6 +43,10 @@ func (h *EndpointHandler) loadMap(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	board := definition.Board
+	if !board.WithinLimits() {
+		http.Error(w, app.ErrCapacity.Error(), http.StatusConflict)
+		return
+	}
 	// Send only the image and fit in boardMapChanged; utilities have their own messages.
 	definition.Board = nil
 	ws.clearBoardLocked()
@@ -52,12 +57,14 @@ func (h *EndpointHandler) loadMap(w http.ResponseWriter, r *http.Request) {
 		// Fresh utility IDs keep delayed erase/drawing messages from targeting loaded content.
 		owner := "loaded/" + rand.Text()
 		for index, stroke := range board.Strokes {
+			ws.drawingPoints += len(stroke.Points)
 			stroke.ID, stroke.Owner = owner+"/"+strconv.Itoa(index+1), owner
 			stroke.Offset, stroke.Finished, stroke.Generation = 0, true, ws.boardGeneration
 			ws.strokes[stroke.ID] = stroke
 			ws.broadcastValueLocked(stroke)
 		}
 		for index, mark := range board.Fog {
+			ws.drawingPoints += len(mark.Points)
 			mark.ID, mark.Owner, mark.Generation = owner+"/"+strconv.Itoa(index+1), owner, ws.boardGeneration
 			ws.fogMarks = append(ws.fogMarks, mark)
 			ws.broadcastValueLocked(mark)

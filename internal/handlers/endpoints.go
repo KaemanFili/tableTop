@@ -135,6 +135,13 @@ func (h *EndpointHandler) newUnit(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "text/html")
+	ws := h.webSocketHandler
+	ws.boardMutex.Lock()
+	defer ws.boardMutex.Unlock()
+	if h.state.UnitCount() >= app.MaxBoardUnits {
+		http.Error(w, "This board has reached its 500-token limit. Remove tokens before spawning more.", http.StatusConflict)
+		return
+	}
 	w.Header().Set("HX-Trigger", "unitSpawned")
 	w.Header().Set("Cache-Control", "no-store")
 
@@ -144,7 +151,7 @@ func (h *EndpointHandler) newUnit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h.webSocketHandler.BroadcastUnitState()
+	ws.broadcastValueLocked("unit created")
 	log.Println("map size: " + strconv.Itoa(h.state.UnitCount()))
 }
 

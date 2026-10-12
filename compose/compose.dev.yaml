@@ -1,0 +1,14 @@
+services:
+  tabletop:
+    command: ["-dev"]
+    environment:
+      OAUTH2_CLIENT_ID: ""
+      OAUTH2_REDIRECT_URL: ""
+      OAUTH2_CLIENT_SECRET_FILE: ""
+      TABLETOP_ADMIN_USER_IDS: ""
+    secrets: !reset []
+    volumes:
+      - tabletop-dev-data:/app/data
+
+volumes:
+  tabletop-dev-data:

@@ -3,6 +3,7 @@ package handlers
 import (
 	"crypto/rand"
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"sync"
@@ -12,6 +13,7 @@ import (
 	"tableTop/main/internal/app"
 
 	"github.com/gorilla/websocket"
+	"golang.org/x/time/rate"
 )
 
 const socketWriteTimeout = 2 * time.Second
@@ -49,13 +51,19 @@ type WebSocketHandler struct {
 	fogMarks                 []fogMark
 	boardGeneration          uint64
 	currentMap               *app.MapDefinition
+	drawingPoints            int
+	socketSlots              chan struct{}
+	socketMutex              sync.Mutex
+	socketDone               map[*websocket.Conn]chan struct{}
 }
 
 func NewWebSocketHandler(state *app.AppState) *WebSocketHandler {
 	return &WebSocketHandler{
-		state: state,
+		state:       state,
+		socketSlots: make(chan struct{}, 96),
+		socketDone:  make(map[*websocket.Conn]chan struct{}),
 		// Gorilla defaults to accepting absent or same-host Origin headers.
-		upgrader:        websocket.Upgrader{},
+		upgrader:        websocket.Upgrader{HandshakeTimeout: 5 * time.Second},
 		positionClients: make(map[*websocket.Conn]bool),
 		boardClients:    make(map[*websocket.Conn]bool),
 		rulers:          make(map[string]boardRuler),
@@ -148,14 +156,63 @@ func (h *WebSocketHandler) broadcastUnitsLocked(data []byte) {
 	}
 }
 
-func (h *WebSocketHandler) updateServer(w http.ResponseWriter, r *http.Request) {
+// Upgrade reserves a slot before hijacking. Each handler releases it on exit.
+func (h *WebSocketHandler) upgrade(w http.ResponseWriter, r *http.Request) (*websocket.Conn, error) {
+	select {
+	case h.socketSlots <- struct{}{}:
+	default:
+		http.Error(w, "This tabletop has too many connections. Close unused tabs.", http.StatusTooManyRequests)
+		return nil, fmt.Errorf("tabletop connection limit reached")
+	}
 	conn, err := h.upgrader.Upgrade(w, r, nil)
+	if err != nil {
+		<-h.socketSlots
+		return nil, err
+	}
+	conn.SetReadLimit(1024)
+	conn.SetReadDeadline(time.Now().Add(90 * time.Second))
+	conn.SetPongHandler(func(string) error { return conn.SetReadDeadline(time.Now().Add(90 * time.Second)) })
+	done := make(chan struct{})
+	go func() {
+		ticker := time.NewTicker(30 * time.Second)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-done:
+				return
+			case <-ticker.C:
+				if err := conn.WriteControl(websocket.PingMessage, nil, time.Now().Add(socketWriteTimeout)); err != nil {
+					conn.Close()
+					return
+				}
+			}
+		}
+	}()
+	// Keep cleanup scoped to the handler via releaseSocket.
+	h.socketMutex.Lock()
+	h.socketDone[conn] = done
+	h.socketMutex.Unlock()
+	return conn, nil
+}
+
+func (h *WebSocketHandler) releaseSocket(conn *websocket.Conn) {
+	conn.Close()
+	h.socketMutex.Lock()
+	close(h.socketDone[conn])
+	delete(h.socketDone, conn)
+	h.socketMutex.Unlock()
+	<-h.socketSlots
+}
+
+func (h *WebSocketHandler) updateServer(w http.ResponseWriter, r *http.Request) {
+	conn, err := h.upgrade(w, r)
 	if err != nil {
 		log.Println("Upgrade failed:", err)
 		return
 	}
-	defer conn.Close()
+	defer h.releaseSocket(conn)
 
+	limiter := rate.NewLimiter(120, 240)
 	for {
 		_, data, err := conn.ReadMessage()
 		if err != nil {
@@ -163,6 +220,9 @@ func (h *WebSocketHandler) updateServer(w http.ResponseWriter, r *http.Request) 
 			break
 		}
 
+		if !limiter.Allow() {
+			return
+		}
 		var unitData struct {
 			ID   string
 			Left int
@@ -186,20 +246,21 @@ func (h *WebSocketHandler) updateServer(w http.ResponseWriter, r *http.Request) 
 }
 
 func (h *WebSocketHandler) updateClientPosition(w http.ResponseWriter, r *http.Request) {
-	conn, err := h.upgrader.Upgrade(w, r, nil)
+	conn, err := h.upgrade(w, r)
 	if err != nil {
 		log.Println("Upgrade failed:", err)
 		return
 	}
-	defer conn.Close()
+	defer h.releaseSocket(conn)
 
 	h.positionMutex.Lock()
 	h.positionClients[conn] = true
 	h.startPositionBroadcastLocked()
 	h.positionMutex.Unlock()
 
+	limiter := rate.NewLimiter(10, 20)
 	for {
-		if _, _, err := conn.ReadMessage(); err != nil {
+		if _, _, err := conn.ReadMessage(); err != nil || !limiter.Allow() {
 			break
 		}
 	}
@@ -210,12 +271,12 @@ func (h *WebSocketHandler) updateClientPosition(w http.ResponseWriter, r *http.R
 }
 
 func (h *WebSocketHandler) updateBoardUtilityValues(w http.ResponseWriter, r *http.Request) {
-	conn, err := h.upgrader.Upgrade(w, r, nil)
+	conn, err := h.upgrade(w, r)
 	if err != nil {
 		log.Println("Upgrade failed:", err)
 		return
 	}
-	defer conn.Close()
+	defer h.releaseSocket(conn)
 	conn.SetReadLimit(1024)
 	sessionID := rand.Text()
 	defer h.unregisterBoardUtilitiesClient(conn, sessionID)
@@ -265,34 +326,43 @@ func (h *WebSocketHandler) registerBoardUtilitiesClient(conn *websocket.Conn, se
 }
 
 func (h *WebSocketHandler) readBoardUtilitiesMessages(conn *websocket.Conn, sessionID string, isGM bool) {
+	limiter := rate.NewLimiter(120, 240)
 	for {
 		_, data, err := conn.ReadMessage()
 		if err != nil {
 			return
 		}
-		h.handleBoardUtilitiesMessage(sessionID, data, isGM)
+		if !limiter.Allow() {
+			return
+		}
+		if err := h.handleBoardUtilitiesMessage(sessionID, data, isGM); err != nil {
+			h.boardMutex.Lock()
+			writeSocketJSON(conn, map[string]string{"type": "boardLimitReached", "message": err.Error()})
+			h.boardMutex.Unlock()
+		}
 	}
 }
 
-func (h *WebSocketHandler) handleBoardUtilitiesMessage(sessionID string, data []byte, isGM bool) {
+func (h *WebSocketHandler) handleBoardUtilitiesMessage(sessionID string, data []byte, isGM bool) error {
 	var message struct {
 		Type string `json:"type"`
 	}
 	if json.Unmarshal(data, &message) != nil {
-		return
+		return nil
 	}
 	switch message.Type {
 	case "fogMark":
 		if isGM {
-			h.updateFog(sessionID, data)
+			return h.updateFog(sessionID, data)
 		}
 	case "rulerChanged":
-		h.updateRuler(sessionID, data)
+		return h.updateRuler(sessionID, data)
 	case "penStroke":
-		h.updatePen(sessionID, data)
+		return h.updatePen(sessionID, data)
 	case "penErase":
-		h.erasePen(data)
+		return h.erasePen(data)
 	}
+	return nil
 }
 
 func (h *WebSocketHandler) unregisterBoardUtilitiesClient(conn *websocket.Conn, sessionID string) {

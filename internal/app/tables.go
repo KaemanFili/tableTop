@@ -28,13 +28,14 @@ type TableLibrary struct {
 	mu     sync.RWMutex
 	path   string
 	tables []TableDefinition
+	limits *StorageLimits
 }
 
-func NewTableLibrary(dir string) (*TableLibrary, error) {
+func NewTableLibrary(dir string, limits ...*StorageLimits) (*TableLibrary, error) {
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		return nil, err
 	}
-	library := &TableLibrary{path: filepath.Join(dir, "sessions.json")}
+	library := &TableLibrary{path: filepath.Join(dir, "sessions.json"), limits: firstStorageLimit(limits)}
 	data, err := os.ReadFile(library.path)
 	if errors.Is(err, os.ErrNotExist) {
 		return library, nil
@@ -87,9 +88,14 @@ func (library *TableLibrary) Create(name, owner string) (TableDefinition, error)
 	}
 	library.mu.Lock()
 	defer library.mu.Unlock()
+	library.limits.lock()
+	defer library.limits.unlock()
+	if len(library.tables) >= MaxTabletops {
+		return TableDefinition{}, ErrCapacity
+	}
 	table := TableDefinition{ID: rand.Text(), Name: name, OwnerID: owner, Members: []string{owner}}
 	proposed := append(slices.Clone(library.tables), table)
-	if err := writeJSONFile(library.path, proposed); err != nil {
+	if err := writeJSONFile(library.path, proposed, library.limits); err != nil {
 		return TableDefinition{}, err
 	}
 	library.tables = proposed
@@ -103,15 +109,20 @@ func (library *TableLibrary) Join(id, user string) (TableDefinition, error) {
 	}
 	library.mu.Lock()
 	defer library.mu.Unlock()
+	library.limits.lock()
+	defer library.limits.unlock()
 	for index, table := range library.tables {
 		if table.ID != id {
 			continue
 		}
 		if !table.HasMember(user) {
+			if len(table.Members) >= MaxTabletopMembers {
+				return TableDefinition{}, ErrCapacity
+			}
 			table.Members = append(slices.Clone(table.Members), user)
 			proposed := slices.Clone(library.tables)
 			proposed[index] = table
-			if err := writeJSONFile(library.path, proposed); err != nil {
+			if err := writeJSONFile(library.path, proposed, library.limits); err != nil {
 				return TableDefinition{}, err
 			}
 			library.tables = proposed

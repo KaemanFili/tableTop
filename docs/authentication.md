@@ -26,6 +26,7 @@ file and set these environment variables before starting the server:
 export OAUTH2_CLIENT_ID='your application client ID'
 export OAUTH2_CLIENT_SECRET_FILE='/path/to/oauth2_client_secret'
 export OAUTH2_REDIRECT_URL='http://localhost:18080/auth/discord/callback'
+export TABLETOP_ADMIN_USER_IDS='your-numeric-discord-user-id'
 go run .
 ```
 
@@ -44,10 +45,18 @@ The direct `OAUTH2_CLIENT_SECRET` variable remains supported for host-process
 compatibility; set either it or `OAUTH2_CLIENT_SECRET_FILE`, never both.
 An unreadable secret file stops startup.
 
-When all three settings are absent, the existing local development board remains
-available, including `?gm=true`. Partial configuration stops startup. When Discord
+Normal startup requires all OAuth settings and `TABLETOP_ADMIN_USER_IDS`.
+Use `go run . -dev` or `./compose/compose.sh -dev up -d` to explicitly enable the
+local development board, including `?gm=true`. Partial configuration stops normal startup. When Discord
 is configured, login is required and GM permissions come from session ownership;
 adding `?gm=true` does not grant access.
+
+Administrators sign in without invitations and use **Invite players** in the
+lobby to admit other Discord accounts. Each invitation admits one account,
+expires after seven days, and can be revoked before use. Admission persists in
+`data/access.json`; returning members do not need new invitations. Invited
+players still need each game's join code. See [public hosting](public-hosting.md)
+for configuration, limits, and backups.
 
 ## Session behavior and storage
 

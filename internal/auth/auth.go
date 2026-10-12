@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"golang.org/x/oauth2"
+	"golang.org/x/time/rate"
 )
 
 type Config struct {
@@ -21,12 +22,14 @@ type Config struct {
 	RedirectURL  string
 	HTTPClient   *http.Client
 	Provider     Provider
+	Access       Access
 }
 
 type User struct {
-	ID   string
-	Name string
-	IsGM bool
+	ID      string
+	Name    string
+	IsGM    bool
+	IsAdmin bool
 }
 
 type userKey struct{}
@@ -62,9 +65,11 @@ type Manager struct {
 	mu                      sync.Mutex
 	sessions                map[string]*session
 	states                  map[string]loginAttempt
+	loginLimiter            *rate.Limiter
+	socketCount             int
 }
 
-func FromEnvironment() (*Manager, error) {
+func FromEnvironment(access ...Access) (*Manager, error) {
 	secret, path := os.Getenv("OAUTH2_CLIENT_SECRET"), os.Getenv("OAUTH2_CLIENT_SECRET_FILE")
 	if secret != "" && path != "" {
 		return nil, errors.New("set only one of OAUTH2_CLIENT_SECRET and OAUTH2_CLIENT_SECRET_FILE")
@@ -77,6 +82,9 @@ func FromEnvironment() (*Manager, error) {
 		secret = strings.TrimSpace(string(data))
 	}
 	config := Config{ClientID: os.Getenv("OAUTH2_CLIENT_ID"), ClientSecret: secret, RedirectURL: os.Getenv("OAUTH2_REDIRECT_URL")}
+	if len(access) > 0 {
+		config.Access = access[0]
+	}
 	if config.ClientID == "" && config.ClientSecret == "" && config.RedirectURL == "" {
 		return nil, nil
 	}
@@ -109,7 +117,7 @@ func New(config Config) (*Manager, error) {
 	return &Manager{config: config, origin: redirect.Scheme + "://" + redirect.Host, secure: redirect.Scheme == "https", client: client,
 		oauth:    oauth2.Config{ClientID: config.ClientID, ClientSecret: config.ClientSecret, RedirectURL: config.RedirectURL, Endpoint: provider.Endpoint(), Scopes: provider.Scopes()},
 		provider: provider, loginPath: provider.LoginPath(), callbackPath: redirect.Path,
-		sessions: make(map[string]*session), states: make(map[string]loginAttempt)}, nil
+		sessions: make(map[string]*session), states: make(map[string]loginAttempt), loginLimiter: rate.NewLimiter(2, 20)}, nil
 }
 
 var callbackPathPattern = regexp.MustCompile(`^/auth(?:/[A-Za-z0-9_-]+)*/callback$`)
@@ -120,6 +128,9 @@ func (m *Manager) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET "+m.loginPath, m.login)
 	mux.HandleFunc("GET "+m.callbackPath, m.callback)
 	mux.HandleFunc("POST /auth/logout", m.logout)
+	mux.HandleFunc("GET /admin/invites", m.admin)
+	mux.HandleFunc("POST /admin/invites", m.admin)
+	mux.HandleFunc("POST /admin/invites/{invite}/revoke", m.admin)
 }
 
 func (m *Manager) Middleware(next http.Handler) http.Handler {
@@ -150,7 +161,15 @@ func (m *Manager) Middleware(next http.Handler) http.Handler {
 			return
 		}
 		if strings.EqualFold(r.Header.Get("Upgrade"), "websocket") {
+			if !m.canOpenSocket(token) {
+				http.Error(w, "Too many open connections. Close unused tabs.", http.StatusTooManyRequests)
+				return
+			}
 			w = &socketWriter{ResponseWriter: w, manager: m, token: token}
+		} else if !m.allowRequest(token, r) {
+			w.Header().Set("Retry-After", "10")
+			http.Error(w, "Too many requests. Try again shortly.", http.StatusTooManyRequests)
+			return
 		}
 		next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), userKey{}, user)))
 	})

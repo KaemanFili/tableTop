@@ -3,6 +3,7 @@ package handlers
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"io"
 	"log"
 	"net/http"
@@ -106,6 +107,10 @@ func (h *EndpointHandler) createMap(w http.ResponseWriter, r *http.Request) {
 	definition, err := h.mapLibrary.Create(data.MapDefinition, image)
 	if err != nil {
 		log.Println("Save map:", err)
+		if errors.Is(err, app.ErrStorageLimit) {
+			fail(err.Error())
+			return
+		}
 		fail("The map could not be saved. Please try again.")
 		return
 	}
@@ -154,6 +159,14 @@ func (h *EndpointHandler) saveBoard(w http.ResponseWriter, r *http.Request) {
 	}
 	if err := h.mapLibrary.SaveBoard(*ws.currentMap, board); err != nil {
 		log.Println("Save board:", err)
+		if errors.Is(err, app.ErrCapacity) {
+			http.Error(w, err.Error(), http.StatusConflict)
+			return
+		}
+		if errors.Is(err, app.ErrStorageLimit) {
+			http.Error(w, err.Error(), http.StatusInsufficientStorage)
+			return
+		}
 		http.Error(w, "The map could not be saved. Please try again.", http.StatusInternalServerError)
 		return
 	}

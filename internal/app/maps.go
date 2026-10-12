@@ -42,13 +42,14 @@ func (m MapDefinition) Validate() error {
 }
 
 type MapLibrary struct {
-	mutex sync.RWMutex
-	dir   string
-	maps  map[string]MapDefinition
+	mutex  sync.RWMutex
+	dir    string
+	maps   map[string]MapDefinition
+	limits *StorageLimits
 }
 
-func NewMapLibrary(dir string) (*MapLibrary, error) {
-	library := &MapLibrary{dir: dir, maps: make(map[string]MapDefinition)}
+func NewMapLibrary(dir string, limits ...*StorageLimits) (*MapLibrary, error) {
+	library := &MapLibrary{dir: dir, maps: make(map[string]MapDefinition), limits: firstStorageLimit(limits)}
 	if err := os.MkdirAll(filepath.Join(dir, "maps"), 0755); err != nil {
 		return nil, err
 	}
@@ -110,11 +111,16 @@ func (l *MapLibrary) Maps() []MapDefinition {
 func (l *MapLibrary) SaveBoard(definition MapDefinition, board SavedBoard) error {
 	l.mutex.Lock()
 	defer l.mutex.Unlock()
+	l.limits.lock()
+	defer l.limits.unlock()
 	if _, exists := l.maps[definition.ID]; !exists {
 		return errors.New("map is not in the library")
 	}
 	if err := definition.Validate(); err != nil {
 		return err
+	}
+	if !board.WithinLimits() {
+		return ErrCapacity
 	}
 	if _, err := os.Stat(filepath.Join(l.dir, "maps", definition.ID+".png")); err != nil {
 		return err
@@ -147,13 +153,15 @@ func (l *MapLibrary) Create(definition MapDefinition, pngImage []byte) (MapDefin
 	}
 	l.mutex.Lock()
 	defer l.mutex.Unlock()
+	l.limits.lock()
+	defer l.limits.unlock()
 	var id [16]byte
 	if _, err := rand.Read(id[:]); err != nil {
 		return MapDefinition{}, err
 	}
 	definition.ID = hex.EncodeToString(id[:])
 	imagePath := filepath.Join(l.dir, "maps", definition.ID+".png")
-	if err := os.WriteFile(imagePath, pngImage, 0644); err != nil {
+	if err := writeStorageFile(imagePath, pngImage, 0644, l.limits); err != nil {
 		return MapDefinition{}, err
 	}
 	if err := l.save(definition); err != nil {
@@ -175,13 +183,15 @@ func (l *MapLibrary) save(definition MapDefinition) error {
 }
 
 func (l *MapLibrary) saveMaps(maps []MapDefinition) error {
-	return writeJSONFile(filepath.Join(l.dir, "maps.json"), maps)
+	return writeJSONFile(filepath.Join(l.dir, "maps.json"), maps, l.limits)
 }
 
 // Delete removes a saved map and its artwork, preserving the entry on failure.
 func (l *MapLibrary) Delete(id string) error {
 	l.mutex.Lock()
 	defer l.mutex.Unlock()
+	l.limits.lock()
+	defer l.limits.unlock()
 	if _, exists := l.maps[id]; !exists {
 		return nil
 	}
@@ -197,7 +207,9 @@ func (l *MapLibrary) Delete(id string) error {
 		return err
 	}
 	if err := os.Remove(filepath.Join(l.dir, "maps", id+".png")); err != nil && !errors.Is(err, os.ErrNotExist) {
-		return errors.Join(err, l.saveMaps(original))
+		// Restore the previous catalog even if limits were lowered below its
+		// existing size. This rollback does not grow usage beyond the original.
+		return errors.Join(err, writeJSONFile(filepath.Join(l.dir, "maps.json"), original))
 	}
 	delete(l.maps, id)
 	return nil

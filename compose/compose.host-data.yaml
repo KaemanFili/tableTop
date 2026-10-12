@@ -4,3 +4,7 @@ services:
     user: "${TABLETOP_UID:?Set TABLETOP_UID to your host user ID}:${TABLETOP_GID:?Set TABLETOP_GID to your host group ID}"
     volumes:
       - ../data:/app/data
+  maintenance:
+    user: "${TABLETOP_UID:?Set TABLETOP_UID to your host user ID}:${TABLETOP_GID:?Set TABLETOP_GID to your host group ID}"
+    volumes:
+      - ../data:/data

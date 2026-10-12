@@ -117,6 +117,10 @@ func (h *EndpointHandler) createUnit(w http.ResponseWriter, r *http.Request) {
 	unit, err := h.library.Create(data.Name, data.UnitType, data.Size, data.ImageFit, pngImage)
 	if err != nil {
 		log.Println("Save unit:", err)
+		if errors.Is(err, app.ErrStorageLimit) {
+			fail(err.Error())
+			return
+		}
 		fail("The unit could not be saved. Please try again. If you selected an image, choose it again before saving.")
 		return
 	}

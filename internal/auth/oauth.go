@@ -19,6 +19,7 @@ const stateLifetime = 10 * time.Minute
 type loginAttempt struct {
 	Expires  time.Time
 	ReturnTo string
+	Invite   string
 }
 type loginData struct{ Error, LoginURL, ProviderName string }
 
@@ -39,13 +40,25 @@ func (m *Manager) loginPage(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	link := m.loginPath
+	query := url.Values{}
+	if invite := r.URL.Query().Get("invite"); invite != "" && len(invite) <= 128 {
+		query.Set("invite", invite)
+	}
 	if next := safeReturn(r.URL.Query().Get("next")); next != "" {
-		link += "?next=" + url.QueryEscape(next)
+		query.Set("next", next)
+	}
+	if len(query) > 0 {
+		link += "?" + query.Encode()
 	}
 	loginTemplate.Execute(w, loginData{LoginURL: link, ProviderName: m.provider.Name()})
 }
 
 func (m *Manager) login(w http.ResponseWriter, r *http.Request) {
+	if !m.loginLimiter.Allow() {
+		w.Header().Set("Retry-After", "1")
+		http.Error(w, "Too many sign-in attempts. Try again shortly.", http.StatusTooManyRequests)
+		return
+	}
 	state := rand.Text()
 	now := time.Now()
 	m.mu.Lock()
@@ -54,16 +67,31 @@ func (m *Manager) login(w http.ResponseWriter, r *http.Request) {
 			delete(m.states, key)
 		}
 	}
-	m.states[state] = loginAttempt{Expires: now.Add(stateLifetime), ReturnTo: safeReturn(r.URL.Query().Get("next"))}
+	invite := r.URL.Query().Get("invite")
+	if len(invite) > 128 {
+		invite = ""
+	}
+	if len(m.states) >= 1000 {
+		m.mu.Unlock()
+		http.Error(w, "Too many sign-in attempts. Try again shortly.", http.StatusTooManyRequests)
+		return
+	}
+	m.states[state] = loginAttempt{Expires: now.Add(stateLifetime), ReturnTo: safeReturn(r.URL.Query().Get("next")), Invite: invite}
 	m.mu.Unlock()
 	m.setCookie(w, stateCookie, state, int(stateLifetime.Seconds()))
 	http.Redirect(w, r, m.oauth.AuthCodeURL(state), http.StatusFound)
 }
 
 func (m *Manager) callback(w http.ResponseWriter, r *http.Request) {
+	if !m.loginLimiter.Allow() {
+		w.Header().Set("Retry-After", "1")
+		http.Error(w, "Too many sign-in attempts. Try again shortly.", http.StatusTooManyRequests)
+		return
+	}
 	cookie, err := r.Cookie(stateCookie)
 	state := r.URL.Query().Get("state")
 	returnTo := "/lobby"
+	invite := ""
 	valid := err == nil && state != "" && subtle.ConstantTimeCompare([]byte(cookie.Value), []byte(state)) == 1
 	if valid {
 		m.mu.Lock()
@@ -71,6 +99,9 @@ func (m *Manager) callback(w http.ResponseWriter, r *http.Request) {
 		delete(m.states, state)
 		m.mu.Unlock()
 		valid = exists && time.Now().Before(attempt.Expires)
+		if valid {
+			invite = attempt.Invite
+		}
 		if valid && attempt.ReturnTo != "" {
 			returnTo = attempt.ReturnTo
 		}
@@ -98,11 +129,21 @@ func (m *Manager) callback(w http.ResponseWriter, r *http.Request) {
 		m.loginError(w, "Sign-in failed. Please try again.", http.StatusBadGateway)
 		return
 	}
+	if m.config.Access != nil {
+		if err := m.config.Access.Admit(user.ID, invite); err != nil {
+			m.loginError(w, "An administrator invitation is required to join this server. Ask your host for a new invitation link.", http.StatusForbidden)
+			return
+		}
+		user.IsAdmin = m.config.Access.IsAdmin(user.ID)
+	}
 	if old, err := r.Cookie(sessionCookie); err == nil {
 		m.removeSession(old.Value)
 	}
 	user.IsGM = false
-	m.newSession(w, user)
+	if !m.newSession(w, user) {
+		m.loginError(w, "Too many login sessions. Sign out of an unused browser before trying again.", http.StatusTooManyRequests)
+		return
+	}
 	http.Redirect(w, r, returnTo, http.StatusSeeOther)
 }
 

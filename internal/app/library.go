@@ -26,9 +26,10 @@ type UnitDefinition struct {
 }
 
 type UnitLibrary struct {
-	mutex sync.RWMutex
-	dir   string
-	units map[string]UnitDefinition
+	mutex  sync.RWMutex
+	dir    string
+	units  map[string]UnitDefinition
+	limits *StorageLimits
 }
 
 const unitCatalogVersion = 1
@@ -38,7 +39,7 @@ type unitCatalog struct {
 	Units   []UnitDefinition `json:"units"`
 }
 
-func NewUnitLibrary(dir string) (*UnitLibrary, error) {
+func NewUnitLibrary(dir string, limits ...*StorageLimits) (*UnitLibrary, error) {
 	if err := os.MkdirAll(filepath.Join(dir, "images"), 0755); err != nil {
 		return nil, err
 	}
@@ -56,7 +57,7 @@ func NewUnitLibrary(dir string) (*UnitLibrary, error) {
 		}
 	}
 
-	library := &UnitLibrary{dir: dir, units: make(map[string]UnitDefinition, len(saved))}
+	library := &UnitLibrary{dir: dir, units: make(map[string]UnitDefinition, len(saved)), limits: firstStorageLimit(limits)}
 	for _, entry := range saved {
 		unit, err := normalizeSavedUnit(entry)
 		if err != nil {
@@ -188,6 +189,8 @@ func (l *UnitLibrary) Create(name, unitType string, size UnitSize, fit ImageFit,
 	}
 	l.mutex.Lock()
 	defer l.mutex.Unlock()
+	l.limits.lock()
+	defer l.limits.unlock()
 	var randomID [16]byte
 	if _, err := rand.Read(randomID[:]); err != nil {
 		return UnitDefinition{}, err
@@ -200,7 +203,7 @@ func (l *UnitLibrary) Create(name, unitType string, size UnitSize, fit ImageFit,
 	if len(pngImage) > 0 {
 		unit.ImageID = unit.ID
 		imagePath = filepath.Join(l.dir, "images", unit.ID+".png")
-		if err := os.WriteFile(imagePath, pngImage, 0644); err != nil {
+		if err := writeStorageFile(imagePath, pngImage, 0644, l.limits); err != nil {
 			return UnitDefinition{}, err
 		}
 	}
@@ -219,13 +222,15 @@ func (l *UnitLibrary) Create(name, unitType string, size UnitSize, fit ImageFit,
 }
 
 func (l *UnitLibrary) save(units []UnitDefinition) error {
-	return writeJSONFile(filepath.Join(l.dir, "units.json"), unitCatalog{Version: unitCatalogVersion, Units: units})
+	return writeJSONFile(filepath.Join(l.dir, "units.json"), unitCatalog{Version: unitCatalogVersion, Units: units}, l.limits)
 }
 
 // Delete removes a reusable definition; placed copies retain their artwork.
 func (l *UnitLibrary) Delete(id string) error {
 	l.mutex.Lock()
 	defer l.mutex.Unlock()
+	l.limits.lock()
+	defer l.limits.unlock()
 	if _, exists := l.units[id]; !exists {
 		return nil
 	}

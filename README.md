@@ -3,10 +3,10 @@ ttrpg table top tool meant to run in browser
 
 ## Development
 
-Requires Go 1.27.1 or newer. Run the app from the project root with `go run .`,
+Requires Go 1.27.1 or newer. Run the development board from the project root with `go run . -dev`,
 then open `http://localhost:18080/` (or `http://127.0.0.1:18080/`). To use the
 executable, rebuild with `go build -o main .`, then run `./main` from the project
-root. Restart a running server after rebuilding; replacing the executable does
+root with `./main -dev`. Restart a running server after rebuilding; replacing the executable does
 not update the running process.
 
 Use `go fix ./...` to apply Go's automated source modernizations, then
@@ -34,6 +34,12 @@ from `compose/.env`. Run `docker compose -f compose/compose.yaml up --build -d`.
 `http://localhost:18080/`; runtime credentials stay outside the image and Git.
 Data persists in a named volume. See [container setup](docs/containers.md) for
 requirements, configuration updates, and using your existing host data directory.
+Storage defaults to 5 GiB total and 512 MiB per tabletop; the container guide
+explains how to configure these limits.
+Normal startup requires OAuth and `TABLETOP_ADMIN_USER_IDS`. Administrators
+invite players through the lobby's **Invite players** link. Run
+`./compose/compose.sh -dev up --build -d` for a development board using a separate
+volume. See [public hosting](docs/public-hosting.md) for limits and backup/restore.
 
 ## Discord sign-in
 
@@ -42,8 +48,8 @@ The creator is its GM; joining users are players. Each session has an independen
 board and libraries. See [Discord setup and sessions](docs/authentication.md) for
 the one-time application credentials and redirect URL configuration.
 
-With Discord configured, session ownership controls GM access. Without it,
-the existing local development mode remains available.
+With Discord configured, session ownership controls GM access. Explicit `-dev`
+mode enables the local development board.
 
 ## Structure
 

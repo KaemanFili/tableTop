@@ -26,6 +26,7 @@ func (ws *WebSocketHandler) clearBoardLocked() {
 	clear(ws.strokes)
 	clear(ws.erasedStrokes)
 	ws.fogMarks = nil
+	ws.drawingPoints = 0
 	ws.currentMap = nil
 	ws.boardGeneration++
 	message, _ := json.Marshal(struct {

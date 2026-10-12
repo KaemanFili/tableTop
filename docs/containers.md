@@ -30,12 +30,17 @@ client ID and redirect URL:
 ```dotenv
 OAUTH2_CLIENT_ID=your-application-client-id
 OAUTH2_REDIRECT_URL=http://localhost:18080/auth/discord/callback
+TABLETOP_ADMIN_USER_IDS=your-numeric-discord-user-id
 ```
 
 Compose mounts the client secret read-only as a file; its contents are not put
 in the container's environment. The app reads it at startup. `compose/secrets/` is excluded from Git and the Docker build context. See
 [Docker's Compose secrets guide](https://docs.docker.com/compose/how-tos/use-secrets/).
-Leave the client ID, redirect URL, and secret file empty for local development.
+Normal startup requires complete OAuth settings and administrator IDs. Run
+`./compose/compose.sh -dev up --build -d` for an explicit development board;
+it uses a separate volume and no OAuth secret mount. See
+[public hosting](public-hosting.md) for development mode, server invitations,
+runtime limits, tunnel configuration, and backup/restore commands.
 
 Compose interpolates these values into `compose/compose.yaml` and automatically
 loads `.env` beside that file when using the commands below. Exported shell
@@ -94,6 +99,41 @@ membership, unit libraries, saved maps, and artwork survive container replacemen
 The volume starts independently of an existing host `data/` directory.
 Live board state and login sessions still reset when the process restarts, as
 they do outside a container. Save maps to retain live board content.
+
+### Storage limits
+
+The app defaults to **5 GiB total** under `/app/data` and **512 MiB per tabletop**.
+Stored PNG images, unit/map catalogs, and saved boards count toward both
+limits; the root session/membership catalog counts toward the total. Image
+sizes are measured after conversion to PNG. The app
+rejects growth that would cross either limit and explains the storage problem
+in the form or save response. Existing data stays readable; deletions and
+shrinking saves remain available when storage is full.
+
+Override the limits in `compose/.env` using positive byte counts:
+
+```dotenv
+TABLETOP_STORAGE_LIMIT_BYTES=5368709120
+TABLETOP_SESSION_STORAGE_LIMIT_BYTES=536870912
+```
+
+Recreate the service after changing these values. For a host process, export
+the same variables before starting it. The tabletop limit must not exceed the
+total limit. The standalone development board also uses the tabletop limit.
+
+All libraries in one process share the quota check, so concurrent uploads
+cannot bypass the global limit. Disk usage is measured before growing writes,
+including existing files after restart and artwork retained for placed units
+or saved boards. Deleting a unit definition preserves its artwork; deleting a
+map removes that map's image. Existing data is never automatically deleted.
+
+These limits cap committed file bytes written by the app. Atomic catalog/image
+updates temporarily keep both old and new files on disk, so leave additional
+free space. Filesystem overhead, Docker images/logs, backups, and writes from
+other processes are outside this cap. An ordinary Docker named volume has no
+configured size limit of its own; for an OS-enforced physical ceiling, use a
+filesystem quota or a dedicated filesystem for the data directory. Run one app
+process per data root, as the app quota lock is held within that process.
 
 To use your existing host `data/` directory instead, use the optional override
 on Linux with your host UID and GID:

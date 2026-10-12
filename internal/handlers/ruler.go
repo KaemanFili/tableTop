@@ -17,13 +17,13 @@ func validRulerPoint(point *rulerPoint) bool {
 		point.X >= 0 && point.Y >= 0 && point.X <= 64 && point.Y <= 64
 }
 
-func (h *WebSocketHandler) updateRuler(id string, data []byte) {
+func (h *WebSocketHandler) updateRuler(id string, data []byte) error {
 	var ruler boardRuler
 	if json.Unmarshal(data, &ruler) != nil || ruler.Type != "rulerChanged" {
-		return
+		return nil
 	}
 	if !ruler.Clear && (!validRulerPoint(ruler.Start) || !validRulerPoint(ruler.End)) {
-		return
+		return nil
 	}
 	ruler.ID = id
 	if ruler.Clear {
@@ -32,7 +32,10 @@ func (h *WebSocketHandler) updateRuler(id string, data []byte) {
 	h.boardMutex.Lock()
 	defer h.boardMutex.Unlock()
 	if ruler.Generation != h.boardGeneration {
-		return
+		return nil
+	}
+	if _, exists := h.rulers[id]; !exists && !ruler.Clear && len(h.rulers) >= app.MaxTabletopMembers {
+		return app.ErrCapacity
 	}
 	if ruler.Clear {
 		delete(h.rulers, id)
@@ -41,4 +44,5 @@ func (h *WebSocketHandler) updateRuler(id string, data []byte) {
 	}
 	message, _ := json.Marshal(ruler)
 	h.broadcastUnitsLocked(message)
+	return nil
 }

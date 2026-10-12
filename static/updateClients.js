@@ -183,6 +183,12 @@ posUpdateSocket.onerror = function(err) {
 
 newUnitUpdateSocket.onmessage = function(event) {
     const message = JSON.parse(event.data);
+    if (message.type === 'boardLimitReached') {
+        const error = document.getElementById('utility-error');
+        error.textContent = `${message.message}. Refresh to resync your drawing; ask the GM to clear unused content.`;
+        error.hidden = false;
+        return;
+    }
     if (message.type === 'boardMapChanged') {
         document.dispatchEvent(new CustomEvent('boardMapChanged', {detail: message}));
         return;

@@ -1,6 +1,7 @@
 package tables
 
 import (
+	"errors"
 	"html/template"
 	"log"
 	"net/http"
@@ -19,14 +20,19 @@ type Manager struct {
 	dir, assets string
 	mu          sync.Mutex
 	boards      map[string]http.Handler
+	limits      *app.StorageLimits
 }
 
-func New(dir, assets string) (*Manager, error) {
-	library, err := app.NewTableLibrary(dir)
+func New(dir, assets string, limits ...*app.StorageLimits) (*Manager, error) {
+	var storage *app.StorageLimits
+	if len(limits) > 0 {
+		storage = limits[0]
+	}
+	library, err := app.NewTableLibrary(dir, storage)
 	if err != nil {
 		return nil, err
 	}
-	return &Manager{library: library, dir: dir, assets: assets, boards: make(map[string]http.Handler)}, nil
+	return &Manager{library: library, dir: dir, assets: assets, boards: make(map[string]http.Handler), limits: storage}, nil
 }
 
 func (m *Manager) RegisterRoutes(mux *http.ServeMux) {
@@ -43,7 +49,7 @@ func (m *Manager) RegisterRoutes(mux *http.ServeMux) {
 	})
 }
 
-var lobbyTemplate = template.Must(template.New("lobby").Parse(`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Your sessions · tableTop</title><link rel="stylesheet" href="/static/style.css?v=42"></head><body class="lobby-page"><main><header><h1>Your sessions</h1><span>{{.User.Name}}</span><form action="/auth/logout" method="post"><button>Sign out</button></form></header>{{if .Error}}<p role="alert">{{.Error}}</p>{{end}}<section><h2>Create a session</h2><p>You will be the GM.</p><form action="/sessions" method="post"><label>Session name<input name="name" maxlength="80" required></label><button>Create session</button></form></section><section><h2>Join a session</h2><p>Enter the code shared by your GM.</p><form action="/sessions/join" method="post"><label>Join code<input name="code" value="{{.Invite}}" required autocomplete="off"></label><button>Join as player</button></form></section><section><h2>Your tabletops</h2>{{range .Tables}}<article><a href="/sessions/{{.ID}}/">{{.Name}}</a><span>{{if eq .OwnerID $.User.ID}}GM{{else}}Player{{end}}</span><label>Join code<input readonly value="{{.ID}}" aria-label="Join code for {{.Name}}"></label></article>{{else}}<p>Create or join a session to get started.</p>{{end}}</section></main></body></html>`))
+var lobbyTemplate = template.Must(template.New("lobby").Parse(`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Your sessions · tableTop</title><link rel="stylesheet" href="/static/style.css?v=42"></head><body class="lobby-page"><main><header><h1>Your sessions</h1><span>{{.User.Name}}</span>{{if .User.IsAdmin}}<a href="/admin/invites">Invite players</a>{{end}}<form action="/auth/logout" method="post"><button>Sign out</button></form></header>{{if .Error}}<p role="alert">{{.Error}}</p>{{end}}<section><h2>Create a session</h2><p>You will be the GM.</p><form action="/sessions" method="post"><label>Session name<input name="name" maxlength="80" required></label><button>Create session</button></form></section><section><h2>Join a session</h2><p>Enter the code shared by your GM.</p><form action="/sessions/join" method="post"><label>Join code<input name="code" value="{{.Invite}}" required autocomplete="off"></label><button>Join as player</button></form></section><section><h2>Your tabletops</h2>{{range .Tables}}<article><a href="/sessions/{{.ID}}/">{{.Name}}</a><span>{{if eq .OwnerID $.User.ID}}GM{{else}}Player{{end}}</span><label>Join code<input readonly value="{{.ID}}" aria-label="Join code for {{.Name}}"></label></article>{{else}}<p>Create or join a session to get started.</p>{{end}}</section></main></body></html>`))
 
 func (m *Manager) renderLobby(w http.ResponseWriter, r *http.Request, message string, status int) {
 	user := auth.CurrentUser(r)
@@ -68,6 +74,14 @@ func (m *Manager) create(w http.ResponseWriter, r *http.Request) {
 	}
 	table, err := m.library.Create(r.Form.Get("name"), auth.CurrentUser(r).ID)
 	if err != nil {
+		if errors.Is(err, app.ErrCapacity) {
+			m.renderLobby(w, r, err.Error(), http.StatusConflict)
+			return
+		}
+		if errors.Is(err, app.ErrStorageLimit) {
+			m.renderLobby(w, r, err.Error(), http.StatusInsufficientStorage)
+			return
+		}
 		m.renderLobby(w, r, "Could not create the session. Use a name between 1 and 80 characters.", http.StatusBadRequest)
 		return
 	}
@@ -82,6 +96,14 @@ func (m *Manager) join(w http.ResponseWriter, r *http.Request) {
 	}
 	table, err := m.library.Join(strings.TrimSpace(r.Form.Get("code")), auth.CurrentUser(r).ID)
 	if err != nil {
+		if errors.Is(err, app.ErrCapacity) {
+			m.renderLobby(w, r, err.Error(), http.StatusConflict)
+			return
+		}
+		if errors.Is(err, app.ErrStorageLimit) {
+			m.renderLobby(w, r, err.Error(), http.StatusInsufficientStorage)
+			return
+		}
 		m.renderLobby(w, r, "Could not join that session. Check the join code and try again.", http.StatusBadRequest)
 		return
 	}
@@ -124,11 +146,11 @@ func (m *Manager) handler(id string) (http.Handler, error) {
 		return handler, nil
 	}
 	dir := filepath.Join(m.dir, "sessions", id)
-	units, err := app.NewUnitLibrary(dir)
+	units, err := app.NewUnitLibrary(dir, m.limits)
 	if err != nil {
 		return nil, err
 	}
-	maps, err := app.NewMapLibrary(dir)
+	maps, err := app.NewMapLibrary(dir, m.limits)
 	if err != nil {
 		return nil, err
 	}

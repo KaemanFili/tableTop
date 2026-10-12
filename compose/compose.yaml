@@ -7,13 +7,17 @@ services:
       context: ..
       dockerfile: compose/Dockerfile
     ports:
-      - "18080:18080"
+      - "127.0.0.1:18080:18080"
     environment:
       # Set these public settings to enable Discord sign-in.
       OAUTH2_CLIENT_ID: "${OAUTH2_CLIENT_ID}"
       # Local callback: http://localhost:18080/auth/discord/callback
       OAUTH2_REDIRECT_URL: "${OAUTH2_REDIRECT_URL}"
       OAUTH2_CLIENT_SECRET_FILE: /run/secrets/oauth2_client_secret
+      TABLETOP_ADMIN_USER_IDS: "${TABLETOP_ADMIN_USER_IDS:-}"
+      # Limits count stored files, including normalized artwork and catalogs.
+      TABLETOP_STORAGE_LIMIT_BYTES: "${TABLETOP_STORAGE_LIMIT_BYTES:-5368709120}"
+      TABLETOP_SESSION_STORAGE_LIMIT_BYTES: "${TABLETOP_SESSION_STORAGE_LIMIT_BYTES:-536870912}"
     secrets:
       - oauth2_client_secret
     volumes:
@@ -27,9 +31,32 @@ services:
       - no-new-privileges:true
     init: true
     restart: unless-stopped
+    mem_limit: 1g
+    cpus: 1.0
+    pids_limit: 128
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  maintenance:
+    profiles: [maintenance]
+    image: alpine:3.24
+    user: "10001:10001"
+    volumes:
+      - tabletop-data:/data
+    read_only: true
+    network_mode: none
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 256m
+    cpus: 1.0
+    pids_limit: 32
 
 volumes:
   tabletop-data:
+    name: "${TABLETOP_DATA_VOLUME:-tabletop_tabletop-data}"
 
 secrets:
   oauth2_client_secret:
