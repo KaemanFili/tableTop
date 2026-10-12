@@ -1,32 +1,24 @@
 package app
 
 import (
+	"encoding/json"
 	"errors"
 	"regexp"
 	"slices"
 	"strings"
-	"sync"
+	bundled "tableTop/main/plugins"
 	"unicode/utf8"
 )
 
 type UnitStatus string
 
 type UnitStatusOption struct {
-	Value UnitStatus `bson:"value"`
-	Color string     `bson:"color"`
+	Value UnitStatus `json:"value" bson:"value"`
+	Color string     `json:"color" bson:"color"`
 }
 
-// Definitions are loaded once at startup; readers receive their own slice.
-var statusDefinitions = struct {
-	sync.RWMutex
-	options []UnitStatusOption
-}{options: defaultUnitStatuses()}
-
-func UnitStatuses() []UnitStatusOption {
-	statusDefinitions.RLock()
-	defer statusDefinitions.RUnlock()
-	return slices.Clone(statusDefinitions.options)
-}
+// UnitStatuses returns the bundled defaults; live states own their session definitions.
+func UnitStatuses() []UnitStatusOption { return slices.Clone(defaultUnitStatuses()) }
 
 var statusColorPattern = regexp.MustCompile(`^#[0-9a-fA-F]{6}$`)
 
@@ -48,35 +40,16 @@ func validateUnitStatuses(options []UnitStatusOption) error {
 	return nil
 }
 
-func setUnitStatuses(options []UnitStatusOption) error {
-	if err := validateUnitStatuses(options); err != nil {
-		return err
-	}
-	statusDefinitions.Lock()
-	defer statusDefinitions.Unlock()
-	statusDefinitions.options = slices.Clone(options)
-	return nil
-}
-
 func defaultUnitStatuses() []UnitStatusOption {
-	return []UnitStatusOption{
-		{"Blinded", "#64748B"},
-		{"Charmed", "#EC4899"},
-		{"Deafened", "#5F9EA0"},
-		{"Exhaustion", "#C2410C"},
-		{"Frightened", "#9333EA"},
-		{"Grappled", "#F59E0B"},
-		{"Incapacitated", "#DC2626"},
-		{"Invisible", "#22D3EE"},
-		{"Paralyzed", "#991B1B"},
-		{"Petrified", "#78716C"},
-		{"Poisoned", "#65A30D"},
-		{"Prone", "#EAB308"},
-		{"Restrained", "#D97706"},
-		{"Stunned", "#D946EF"},
-		{"Unconscious", "#7F1D1D"},
-		{"Dead", "#450A0A"},
+	data, err := bundled.Builtin.ReadFile("builtin/statuses.json")
+	if err != nil {
+		panic(err)
 	}
+	var options []UnitStatusOption
+	if err := json.Unmarshal(data, &options); err != nil {
+		panic(err)
+	}
+	return options
 }
 
 func (status UnitStatus) Color() string {
@@ -91,7 +64,7 @@ func (status UnitStatus) Color() string {
 var ErrInvalidStatus = errors.New("unknown status")
 
 func (s *AppState) SetUnitStatus(id string, status UnitStatus) (UnitData, error) {
-	if status != "" && status.Color() == "transparent" {
+	if status != "" && s.StatusColor(status) == "transparent" {
 		return UnitData{}, ErrInvalidStatus
 	}
 	s.mutex.Lock()

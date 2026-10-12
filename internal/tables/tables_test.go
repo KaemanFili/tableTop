@@ -18,6 +18,7 @@ import (
 	"github.com/gorilla/websocket"
 	"tableTop/main/internal/app"
 	"tableTop/main/internal/auth"
+	"tableTop/main/internal/plugins"
 )
 
 type cleanupFailureStore struct {
@@ -51,7 +52,7 @@ type testSession struct{ path, id string }
 
 func (f tableTestFixture) createSession(t *testing.T, client *http.Client, name string) testSession {
 	t.Helper()
-	response, _ := f.request(client, "POST", "/sessions", url.Values{"name": {name}}.Encode(), http.StatusSeeOther)
+	response, _ := f.request(client, "POST", "/sessions", url.Values{"name": {name}, "plugin": {"builtin"}}.Encode(), http.StatusSeeOther)
 	path := response.Header.Get("Location")
 	return testSession{path, strings.Split(path, "/")[2]}
 }
@@ -99,14 +100,14 @@ func TestNonmembersCannotReadOrChangeBoardContent(t *testing.T) {
 	session := f.createSession(t, f.login("owner"), "First")
 	stranger := f.login("stranger")
 	f.request(stranger, "GET", session.path+"loadExistingUnits", "", http.StatusForbidden)
-	f.request(stranger, "POST", session.path+"unit?unitID=knight", "", http.StatusForbidden)
+	f.request(stranger, "POST", session.path+"unit?unitID="+plugins.StableID("builtin", "unit", "knight")+"", "", http.StatusForbidden)
 }
 
 func TestSessionTokensAndArtworkAreIsolated(t *testing.T) {
 	f := newTableTestFixture(t)
 	owner := f.login("owner")
 	first, second := f.createSession(t, owner, "First"), f.createSession(t, owner, "Second")
-	f.request(owner, "POST", first.path+"unit?unitID=knight", "", http.StatusOK)
+	f.request(owner, "POST", first.path+"unit?unitID="+plugins.StableID("builtin", "unit", "knight")+"", "", http.StatusOK)
 	_, firstUnits := f.request(owner, "GET", first.path+"loadExistingUnits", "", http.StatusOK)
 	_, secondUnits := f.request(owner, "GET", second.path+"loadExistingUnits", "", http.StatusOK)
 	if !strings.Contains(firstUnits, `class="unit"`) || strings.Contains(secondUnits, `class="unit"`) {

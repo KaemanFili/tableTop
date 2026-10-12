@@ -27,11 +27,13 @@ type AppState struct {
 	mutex      sync.RWMutex
 	units      map[string]UnitData
 	nextUnitID uint64
+	statuses   []UnitStatusOption
 }
 
 func NewState() *AppState {
 	return &AppState{
-		units: make(map[string]UnitData),
+		units:    make(map[string]UnitData),
+		statuses: UnitStatuses(),
 	}
 }
 

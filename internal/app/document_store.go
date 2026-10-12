@@ -35,3 +35,11 @@ type LibraryStore interface {
 	Units(scope string) DocumentStore[UnitDefinition]
 	DeleteScope(scope string) error
 }
+
+// MapDocumentStore separates lightweight listings from loading one embedded board.
+type MapDocumentStore interface {
+	DocumentStore[MapDefinition]
+	List() ([]MapDefinition, bool, error)
+	Get(string) (MapDefinition, error)
+	InitializeEach(func(func(MapDefinition) error) error) error
+}

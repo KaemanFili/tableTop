@@ -17,12 +17,13 @@ import (
 
 // UnitDefinition is a reusable unit in the library, separate from a placed token.
 type UnitDefinition struct {
-	ID       string   `json:"id" bson:"id"`
-	Name     string   `json:"name" bson:"name"`
-	UnitType string   `json:"unitType" bson:"unitType"`
-	ImageID  string   `json:"imageID" bson:"imageID"`
-	Size     UnitSize `json:"size" bson:"size"`
-	ImageFit ImageFit `json:"imageFit" bson:"imageFit"`
+	Source   *ContentSource `json:"source,omitempty" bson:"source,omitempty"`
+	ID       string         `json:"id" bson:"id"`
+	Name     string         `json:"name" bson:"name"`
+	UnitType string         `json:"unitType" bson:"unitType"`
+	ImageID  string         `json:"imageID" bson:"imageID"`
+	Size     UnitSize       `json:"size" bson:"size"`
+	ImageFit ImageFit       `json:"imageFit" bson:"imageFit"`
 }
 
 type UnitLibrary struct {

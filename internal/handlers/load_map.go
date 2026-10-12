@@ -4,11 +4,11 @@ import (
 	"bytes"
 	"crypto/rand"
 	"encoding/json"
+	"errors"
 	"log"
 	"net/http"
 	"os"
 	"strconv"
-	"tableTop/main/internal/app"
 )
 
 func (h *EndpointHandler) mapPicker(w http.ResponseWriter, r *http.Request) {
@@ -32,9 +32,18 @@ func (h *EndpointHandler) loadMap(w http.ResponseWriter, r *http.Request) {
 	ws := h.webSocketHandler
 	ws.boardMutex.Lock()
 	defer ws.boardMutex.Unlock()
-	definition, exists := h.mapLibrary.MapByID(r.PathValue("id"))
-	if !exists {
+	definition, err := h.mapLibrary.LoadMap(r.PathValue("id"))
+	if errors.Is(err, os.ErrNotExist) {
 		http.Error(w, "Saved map not found.", http.StatusNotFound)
+		return
+	}
+	if err != nil {
+		log.Println("Load saved map:", err)
+		http.Error(w, "Could not read this saved map.", http.StatusInternalServerError)
+		return
+	}
+	if err := definition.Validate(); err != nil {
+		http.Error(w, "Invalid saved map.", http.StatusConflict)
 		return
 	}
 	path, _ := h.mapLibrary.ImagePath(definition.ID)
@@ -43,8 +52,8 @@ func (h *EndpointHandler) loadMap(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	board := definition.Board
-	if !board.WithinLimits() {
-		http.Error(w, app.ErrCapacity.Error(), http.StatusConflict)
+	if err := board.Validate(); err != nil {
+		http.Error(w, err.Error(), http.StatusConflict)
 		return
 	}
 	// Send only the image and fit in boardMapChanged; utilities have their own messages.

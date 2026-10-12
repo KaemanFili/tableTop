@@ -43,7 +43,7 @@ func newEndpointHandler(state *app.AppState, webSocketHandler *WebSocketHandler,
 		webSocketHandler: webSocketHandler,
 		gridTemplate:     template.Must(template.ParseFS(assets, "templates/grid.html")),
 	}
-	functions := template.FuncMap{"boardPrefix": func() string { return handler.routePrefix }}
+	functions := template.FuncMap{"statusColor": state.StatusColor, "boardPrefix": func() string { return handler.routePrefix }}
 	handler.unitTemplate = template.Must(template.New("unit.html").Funcs(functions).ParseFS(assets, "templates/unit.html"))
 	handler.indexTemplate = template.Must(template.New("index.html").Funcs(functions).ParseFS(assets, "index.html", "templates/spawn-menu.html", "templates/utilities.html", "templates/map-editor.html", "templates/map-picker.html"))
 
@@ -92,7 +92,7 @@ func (h *EndpointHandler) index(w http.ResponseWriter, r *http.Request) {
 		UnitStatuses []app.UnitStatusOption
 		IsGM         bool
 		User         *auth.User
-	}{UnitSizes: template.JS(sizes), UnitStatuses: app.UnitStatuses(), IsGM: auth.IsGM(r), User: auth.CurrentUser(r)}
+	}{UnitSizes: template.JS(sizes), UnitStatuses: h.state.UnitStatuses(), IsGM: auth.IsGM(r), User: auth.CurrentUser(r)}
 	if err := h.indexTemplate.ExecuteTemplate(w, "index.html", data); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}

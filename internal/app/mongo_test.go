@@ -411,50 +411,58 @@ func TestMongoMapWriteFailurePreservesSavedBoard(t *testing.T) {
 	}
 }
 
-func TestMongoStatusDefinitions(t *testing.T) {
+func TestMongoSessionStatusesSeedOnce(t *testing.T) {
 	store := testMongoStore(t)
-	original := UnitStatuses()
-	t.Cleanup(func() {
-		if err := setUnitStatuses(original); err != nil {
-			t.Error(err)
-		}
-	})
+	custom := []UnitStatusOption{{Value: "Marked", Color: "#123456"}}
+	if err := store.InitializeStatuses("first", custom); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.InitializeStatuses("first", defaultUnitStatuses()); err != nil {
+		t.Fatal(err)
+	}
+	got, err := store.LoadStatuses("first", defaultUnitStatuses())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(got, custom) {
+		t.Fatal("retry replaced statuses")
+	}
+	other, err := store.LoadStatuses("second", defaultUnitStatuses())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(other, defaultUnitStatuses()) {
+		t.Fatal("status definitions crossed scopes")
+	}
+}
+func TestMongoLegacyStatusesCopiedOnce(t *testing.T) {
+	store := testMongoStore(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	if err := store.LoadUnitStatuses(ctx); err != nil {
+	custom := []UnitStatusOption{{Value: "Marked", Color: "#123456"}}
+	if _, err := store.db.Collection("settings").InsertOne(ctx, statusDocument{"unit_statuses", 1, custom}); err != nil {
 		t.Fatal(err)
 	}
-	if !reflect.DeepEqual(UnitStatuses(), defaultUnitStatuses()) {
-		t.Fatal("initial statuses were not seeded")
+	got, err := store.LoadStatuses("first", defaultUnitStatuses())
+	if err != nil || !reflect.DeepEqual(got, custom) {
+		t.Fatalf("legacy migration: %v", err)
 	}
-	custom := []UnitStatusOption{{Value: "Marked", Color: "#123456"}, {Value: "Poisoned", Color: "#ABCDEF"}}
-	_, err := store.db.Collection("settings").UpdateOne(ctx, bson.M{"_id": "unit_statuses"}, bson.M{"$set": bson.M{"options": custom}})
-	if err != nil {
+	if _, err := store.db.Collection("settings").UpdateOne(ctx, bson.M{"_id": "unit_statuses"}, bson.M{"$set": bson.M{"options": defaultUnitStatuses()}}); err != nil {
 		t.Fatal(err)
 	}
-	if err := store.LoadUnitStatuses(ctx); err != nil {
+	got, err = store.LoadStatuses("first", defaultUnitStatuses())
+	if err != nil || !reflect.DeepEqual(got, custom) {
+		t.Fatalf("legacy statuses overwritten: %v", err)
+	}
+}
+func TestMongoInvalidSessionStatusesRejected(t *testing.T) {
+	store := testMongoStore(t)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if _, err := store.db.Collection("settings").InsertOne(ctx, statusDocument{"unit_statuses/first", 1, []UnitStatusOption{{Value: "Marked", Color: "invalid"}}}); err != nil {
 		t.Fatal(err)
 	}
-	if !reflect.DeepEqual(UnitStatuses(), custom) || UnitStatus("Marked").Color() != "#123456" {
-		t.Fatal("stored status names, order, or colors were ignored")
-	}
-	state := NewState()
-	unit := state.AddRandomUnit(PCUnitImageID)
-	if _, err := state.SetUnitStatus(unit.ID, "Marked"); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := state.SetUnitStatus(unit.ID, "Dead"); !errors.Is(err, ErrInvalidStatus) {
-		t.Fatal("status validation ignored stored definitions")
-	}
-	custom[0].Color = "invalid"
-	_, err = store.db.Collection("settings").UpdateOne(ctx, bson.M{"_id": "unit_statuses"}, bson.M{"$set": bson.M{"options": custom}})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := store.LoadUnitStatuses(ctx); err == nil {
-		t.Fatal("invalid status colors were accepted")
-	}
-	if UnitStatus("Marked").Color() != "#123456" {
-		t.Fatal("failed load changed active definitions")
+	if _, err := store.LoadStatuses("first", defaultUnitStatuses()); err == nil {
+		t.Fatal("invalid stored statuses accepted")
 	}
 }

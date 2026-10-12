@@ -49,7 +49,7 @@ func NewMongoStore(ctx context.Context, uri, database string) (*MongoStore, erro
 func (s *MongoStore) Close(ctx context.Context) error { return s.client.Disconnect(ctx) }
 
 func (s *MongoStore) Maps(scope string) DocumentStore[MapDefinition] {
-	return &mongoDocumentStore[MapDefinition]{s, "maps", scope, func(m MapDefinition) string { return m.ID }}
+	return &mongoMapStore{&mongoDocumentStore[MapDefinition]{s, "maps", scope, func(m MapDefinition) string { return m.ID }}}
 }
 
 func (s *MongoStore) Units(scope string) DocumentStore[UnitDefinition] {
@@ -199,26 +199,14 @@ func (c *mongoDocumentStore[T]) Exists(id string) (bool, error) {
 	return err == nil, err
 }
 
-// LoadUnitStatuses seeds the server-wide status document on first use, then
-// uses its ordered definitions for validation, the picker, and token colors.
-func (s *MongoStore) LoadUnitStatuses(ctx context.Context) error {
-	type statusDocument struct {
-		ID      string             `bson:"_id"`
-		Version int                `bson:"schemaVersion"`
-		Options []UnitStatusOption `bson:"options"`
-	}
-	collection := s.db.Collection("settings")
-	filter := bson.M{"_id": "unit_statuses"}
-	_, err := collection.UpdateOne(ctx, filter, bson.M{"$setOnInsert": statusDocument{"unit_statuses", 1, defaultUnitStatuses()}}, options.UpdateOne().SetUpsert(true))
+// ValidateContentDocument uses the same envelope as MongoDB writes during preflight.
+func ValidateContentDocument(scope, kind, id string, entry any) error {
+	data, err := bson.Marshal(mongoDocument[any]{scope + "/" + id, scope, 1, entry})
 	if err != nil {
 		return err
 	}
-	var document statusDocument
-	if err := collection.FindOne(ctx, filter).Decode(&document); err != nil {
-		return err
+	if len(data) > maxMongoDocumentBytes {
+		return fmt.Errorf("%w: %s document exceeds 16 MiB", ErrCapacity, kind)
 	}
-	if document.Version != 1 {
-		return errors.New("unsupported status definitions schema")
-	}
-	return setUnitStatuses(document.Options)
+	return nil
 }

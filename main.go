@@ -13,6 +13,7 @@ import (
 	"tableTop/main/internal/app"
 	"tableTop/main/internal/auth"
 	"tableTop/main/internal/handlers"
+	"tableTop/main/internal/plugins"
 	"tableTop/main/internal/tables"
 )
 
@@ -47,11 +48,7 @@ func run() error {
 			return fmt.Errorf("connect MongoDB: %w", err)
 		}
 		defer mongoStore.Close(context.Background())
-		err = mongoStore.LoadUnitStatuses(ctx)
 		cancel()
-		if err != nil {
-			return fmt.Errorf("load status definitions: %w", err)
-		}
 		store = mongoStore
 	}
 	mux := http.NewServeMux()
@@ -66,6 +63,9 @@ func run() error {
 		authentication.RegisterRoutes(mux)
 		handler = authentication.Middleware(mux)
 	} else {
+		if err := plugins.InitializeDevelopment("data", store, limits); err != nil {
+			return fmt.Errorf("initialize development content: %w", err)
+		}
 		var unitStore app.DocumentStore[app.UnitDefinition]
 		var mapStore app.DocumentStore[app.MapDefinition]
 		if store != nil {
@@ -80,7 +80,14 @@ func run() error {
 		if err != nil {
 			return fmt.Errorf("load map library: %w", err)
 		}
-		state := app.NewState()
+		statuses, err := app.LoadSessionStatuses("data", "dev", store, limits)
+		if err != nil {
+			return fmt.Errorf("load statuses: %w", err)
+		}
+		state, err := app.NewStateWithStatuses(statuses)
+		if err != nil {
+			return err
+		}
 		sockets := handlers.NewWebSocketHandler(state)
 		handlers.NewEndpointHandler(state, sockets, library, maps).RegisterRoutes(mux)
 		sockets.RegisterRoutes(mux)

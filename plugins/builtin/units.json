@@ -1,0 +1,14 @@
+[
+  {
+    "key": "knight",
+    "name": "Knight",
+    "unitType": "pc",
+    "size": "medium"
+  },
+  {
+    "key": "goblin",
+    "name": "Goblin",
+    "unitType": "npc",
+    "size": "small"
+  }
+]

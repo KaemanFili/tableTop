@@ -1,7 +1,9 @@
 # Tabletop content plugins
 
-Status: proposed. This document specifies a future plugin feature; session
-creation does not select plugins yet.
+Status: superseded design. The per-tabletop copy model below is retained for
+historical context. The proposed replacement is
+[Shared plugin defaults and tabletop-owned content](shared-plugin-storage-spec.md),
+which imports each immutable plugin version once and makes its defaults read-only.
 
 ## Purpose and scope
 

@@ -11,7 +11,7 @@
     <button type="button" class="saved-map" data-load-map hx-post="{{ boardPrefix }}/map-library/{{ .ID }}/load?gm=true"
         hx-target="#map-editor" hx-swap="innerHTML" hx-disabled-elt="#map-editor [data-load-map]">
         <img src="{{ boardPrefix }}/maps/images/{{ .ID }}" alt="" loading="lazy">
-        <span>{{ .Name }}{{ if not .Board }}<small>Image only</small>{{ end }}</span>
+        <span>{{ .Name }}{{ if not .HasSavedBoard }}<small>Image only</small>{{ end }}</span>
     </button>
     <button type="button" class="library-delete" data-delete-map aria-label="Delete {{ .Name }} permanently"
         hx-delete="{{ boardPrefix }}/map-library/{{ .ID }}?gm=true" hx-target="#map-editor" hx-swap="innerHTML"

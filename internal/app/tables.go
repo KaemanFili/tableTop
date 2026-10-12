@@ -14,11 +14,14 @@ import (
 )
 
 type TableDefinition struct {
-	ID       string   `json:"id"`
-	Name     string   `json:"name"`
-	OwnerID  string   `json:"ownerID"`
-	Members  []string `json:"members"`
-	Deleting bool     `json:"deleting,omitempty"`
+	ID             string   `json:"id"`
+	Name           string   `json:"name"`
+	OwnerID        string   `json:"ownerID"`
+	Members        []string `json:"members"`
+	PluginID       string   `json:"pluginID,omitempty"`
+	PluginVersion  int      `json:"pluginVersion,omitempty"`
+	Initialization string   `json:"initialization,omitempty"`
+	Deleting       bool     `json:"deleting,omitempty"`
 }
 
 func (table TableDefinition) HasMember(id string) bool { return slices.Contains(table.Members, id) }
@@ -74,7 +77,7 @@ func (library *TableLibrary) ForUser(id string) []TableDefinition {
 	defer library.mu.RUnlock()
 	var tables []TableDefinition
 	for _, table := range library.tables {
-		if table.HasMember(id) && (!table.Deleting || table.OwnerID == id) {
+		if table.HasMember(id) && ((!table.Deleting && table.Initialization == "") || table.OwnerID == id) {
 			table.Members = slices.Clone(table.Members)
 			tables = append(tables, table)
 		}
@@ -83,6 +86,15 @@ func (library *TableLibrary) ForUser(id string) []TableDefinition {
 }
 
 func (library *TableLibrary) Create(name, owner string) (TableDefinition, error) {
+	return library.create(name, owner, TableDefinition{ID: rand.Text()})
+}
+func (library *TableLibrary) CreatePrepared(name, owner, id, plugin string, version int) (TableDefinition, error) {
+	if !tableIDPattern.MatchString(id) || plugin == "" || version < 1 {
+		return TableDefinition{}, errors.New("invalid prepared session")
+	}
+	return library.create(name, owner, TableDefinition{ID: id, PluginID: plugin, PluginVersion: version, Initialization: "maps"})
+}
+func (library *TableLibrary) create(name, owner string, prepared TableDefinition) (TableDefinition, error) {
 	name = strings.TrimSpace(name)
 	if name == "" || !utf8.ValidString(name) || utf8.RuneCountInString(name) > 80 || owner == "" {
 		return TableDefinition{}, errors.New("Enter a session name between 1 and 80 characters.")
@@ -94,7 +106,13 @@ func (library *TableLibrary) Create(name, owner string) (TableDefinition, error)
 	if len(library.tables) >= MaxTabletops {
 		return TableDefinition{}, ErrCapacity
 	}
-	table := TableDefinition{ID: rand.Text(), Name: name, OwnerID: owner, Members: []string{owner}}
+	table := prepared
+	table.Name, table.OwnerID, table.Members = name, owner, []string{owner}
+	for _, existing := range library.tables {
+		if existing.ID == table.ID {
+			return TableDefinition{}, errors.New("duplicate tabletop ID")
+		}
+	}
 	proposed := append(slices.Clone(library.tables), table)
 	if err := writeJSONFile(library.path, proposed, library.limits); err != nil {
 		return TableDefinition{}, err
@@ -116,8 +134,8 @@ func (library *TableLibrary) Join(id, user string) (TableDefinition, error) {
 		if table.ID != id {
 			continue
 		}
-		if table.Deleting {
-			return TableDefinition{}, errors.New("This tabletop is being deleted.")
+		if table.Deleting || table.Initialization != "" {
+			return TableDefinition{}, errors.New("This tabletop is unavailable.")
 		}
 		if !table.HasMember(user) {
 			if len(table.Members) >= MaxTabletopMembers {
@@ -201,4 +219,54 @@ func RemoveTableFiles(dir, id string, limits *StorageLimits) error {
 	limits.lock()
 	defer limits.unlock()
 	return os.RemoveAll(filepath.Join(dir, "sessions", id))
+}
+
+// AdvanceInitialization persists a checkpoint only after the step succeeds.
+func (library *TableLibrary) AdvanceInitialization(id, expected, next string) error {
+	library.mu.Lock()
+	defer library.mu.Unlock()
+	library.limits.lock()
+	defer library.limits.unlock()
+	for i, t := range library.tables {
+		if t.ID != id {
+			continue
+		}
+		if t.Deleting || t.Initialization != expected {
+			return errors.New("session initialization changed")
+		}
+		if !((expected == "maps" && next == "statuses") || (expected == "statuses" && next == "units") || (expected == "units" && next == "")) {
+			return errors.New("invalid initialization transition")
+		}
+		proposed := slices.Clone(library.tables)
+		proposed[i].Initialization = next
+		if err := writeJSONFile(library.path, proposed, library.limits); err != nil {
+			return err
+		}
+		library.tables = proposed
+		return nil
+	}
+	return ErrTableNotFound
+}
+func (library *TableLibrary) MigrateLegacyProvenance() error {
+	library.mu.Lock()
+	defer library.mu.Unlock()
+	library.limits.lock()
+	defer library.limits.unlock()
+	proposed := slices.Clone(library.tables)
+	changed := false
+	for i := range proposed {
+		if proposed[i].PluginID == "" {
+			proposed[i].PluginID = "builtin"
+			proposed[i].PluginVersion = 1
+			changed = true
+		}
+	}
+	if !changed {
+		return nil
+	}
+	if err := writeJSONFile(library.path, proposed, library.limits); err != nil {
+		return err
+	}
+	library.tables = proposed
+	return nil
 }

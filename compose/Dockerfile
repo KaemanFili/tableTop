@@ -5,6 +5,7 @@ COPY go.mod go.sum ./
 RUN go mod download
 COPY main.go ./
 COPY internal ./internal
+COPY plugins ./plugins
 
 RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/tabletop .
 RUN mkdir -p /runtime/data /runtime/tmp && \
@@ -18,6 +19,7 @@ COPY --from=build --chown=10001:10001 /runtime/data /app/data
 COPY --from=build /runtime/tmp /tmp
 COPY static ./static
 COPY templates ./templates
+COPY plugins ./plugins
 COPY index.html ./index.html
 
 USER 10001:10001

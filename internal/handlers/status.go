@@ -30,7 +30,7 @@ func (h *EndpointHandler) setUnitStatus(w http.ResponseWriter, r *http.Request) 
 		http.Error(w, err.Error(), code)
 		return
 	}
-	change := unitStatusChange{unit.ID, unit.Status, unit.Status.Color()}
+	change := unitStatusChange{unit.ID, unit.Status, h.state.StatusColor(unit.Status)}
 	trigger, _ := json.Marshal(map[string]any{"unitStatusChanged": change})
 	w.Header().Set("HX-Trigger", string(trigger))
 	data, _ := json.Marshal(struct {
