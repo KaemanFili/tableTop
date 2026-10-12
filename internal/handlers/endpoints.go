@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"tableTop/main/internal/auth"
 
 	"tableTop/main/internal/app"
 )
@@ -20,10 +21,17 @@ type EndpointHandler struct {
 	library          *app.UnitLibrary
 	mapLibrary       *app.MapLibrary
 	assetRoot        string
+	routePrefix      string
 }
 
 func NewEndpointHandler(state *app.AppState, webSocketHandler *WebSocketHandler, library *app.UnitLibrary, maps ...*app.MapLibrary) *EndpointHandler {
 	return newEndpointHandler(state, webSocketHandler, library, ".", maps...)
+}
+
+func NewTableEndpointHandler(state *app.AppState, ws *WebSocketHandler, units *app.UnitLibrary, maps *app.MapLibrary, assetRoot, prefix string) *EndpointHandler {
+	handler := newEndpointHandler(state, ws, units, assetRoot, maps)
+	handler.routePrefix = prefix
+	return handler
 }
 
 func newEndpointHandler(state *app.AppState, webSocketHandler *WebSocketHandler, library *app.UnitLibrary, assetRoot string, maps ...*app.MapLibrary) *EndpointHandler {
@@ -34,9 +42,11 @@ func newEndpointHandler(state *app.AppState, webSocketHandler *WebSocketHandler,
 		state:            state,
 		webSocketHandler: webSocketHandler,
 		gridTemplate:     template.Must(template.ParseFS(assets, "templates/grid.html")),
-		unitTemplate:     template.Must(template.ParseFS(assets, "templates/unit.html")),
-		indexTemplate:    template.Must(template.ParseFS(assets, "index.html", "templates/spawn-menu.html", "templates/utilities.html", "templates/map-editor.html", "templates/map-picker.html")),
 	}
+	functions := template.FuncMap{"boardPrefix": func() string { return handler.routePrefix }}
+	handler.unitTemplate = template.Must(template.New("unit.html").Funcs(functions).ParseFS(assets, "templates/unit.html"))
+	handler.indexTemplate = template.Must(template.New("index.html").Funcs(functions).ParseFS(assets, "index.html", "templates/spawn-menu.html", "templates/utilities.html", "templates/map-editor.html", "templates/map-picker.html"))
+
 	if len(maps) > 0 {
 		handler.mapLibrary = maps[0]
 	}
@@ -81,7 +91,8 @@ func (h *EndpointHandler) index(w http.ResponseWriter, r *http.Request) {
 		UnitSizes    template.JS
 		UnitStatuses []app.UnitStatusOption
 		IsGM         bool
-	}{UnitSizes: template.JS(sizes), UnitStatuses: app.UnitStatuses(), IsGM: r.URL.Query().Get("gm") == "true"}
+		User         *auth.User
+	}{UnitSizes: template.JS(sizes), UnitStatuses: app.UnitStatuses(), IsGM: auth.IsGM(r), User: auth.CurrentUser(r)}
 	if err := h.indexTemplate.ExecuteTemplate(w, "index.html", data); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}

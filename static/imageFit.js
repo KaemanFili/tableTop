@@ -76,7 +76,7 @@
             }
             const nextURL = file ? URL.createObjectURL(file) : null;
             const image = new Image();
-            image.src = nextURL || `/images/${unitType === 'pc' ? 'knight' : 'goblin'}`;
+            image.src = nextURL || boardURL(`/images/${unitType === 'pc' ? 'knight' : 'goblin'}`);
             try {
                 await image.decode();
                 if (disposed || requestVersion !== version) {

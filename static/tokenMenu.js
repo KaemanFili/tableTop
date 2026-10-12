@@ -128,10 +128,10 @@
         menu.dataset.unitId = unit.id;
         error.hidden = true;
         error.textContent = '';
-        remove.setAttribute('hx-delete', `/unit/${encodeURIComponent(unit.id)}`);
+        remove.setAttribute('hx-delete', boardURL(`/unit/${encodeURIComponent(unit.id)}`));
         htmx.process(remove);
         for (const button of [increase, decrease, ...circles]) {
-            button.setAttribute('hx-post', `/unit/${encodeURIComponent(unit.id)}/${circles.includes(button) ? 'status' : 'size'}`);
+            button.setAttribute('hx-post', boardURL(`/unit/${encodeURIComponent(unit.id)}/${circles.includes(button) ? 'status' : 'size'}`));
             htmx.process(button);
         }
         menu.hidden = false;

@@ -22,6 +22,29 @@ project assets without changing the process working directory.
 HTMX 2.0.11 is vendored in `static/vendor/`, including its license and checksum.
 The app serves it locally; dependency updates are explicit.
 
+## Containers
+
+Run `./compose/rebuild.sh` to rebuild both the local `main` executable and the
+Docker image. The script works from any working directory and stops on failure.
+
+Set the client ID and redirect URL in `compose/.env` and prepare
+`compose/secrets/oauth2_client_secret` using the [container setup guide](docs/containers.md).
+The client secret is mounted as a file; Compose loads the client ID and redirect URL
+from `compose/.env`. Run `docker compose -f compose/compose.yaml up --build -d`. The app is available at
+`http://localhost:18080/`; runtime credentials stay outside the image and Git.
+Data persists in a named volume. See [container setup](docs/containers.md) for
+requirements, configuration updates, and using your existing host data directory.
+
+## Discord sign-in
+
+Players use **Sign in with Discord**, then create or join a tabletop session.
+The creator is its GM; joining users are players. Each session has an independent
+board and libraries. See [Discord setup and sessions](docs/authentication.md) for
+the one-time application credentials and redirect URL configuration.
+
+With Discord configured, session ownership controls GM access. Without it,
+the existing local development mode remains available.
+
 ## Structure
 
 - `main.go`: application entrypoint and route wiring.
@@ -90,8 +113,8 @@ Open `http://localhost:18080/?gm=true` to show the **GM** button below the utili
 GM fog controls appear beneath it. Click **GM** to hide or show its map and fog
 controls, including an open map editor. This affects only your browser and
 preserves the selected tool and any form input. Without `gm=true`, GM controls are omitted
-from the page. This URL flag selects the GM role for now; authenticated roles
-will replace it later.
+from the page. This URL flag selects GM mode only when Discord sign-in is not configured.
+Authenticated sessions assign the GM role to their creator.
 
 The GM controls include a square folded-map button with a **Map Options** tooltip.
 Click it to open **Load Map**, **Save Map**, **Create New Map**, and **Clear Map**,
@@ -148,7 +171,8 @@ selected thickness. It scales with the grid and stays visible over fog and token
 Fog painting and partial erasure sync to every board and remain after refresh or
 GM disconnection. Brush sizes scale with the grid. Fog lives in server memory and
 resets on server restart. Fog is translucent (35% opacity) for GMs and fully opaque
-for players. Only WebSocket clients using `gm=true` may edit fog.
+for players. Only the session GM may edit fog when signed in; local development mode uses
+`gm=true`.
 
 **Ruler**, **Pen**, **Eraser**, and **Ping** appear as separate square icon buttons
 in a vertical toolbar below Spawn unit, with Eraser immediately below Pen.

@@ -1,7 +1,7 @@
-const posUpdateSocket = new WebSocket(`${location.protocol === 'https:' ? 'wss:' : 'ws:'}//${location.host}/ws/updatePosForClients`);
+const posUpdateSocket = new WebSocket(`${location.protocol === 'https:' ? 'wss:' : 'ws:'}//${location.host}${boardURL('/ws/updatePosForClients')}`);
 let boardGeneration = 0;
 
-const newUnitUpdateSocket = new WebSocket(`${location.protocol === 'https:' ? 'wss:' : 'ws:'}//${location.host}/ws/updateUnitsForClients${document.body.dataset.gm === 'true' ? '?gm=true' : ''}`);
+const newUnitUpdateSocket = new WebSocket(`${location.protocol === 'https:' ? 'wss:' : 'ws:'}//${location.host}${boardURL('/ws/updateUnitsForClients')}${document.body.dataset.gm === 'true' ? '?gm=true' : ''}`);
 
 // Coalesce refreshes during a drag; unit refreshes must never replace a dragged token.
 let unitsRefreshPending = false;
@@ -154,7 +154,7 @@ document.addEventListener('boardMapChanged', event => {
         map.alt = '';
         return;
     }
-    map.src = `/maps/images/${encodeURIComponent(definition.id)}`;
+    map.src = boardURL(`/maps/images/${encodeURIComponent(definition.id)}`);
     map.alt = definition.name;
     for (const [property, value] of Object.entries({width: definition.width, height: definition.height,
         left: definition.offsetX, top: definition.offsetY})) {

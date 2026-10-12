@@ -88,7 +88,7 @@
             if (newUnitUpdateSocket.readyState !== WebSocket.OPEN) {
                 throw new Error('Refresh to reconnect before rolling dice.');
             }
-            const response = await fetch(`/dice/roll${shareRolls ? '?gm=true' : ''}`, {
+            const response = await fetch(boardURL(`/dice/roll${shareRolls ? '?gm=true' : ''}`), {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({requestId, groups: selected, private: shareRolls ? !shareRolls.checked : false}),

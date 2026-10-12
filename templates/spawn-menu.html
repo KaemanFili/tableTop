@@ -2,7 +2,7 @@
 <div
     id="spawn-controls"
     {{ if and .Open (not .Creating) }}
-        hx-get="/spawn-menu"
+        hx-get="{{ boardPrefix }}/spawn-menu"
         hx-trigger="click[!target.closest('#spawn-controls')] from:body, keydown[key=='Escape'] from:body, unitSpawned from:body"
         hx-target="this"
         hx-swap="outerHTML"
@@ -13,7 +13,7 @@
         id="spawn-menu-toggle"
         aria-expanded="{{ .Open }}"
         aria-controls="spawn-menu"
-        hx-get="/spawn-menu{{ if not .Open }}?open=true{{ end }}"
+        hx-get="{{ boardPrefix }}/spawn-menu{{ if not .Open }}?open=true{{ end }}"
         hx-target="#spawn-controls"
         hx-swap="outerHTML"
         {{ if not .Open }}autofocus{{ end }}
@@ -24,7 +24,7 @@
             {{ if .Creating }}
                 <div class="spawn-menu-heading">
                     <h2>Create a new unit</h2>
-                    <button type="button" class="secondary-button" hx-get="/spawn-menu?open=true" hx-target="#spawn-controls" hx-swap="outerHTML">Back</button>
+                    <button type="button" class="secondary-button" hx-get="{{ boardPrefix }}/spawn-menu?open=true" hx-target="#spawn-controls" hx-swap="outerHTML">Back</button>
                 </div>
                 <p>Save a unit to your library, then spawn as many copies as you need.</p>
                 {{ if .Error }}<p class="menu-error" role="alert">{{ .Error }}</p>{{ end }}
@@ -33,7 +33,7 @@
                     method="post"
                     action="/unit-library"
                     enctype="multipart/form-data"
-                    hx-post="/unit-library"
+                    hx-post="{{ boardPrefix }}/unit-library"
                     hx-encoding="multipart/form-data"
                     hx-target="#spawn-controls"
                     hx-swap="outerHTML"
@@ -81,14 +81,14 @@
                     </fieldset>
 
                     <div class="unit-form-actions">
-                        <button type="button" class="secondary-button" hx-get="/spawn-menu?open=true" hx-target="#spawn-controls" hx-swap="outerHTML">Cancel</button>
+                        <button type="button" class="secondary-button" hx-get="{{ boardPrefix }}/spawn-menu?open=true" hx-target="#spawn-controls" hx-swap="outerHTML">Cancel</button>
                         <button type="submit" class="primary-button"><span class="save-label">Save unit</span><span class="saving-label">Saving…</span></button>
                     </div>
                 </form>
             {{ else }}
                 <div class="spawn-menu-heading">
                     <h2>Spawn unit</h2>
-                    <button type="button" id="create-unit-toggle" class="primary-button" hx-get="/unit-library/new" hx-target="#spawn-controls" hx-swap="outerHTML" autofocus>+ Create new unit</button>
+                    <button type="button" id="create-unit-toggle" class="primary-button" hx-get="{{ boardPrefix }}/unit-library/new" hx-target="#spawn-controls" hx-swap="outerHTML" autofocus>+ Create new unit</button>
                 </div>
                 <p>Select a unit to add it to the tabletop.</p>
                 {{ if .Error }}<p class="menu-error" role="alert">{{ .Error }}</p>{{ end }}
@@ -117,19 +117,19 @@
         type="button"
         class="library-unit"
         aria-label="Spawn {{ .Name }}"
-        hx-post="/unit?unitID={{ .ID }}"
+        hx-post="{{ boardPrefix }}/unit?unitID={{ .ID }}"
         hx-target="#unitOverlay"
         hx-swap="none"
         hx-disabled-elt="this"
     >
         <span class="library-token-preview" style="--image-zoom: {{.ImageFit.Zoom}}; --image-offset-x: {{.ImageFit.OffsetX}}%; --image-offset-y: {{.ImageFit.OffsetY}}%;">
-            <img class="unit-image" src="/images/{{ .ImageID }}" alt="" width="48" height="48" loading="lazy">
+            <img class="unit-image" src="{{ boardPrefix }}/images/{{ .ImageID }}" alt="" width="48" height="48" loading="lazy">
         </span>
         <span class="library-unit-name">{{ .Name }}<span class="library-unit-size">{{ .Size.Label }}</span></span>
         <span class="spawn-action" aria-hidden="true">Spawn</span>
     </button>
     <button type="button" class="library-delete" aria-label="Delete {{ .Name }} permanently"
-        hx-delete="/unit-library/{{ .ID }}" hx-target="#spawn-controls" hx-swap="outerHTML"
+        hx-delete="{{ boardPrefix }}/unit-library/{{ .ID }}" hx-target="#spawn-controls" hx-swap="outerHTML"
         hx-confirm="Permanently delete {{ .Name }} from the unit library? Existing copies on boards will remain. This cannot be undone."
         hx-disabled-elt="this">Delete</button>
 </li>

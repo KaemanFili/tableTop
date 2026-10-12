@@ -27,7 +27,7 @@
     });
 
     document.addEventListener('htmx:afterRequest', event => {
-        if (!event.detail.elt?.matches('[hx-delete^="/unit-library/"]') || event.detail.successful) return;
+        if (!event.detail.elt?.matches('[hx-delete*="/unit-library/"]') || event.detail.successful) return;
         const menu = document.getElementById('spawn-menu');
         if (!menu) return;
         let message = menu.querySelector('[data-delete-error]');

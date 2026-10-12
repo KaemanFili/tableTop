@@ -6,6 +6,7 @@ import (
 	"io"
 	"math/big"
 	"net/http"
+	"tableTop/main/internal/auth"
 )
 
 type diceGroup struct {
@@ -43,7 +44,7 @@ func (h *EndpointHandler) rollDice(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Choose dice groups to roll.", http.StatusBadRequest)
 		return
 	}
-	if request.Private && r.URL.Query().Get("gm") != "true" {
+	if request.Private && !auth.IsGM(r) {
 		http.Error(w, "Only a GM can roll privately.", http.StatusForbidden)
 		return
 	}

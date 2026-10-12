@@ -1047,3 +1047,76 @@ body.map-panning * {
   align-items: center;
   gap: 6px;
 }
+
+
+#signed-in-user {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: white;
+  background: #202020;
+  padding: 6px;
+  border-radius: 6px;
+  font: 14px/1.4 system-ui, sans-serif;
+}
+
+.login-page {
+  display: grid;
+  place-items: center;
+  background: #202020;
+  color: white;
+  font-family: system-ui, sans-serif;
+}
+
+.login-page main {
+  width: min(360px, calc(100vw - 48px));
+  padding: 24px;
+  border: 1px solid #555;
+  border-radius: 8px;
+}
+
+.oauth-login {
+  display: block;
+  padding: 12px;
+  border-radius: 6px;
+  background: #5865f2;
+  color: white;
+  text-align: center;
+  text-decoration: none;
+}
+
+
+#signed-in-user a { color: #fbbf24; }
+
+.lobby-page {
+  background: #202020;
+  color: white;
+  font: 16px/1.5 system-ui, sans-serif;
+}
+
+.lobby-page main {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 24px;
+}
+
+.lobby-page header,
+.lobby-page form {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.lobby-page section,
+.lobby-page article {
+  margin: 16px 0;
+  padding: 16px;
+  border: 1px solid #555;
+  border-radius: 6px;
+}
+
+.lobby-page label { display: block; }
+.lobby-page input { display: block; padding: 8px; }
+.lobby-page a { color: #fbbf24; }
+.lobby-page button { padding: 8px 12px; cursor: pointer; }

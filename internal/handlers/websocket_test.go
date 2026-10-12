@@ -11,6 +11,45 @@ import (
 	"tableTop/main/internal/app"
 )
 
+func TestPositionBroadcastStopsAndRestarts(t *testing.T) {
+	ws := NewWebSocketHandler(app.NewState())
+	ws.StartPositionBroadcast()
+	mux := http.NewServeMux()
+	ws.RegisterRoutes(mux)
+	server := newTestServer(t, mux)
+	waitIdle := func() {
+		t.Helper()
+		deadline := time.Now().Add(time.Second)
+		for {
+			ws.positionMutex.Lock()
+			idle := !ws.positionBroadcastRunning && len(ws.positionClients) == 0
+			ws.positionMutex.Unlock()
+			if idle {
+				return
+			}
+			if time.Now().After(deadline) {
+				t.Fatal("position broadcast did not stop after the last client left")
+			}
+			time.Sleep(time.Millisecond)
+		}
+	}
+	waitIdle()
+	for range 2 {
+		client, _, err := websocket.DefaultDialer.Dial("ws"+strings.TrimPrefix(server.URL, "http")+"/ws/updatePosForClients", nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() { client.Close() })
+		client.SetReadDeadline(time.Now().Add(time.Second))
+		var units []app.UnitData
+		if err := client.ReadJSON(&units); err != nil {
+			t.Fatalf("connected client received no broadcast: %v", err)
+		}
+		client.Close()
+		waitIdle()
+	}
+}
+
 func TestStalledBoardClientIsDisconnected(t *testing.T) {
 	ws := NewWebSocketHandler(app.NewState())
 	mux := http.NewServeMux()

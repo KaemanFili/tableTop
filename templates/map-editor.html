@@ -9,7 +9,7 @@
 <p>Upload a map and align it with the grid. Each square represents 5 feet.</p>
 {{ if .Error }}<p class="menu-error" role="alert">{{ .Error }} Choose the image again before saving.</p>{{ end }}
 <form id="create-map-form" data-preserve-fit="{{ if .Error }}true{{ else }}false{{ end }}" method="post" action="/map-library?gm=true" enctype="multipart/form-data"
-    hx-post="/map-library?gm=true" hx-encoding="multipart/form-data" hx-target="#map-editor" hx-swap="innerHTML" hx-disabled-elt="find button[type='submit']">
+    hx-post="{{ boardPrefix }}/map-library?gm=true" hx-encoding="multipart/form-data" hx-target="#map-editor" hx-swap="innerHTML" hx-disabled-elt="find button[type='submit']">
     <label for="map-name">Name</label>
     <input id="map-name" name="name" type="text" maxlength="80" required value="{{ .Name }}" placeholder="e.g. Forest ruins" autofocus>
     <label for="map-image">Map image</label>

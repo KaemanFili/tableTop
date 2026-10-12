@@ -5,6 +5,6 @@
     data-size="{{.Size}}"
     data-status="{{.Status}}"
     style="left: {{.Left}}px; top: {{.Top}}px; --unit-squares: {{.Size.Squares}}; --image-zoom: {{.ImageFit.Zoom}}; --image-offset-x: {{.ImageFit.OffsetX}}%; --image-offset-y: {{.ImageFit.OffsetY}}%; --unit-status-color: {{.Status.Color}};">
-    <img class="unit-image" src="/images/{{.ImageID}}" alt="{{if .Name}}{{.Name}}{{else}}Unit {{.ID}}{{end}}" draggable="false">
+    <img class="unit-image" src="{{ boardPrefix }}/images/{{.ImageID}}" alt="{{if .Name}}{{.Name}}{{else}}Unit {{.ID}}{{end}}" draggable="false">
 </div>
 {{ end }}

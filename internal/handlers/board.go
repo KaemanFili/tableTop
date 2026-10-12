@@ -3,11 +3,12 @@ package handlers
 import (
 	"encoding/json"
 	"net/http"
+	"tableTop/main/internal/auth"
 )
 
 func (h *EndpointHandler) clearBoard(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "no-store")
-	if r.URL.Query().Get("gm") != "true" {
+	if !auth.IsGM(r) {
 		http.Error(w, "Only a GM can clear the map.", http.StatusForbidden)
 		return
 	}

@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"tableTop/main/internal/auth"
 
 	"tableTop/main/internal/app"
 )
@@ -22,7 +23,7 @@ type mapEditorData struct {
 
 func (h *EndpointHandler) requireMapGM(w http.ResponseWriter, r *http.Request) bool {
 	w.Header().Set("Cache-Control", "no-store")
-	if r.URL.Query().Get("gm") != "true" {
+	if !auth.IsGM(r) {
 		http.Error(w, "Only a GM can manage maps.", http.StatusForbidden)
 		return false
 	}

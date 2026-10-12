@@ -255,7 +255,7 @@
         if (x < 0 || y < 0 || x >= bounds.width || y >= bounds.height) return;
         try {
             if (newUnitUpdateSocket.readyState !== WebSocket.OPEN) throw new Error('Disconnected');
-            const response = await fetch('/board/ping', {
+            const response = await fetch(boardURL('/board/ping'), {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({x, y, generation: boardGeneration}),

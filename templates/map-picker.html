@@ -8,13 +8,13 @@
 <div class="saved-map-list">
 {{ range . }}
     <div class="library-entry">
-    <button type="button" class="saved-map" data-load-map hx-post="/map-library/{{ .ID }}/load?gm=true"
+    <button type="button" class="saved-map" data-load-map hx-post="{{ boardPrefix }}/map-library/{{ .ID }}/load?gm=true"
         hx-target="#map-editor" hx-swap="innerHTML" hx-disabled-elt="#map-editor [data-load-map]">
-        <img src="/maps/images/{{ .ID }}" alt="" loading="lazy">
+        <img src="{{ boardPrefix }}/maps/images/{{ .ID }}" alt="" loading="lazy">
         <span>{{ .Name }}{{ if not .Board }}<small>Image only</small>{{ end }}</span>
     </button>
     <button type="button" class="library-delete" data-delete-map aria-label="Delete {{ .Name }} permanently"
-        hx-delete="/map-library/{{ .ID }}?gm=true" hx-target="#map-editor" hx-swap="innerHTML"
+        hx-delete="{{ boardPrefix }}/map-library/{{ .ID }}?gm=true" hx-target="#map-editor" hx-swap="innerHTML"
         hx-confirm="Permanently delete {{ .Name }} and its saved board? If active, its background will be removed for everyone. This cannot be undone."
         hx-disabled-elt="#map-editor button">Delete</button>
     </div>

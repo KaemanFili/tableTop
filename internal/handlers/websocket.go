@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"sync"
+	"tableTop/main/internal/auth"
 	"time"
 
 	"tableTop/main/internal/app"
@@ -36,16 +37,18 @@ type WebSocketHandler struct {
 
 	upgrader websocket.Upgrader
 
-	positionClients map[*websocket.Conn]bool
-	boardClients    map[*websocket.Conn]bool
-	positionMutex   sync.Mutex
-	boardMutex      sync.Mutex
-	rulers          map[string]boardRuler
-	strokes         map[string]penStroke
-	erasedStrokes   map[string]bool
-	fogMarks        []fogMark
-	boardGeneration uint64
-	currentMap      *app.MapDefinition
+	positionClients          map[*websocket.Conn]bool
+	boardClients             map[*websocket.Conn]bool
+	positionMutex            sync.Mutex
+	positionBroadcastEnabled bool
+	positionBroadcastRunning bool
+	boardMutex               sync.Mutex
+	rulers                   map[string]boardRuler
+	strokes                  map[string]penStroke
+	erasedStrokes            map[string]bool
+	fogMarks                 []fogMark
+	boardGeneration          uint64
+	currentMap               *app.MapDefinition
 }
 
 func NewWebSocketHandler(state *app.AppState) *WebSocketHandler {
@@ -68,18 +71,36 @@ func (h *WebSocketHandler) RegisterRoutes(mux *http.ServeMux) {
 }
 
 func (h *WebSocketHandler) StartPositionBroadcast() {
+	h.positionMutex.Lock()
+	defer h.positionMutex.Unlock()
+	h.positionBroadcastEnabled = true
+	h.startPositionBroadcastLocked()
+}
+
+// Start only while clients are connected; retain board state for their return.
+func (h *WebSocketHandler) startPositionBroadcastLocked() {
+	if !h.positionBroadcastEnabled || h.positionBroadcastRunning || len(h.positionClients) == 0 {
+		return
+	}
+	h.positionBroadcastRunning = true
 	go func() {
 		ticker := time.NewTicker(33 * time.Millisecond)
 		defer ticker.Stop()
 
 		for range ticker.C {
+			h.positionMutex.Lock()
+			if len(h.positionClients) == 0 {
+				h.positionBroadcastRunning = false
+				h.positionMutex.Unlock()
+				return
+			}
 			data, err := json.Marshal(h.state.Units())
 			if err != nil {
+				h.positionMutex.Unlock()
 				log.Println("Marshal error:", err)
 				continue
 			}
 
-			h.positionMutex.Lock()
 			for conn := range h.positionClients {
 				if err := writeSocket(conn, data); err != nil {
 					log.Println("Write error, removing client:", err)
@@ -174,6 +195,7 @@ func (h *WebSocketHandler) updateClientPosition(w http.ResponseWriter, r *http.R
 
 	h.positionMutex.Lock()
 	h.positionClients[conn] = true
+	h.startPositionBroadcastLocked()
 	h.positionMutex.Unlock()
 
 	for {
@@ -202,7 +224,7 @@ func (h *WebSocketHandler) updateBoardUtilityValues(w http.ResponseWriter, r *ht
 		log.Println("Send initial board state:", err)
 		return
 	}
-	h.readBoardUtilitiesMessages(conn, sessionID, r.URL.Query().Get("gm") == "true")
+	h.readBoardUtilitiesMessages(conn, sessionID, auth.IsGM(r))
 }
 
 // Registration and the initial state share a lock so live updates cannot
