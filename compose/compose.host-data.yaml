@@ -1,0 +1,6 @@
+# Optional: use the existing local data directory instead of the named volume.
+services:
+  tabletop:
+    user: "${TABLETOP_UID:?Set TABLETOP_UID to your host user ID}:${TABLETOP_GID:?Set TABLETOP_GID to your host group ID}"
+    volumes:
+      - ../data:/app/data

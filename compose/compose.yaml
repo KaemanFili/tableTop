@@ -1,0 +1,36 @@
+name: tabletop
+
+services:
+  tabletop:
+    image: tabletop-tabletop
+    build:
+      context: ..
+      dockerfile: compose/Dockerfile
+    ports:
+      - "18080:18080"
+    environment:
+      # Set these public settings to enable Discord sign-in.
+      OAUTH2_CLIENT_ID: "${OAUTH2_CLIENT_ID}"
+      # Local callback: http://localhost:18080/auth/discord/callback
+      OAUTH2_REDIRECT_URL: "${OAUTH2_REDIRECT_URL}"
+      OAUTH2_CLIENT_SECRET_FILE: /run/secrets/oauth2_client_secret
+    secrets:
+      - oauth2_client_secret
+    volumes:
+      - tabletop-data:/app/data
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    init: true
+    restart: unless-stopped
+
+volumes:
+  tabletop-data:
+
+secrets:
+  oauth2_client_secret:
+    file: ./secrets/oauth2_client_secret
