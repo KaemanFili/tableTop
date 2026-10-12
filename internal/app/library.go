@@ -17,47 +17,63 @@ import (
 
 // UnitDefinition is a reusable unit in the library, separate from a placed token.
 type UnitDefinition struct {
-	ID       string   `json:"id"`
-	Name     string   `json:"name"`
-	UnitType string   `json:"unitType"`
-	ImageID  string   `json:"imageID"`
-	Size     UnitSize `json:"size"`
-	ImageFit ImageFit `json:"imageFit"`
+	ID       string   `json:"id" bson:"id"`
+	Name     string   `json:"name" bson:"name"`
+	UnitType string   `json:"unitType" bson:"unitType"`
+	ImageID  string   `json:"imageID" bson:"imageID"`
+	Size     UnitSize `json:"size" bson:"size"`
+	ImageFit ImageFit `json:"imageFit" bson:"imageFit"`
 }
 
 type UnitLibrary struct {
-	mutex  sync.RWMutex
-	dir    string
-	units  map[string]UnitDefinition
-	limits *StorageLimits
+	mutex          sync.RWMutex
+	dir            string
+	units          map[string]UnitDefinition
+	limits         *StorageLimits
+	store          DocumentStore[UnitDefinition]
+	pendingDeletes map[string]bool
 }
 
-const unitCatalogVersion = 1
+const unitDocumentVersion = 1
 
-type unitCatalog struct {
-	Version int              `json:"version"`
-	Units   []UnitDefinition `json:"units"`
+type unitDocument struct {
+	Version int              `json:"version" bson:"version"`
+	Units   []UnitDefinition `json:"units" bson:"units"`
 }
 
 func NewUnitLibrary(dir string, limits ...*StorageLimits) (*UnitLibrary, error) {
+	return NewUnitLibraryWithStore(dir, nil, limits...)
+}
+
+func NewUnitLibraryWithStore(dir string, store DocumentStore[UnitDefinition], limits ...*StorageLimits) (*UnitLibrary, error) {
 	if err := os.MkdirAll(filepath.Join(dir, "images"), 0755); err != nil {
 		return nil, err
 	}
-	data, err := os.ReadFile(filepath.Join(dir, "units.json"))
 	var saved []UnitDefinition
-	switch {
-	case errors.Is(err, os.ErrNotExist):
-		saved = starterUnits()
-	case err != nil:
-		return nil, err
-	default:
-		saved, err = decodeUnitCatalog(data)
+	initialized := false
+	var err error
+	if store != nil {
+		saved, initialized, err = store.Load()
 		if err != nil {
-			return nil, fmt.Errorf("read unit library: %w", err)
+			return nil, err
 		}
 	}
+	if !initialized {
+		data, readErr := os.ReadFile(filepath.Join(dir, "units.json"))
+		switch {
+		case errors.Is(readErr, os.ErrNotExist):
+			saved = starterUnits()
+		case readErr != nil:
+			return nil, readErr
+		default:
+			saved, err = decodeUnitDocument(data)
+			if err != nil {
+				return nil, fmt.Errorf("read unit library: %w", err)
+			}
+		}
+	}
+	library := &UnitLibrary{dir: dir, units: make(map[string]UnitDefinition, len(saved)), limits: firstStorageLimit(limits), store: store}
 
-	library := &UnitLibrary{dir: dir, units: make(map[string]UnitDefinition, len(saved)), limits: firstStorageLimit(limits)}
 	for _, entry := range saved {
 		unit, err := normalizeSavedUnit(entry)
 		if err != nil {
@@ -67,6 +83,11 @@ func NewUnitLibrary(dir string, limits ...*StorageLimits) (*UnitLibrary, error) 
 			return nil, fmt.Errorf("duplicate saved unit %q", unit.ID)
 		}
 		library.units[unit.ID] = unit
+	}
+	if store != nil && !initialized {
+		if err := store.Initialize(library.Units()); err != nil {
+			return nil, err
+		}
 	}
 	return library, nil
 }
@@ -78,13 +99,13 @@ func starterUnits() []UnitDefinition {
 	}
 }
 
-func decodeUnitCatalog(data []byte) ([]UnitDefinition, error) {
+func decodeUnitDocument(data []byte) ([]UnitDefinition, error) {
 	data = bytes.TrimSpace(data)
 	if len(data) == 0 {
-		return nil, errors.New("empty unit catalog")
+		return nil, errors.New("empty unit library")
 	}
 	if data[0] == '[' {
-		// Legacy catalogs contain custom entries only; supply their starter units.
+		// Legacy libraries contain custom entries only; supply their starter units.
 		var units []UnitDefinition
 		if err := json.Unmarshal(data, &units); err != nil {
 			return nil, err
@@ -92,15 +113,15 @@ func decodeUnitCatalog(data []byte) ([]UnitDefinition, error) {
 		return append(starterUnits(), units...), nil
 	}
 
-	var catalog unitCatalog
-	if err := json.Unmarshal(data, &catalog); err != nil {
+	var document unitDocument
+	if err := json.Unmarshal(data, &document); err != nil {
 		return nil, err
 	}
-	if catalog.Version != unitCatalogVersion {
-		return nil, fmt.Errorf("unsupported unit catalog version %d", catalog.Version)
+	if document.Version != unitDocumentVersion {
+		return nil, fmt.Errorf("unsupported unit library version %d", document.Version)
 	}
-	// Versioned catalogs contain the entire library, including starter deletions.
-	return catalog.Units, nil
+	// Versioned libraries contain the entire library, including starter deletions.
+	return document.Units, nil
 }
 
 func normalizeSavedUnit(unit UnitDefinition) (UnitDefinition, error) {
@@ -162,6 +183,9 @@ func (l *UnitLibrary) Units() []UnitDefinition {
 func (l *UnitLibrary) UnitByID(id string) (UnitDefinition, bool) {
 	l.mutex.RLock()
 	defer l.mutex.RUnlock()
+	if l.pendingDeletes[id] {
+		return UnitDefinition{}, false
+	}
 	unit, exists := l.units[id]
 	return unit, exists
 }
@@ -177,7 +201,7 @@ func (l *UnitLibrary) ImagePath(id string) (string, bool) {
 	return filepath.Join(l.dir, "images", id+".png"), true
 }
 
-// Create commits the image and catalog before making the new unit visible.
+// Create commits the image and library before making the new unit visible.
 // pngImage, when present, must be a validated, re-encoded PNG from the handler.
 func (l *UnitLibrary) Create(name, unitType string, size UnitSize, fit ImageFit, pngImage []byte) (UnitDefinition, error) {
 	name = strings.TrimSpace(name)
@@ -207,12 +231,19 @@ func (l *UnitLibrary) Create(name, unitType string, size UnitSize, fit ImageFit,
 			return UnitDefinition{}, err
 		}
 	}
-	saved := []UnitDefinition{unit}
-	for _, existing := range l.units {
-		saved = append(saved, existing)
+	var err error
+	if l.store != nil {
+		err = l.store.Put(unit)
+	} else {
+		saved := []UnitDefinition{unit}
+		for _, existing := range l.units {
+			saved = append(saved, existing)
+		}
+		err = l.save(saved)
 	}
-	if err := l.save(saved); err != nil {
-		if imagePath != "" {
+	if err != nil {
+		// A MongoDB timeout may follow a committed write; retain its artwork.
+		if imagePath != "" && l.store == nil {
 			os.Remove(imagePath)
 		}
 		return UnitDefinition{}, err
@@ -222,7 +253,7 @@ func (l *UnitLibrary) Create(name, unitType string, size UnitSize, fit ImageFit,
 }
 
 func (l *UnitLibrary) save(units []UnitDefinition) error {
-	return writeJSONFile(filepath.Join(l.dir, "units.json"), unitCatalog{Version: unitCatalogVersion, Units: units}, l.limits)
+	return writeJSONFile(filepath.Join(l.dir, "units.json"), unitDocument{Version: unitDocumentVersion, Units: units}, l.limits)
 }
 
 // Delete removes a reusable definition; placed copies retain their artwork.
@@ -240,9 +271,22 @@ func (l *UnitLibrary) Delete(id string) error {
 			units = append(units, unit)
 		}
 	}
-	if err := l.save(units); err != nil {
+	var err error
+	if l.store != nil {
+		err = deleteDocument(l.store, id)
+	} else {
+		err = l.save(units)
+	}
+	if err != nil {
+		if l.store != nil {
+			if l.pendingDeletes == nil {
+				l.pendingDeletes = make(map[string]bool)
+			}
+			l.pendingDeletes[id] = true
+		}
 		return err
 	}
 	delete(l.units, id)
+	delete(l.pendingDeletes, id)
 	return nil
 }

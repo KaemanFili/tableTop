@@ -8,9 +8,9 @@ import (
 // ImageFit frames artwork within the token, independently of its grid size.
 // Offsets are percentages of the token's width and height.
 type ImageFit struct {
-	Zoom    float64 `json:"zoom"`
-	OffsetX float64 `json:"offsetX"`
-	OffsetY float64 `json:"offsetY"`
+	Zoom    float64 `json:"zoom" bson:"zoom"`
+	OffsetX float64 `json:"offsetX" bson:"offsetX"`
+	OffsetY float64 `json:"offsetY" bson:"offsetY"`
 }
 
 func DefaultImageFit() ImageFit {

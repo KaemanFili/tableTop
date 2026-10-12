@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 )
 
-// writeJSONFile replaces a catalog only after its complete contents reach disk.
+// writeJSONFile replaces a library only after its complete contents reach disk.
 func writeJSONFile(path string, value any, limits ...*StorageLimits) error {
 	data, err := json.Marshal(value)
 	if err != nil {
@@ -15,7 +15,7 @@ func writeJSONFile(path string, value any, limits ...*StorageLimits) error {
 	return writeStorageFile(path, append(data, '\n'), 0600, firstStorageLimit(limits))
 }
 
-// The library holds limits.mu across its image/catalog transaction, including
+// The library holds limits.mu across its image/library transaction, including
 // rollback, so concurrent libraries cannot admit growth against the same space.
 func writeStorageFile(path string, data []byte, mode os.FileMode, limits *StorageLimits) error {
 	if limits != nil {

@@ -32,7 +32,8 @@ Set the client ID and redirect URL in `compose/.env` and prepare
 The client secret is mounted as a file; Compose loads the client ID and redirect URL
 from `compose/.env`. Run `docker compose -f compose/compose.yaml up --build -d`. The app is available at
 `http://localhost:18080/`; runtime credentials stay outside the image and Git.
-Data persists in a named volume. See [container setup](docs/containers.md) for
+Compose includes MongoDB with persistent volumes; the app uses it by default.
+Artwork and local settings persist in the app volume. See [container setup](docs/containers.md) for
 requirements, configuration updates, and using your existing host data directory.
 Storage defaults to 5 GiB total and 512 MiB per tabletop; the container guide
 explains how to configure these limits.
@@ -58,7 +59,7 @@ mode enables the local development board.
 - `internal/handlers`: HTTP endpoint handlers and websocket handlers.
 - `static`: browser JavaScript and CSS; `boardGeometry.js` shares drawing coordinate calculations.
 - [docs/menus.md](docs/menus.md): shared floating-menu positioning, dismissal, and focus handling.
-- `internal/app/storage.go`: atomic JSON catalog replacement shared by both libraries.
+- `internal/app/storage.go`: atomic JSON library replacement shared by both libraries.
 - `templates`: reusable HTML templates served by handlers.
 - `docs/movement.md`: movement smoothing, progress calculations, and worked examples.
 - [docs/erasers.md](docs/erasers.md): pen stroke deletion versus partial fog erasure,
@@ -242,13 +243,20 @@ the board.
 Each library entry has a **Delete** button with a permanent-deletion confirmation.
 `DELETE /unit-library/{id}` removes its definition across restarts, including
 starter units. Existing placed copies and saved boards keep their artwork.
-Older unit catalogs migrate automatically when the library is next changed.
+Older unit libraries migrate automatically when the library is next changed.
 Outside clicks, Escape, and successful spawning close the library. The creation
 form stays open on outside clicks so choosing an image or interacting with the
 board does not accidentally discard input; use Cancel, Back, or the main toggle
 to leave it. Form errors preserve the name, type, size, and image framing; an image must be reselected.
 
 ## Server storage and unit images
+
+[MongoDB storage](docs/mongodb.md) stores map and unit definitions as documents,
+embeds each saved board in its map, and reads status names and colors from a
+status document. Compose enables it by default; for a host process, set
+`TABLETOP_MONGODB_URI` to enable it. Existing JSON libraries import on first use.
+Artwork stays in the data directory. The following file-storage details apply
+when MongoDB is not configured.
 
 Created unit definitions are stored in `data/units.json`, with uploaded artwork
 in `data/images/`. The directory is created automatically and excluded from Git.
@@ -260,8 +268,8 @@ remain supported. Each socket write has a two-second deadline, and stalled
 broadcast clients are disconnected so they cannot hold shared locks indefinitely.
 
 The server validates names, types, upload sizes, image formats, and dimensions.
-Catalog updates use an atomic file replacement; failed saves do not publish an
-entry. An unreadable or invalid catalog stops startup rather than replacing it.
+Library updates use an atomic file replacement; failed saves do not publish an
+entry. An unreadable or invalid library stops startup rather than replacing it.
 
 Built-in image files live in `static/images`. The `unitImages` registry in
 `internal/handlers/images.go` maps their image IDs to files. Both built-in and
@@ -297,3 +305,6 @@ Sizes persist with the library and are retained when tokens move or reload.
 
 - [x] Add an option to delete saved units from the unit library.
 - [x] Add an option to delete saved maps from the map library.
+- [ ] Optimize large saved boards by separating strokes and ordered fog into
+  referenced documents or bounded batches if board limits increase; see
+  [MongoDB storage](docs/mongodb.md).

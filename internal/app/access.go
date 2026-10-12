@@ -21,7 +21,7 @@ type Invitation struct {
 	Expires time.Time `json:"expires"`
 }
 
-type accessCatalog struct {
+type accessDocument struct {
 	Members []string     `json:"members"`
 	Invites []Invitation `json:"invites"`
 }
@@ -31,7 +31,7 @@ type AccessLibrary struct {
 	mu     sync.Mutex
 	path   string
 	admins []string
-	data   accessCatalog
+	data   accessDocument
 	limits *StorageLimits
 }
 
@@ -83,7 +83,7 @@ func (library *AccessLibrary) Admit(id, code string) error {
 		if invite.ID != invitationHash(code) || !time.Now().Before(invite.Expires) {
 			continue
 		}
-		proposed := accessCatalog{Members: append(slices.Clone(library.data.Members), id), Invites: slices.Delete(slices.Clone(library.data.Invites), index, index+1)}
+		proposed := accessDocument{Members: append(slices.Clone(library.data.Members), id), Invites: slices.Delete(slices.Clone(library.data.Invites), index, index+1)}
 		if err := library.save(proposed); err != nil {
 			return err
 		}
@@ -105,7 +105,7 @@ func (library *AccessLibrary) CreateInvitation(admin string) (string, error) {
 		return "", errors.New("there are already 100 pending invitations; revoke one before creating another")
 	}
 	code := rand.Text()
-	proposed := accessCatalog{Members: library.data.Members, Invites: append(invites, Invitation{ID: invitationHash(code), Expires: now.Add(7 * 24 * time.Hour)})}
+	proposed := accessDocument{Members: library.data.Members, Invites: append(invites, Invitation{ID: invitationHash(code), Expires: now.Add(7 * 24 * time.Hour)})}
 	if err := library.save(proposed); err != nil {
 		return "", err
 	}
@@ -128,7 +128,7 @@ func (library *AccessLibrary) RevokeInvitation(admin, id string) error {
 	}
 	library.mu.Lock()
 	defer library.mu.Unlock()
-	proposed := accessCatalog{Members: library.data.Members, Invites: slices.DeleteFunc(slices.Clone(library.data.Invites), func(invite Invitation) bool { return invite.ID == id })}
+	proposed := accessDocument{Members: library.data.Members, Invites: slices.DeleteFunc(slices.Clone(library.data.Invites), func(invite Invitation) bool { return invite.ID == id })}
 	if err := library.save(proposed); err != nil {
 		return err
 	}
@@ -136,7 +136,7 @@ func (library *AccessLibrary) RevokeInvitation(admin, id string) error {
 	return nil
 }
 
-func (library *AccessLibrary) save(data accessCatalog) error {
+func (library *AccessLibrary) save(data accessDocument) error {
 	library.limits.lock()
 	defer library.limits.unlock()
 	return writeJSONFile(library.path, data, library.limits)

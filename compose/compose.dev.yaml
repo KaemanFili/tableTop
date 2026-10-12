@@ -6,9 +6,16 @@ services:
       OAUTH2_REDIRECT_URL: ""
       OAUTH2_CLIENT_SECRET_FILE: ""
       TABLETOP_ADMIN_USER_IDS: ""
+      TABLETOP_MONGODB_DATABASE: "${TABLETOP_DEV_MONGODB_DATABASE:-tabletop_dev}"
     secrets: !reset []
     volumes:
       - tabletop-dev-data:/app/data
+  mongo:
+    volumes:
+      - mongodb-dev-data:/data/db
+      - mongodb-dev-config:/data/configdb
 
 volumes:
   tabletop-dev-data:
+  mongodb-dev-data:
+  mongodb-dev-config:

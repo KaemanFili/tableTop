@@ -90,7 +90,8 @@ docker compose -f compose/compose.yaml up -d --no-build --force-recreate
 
 The Dockerfile uses ordinary build steps and Docker layer caching. The rebuild
 script selects the classic builder, so Buildx is not required.
-`docker compose -f compose/compose.yaml down` stops the app and retains its data volume.
+`docker compose -f compose/compose.yaml down` stops the app and MongoDB and retains
+their data volumes.
 
 ## Persistent data
 
@@ -100,11 +101,19 @@ The volume starts independently of an existing host `data/` directory.
 Live board state and login sessions still reset when the process restarts, as
 they do outside a container. Save maps to retain live board content.
 
+Compose includes MongoDB for map/unit definitions and status definitions. The
+app waits for the database health check before starting. MongoDB has no published
+host port and uses its own persistent volumes; development mode uses separate
+volumes for both services. Artwork and session membership stay in the app volume.
+See [MongoDB storage](mongodb.md) for imports, settings, and database backups.
+The file backup scripts cover the app volume only; the limits below count local
+files only.
+
 ### Storage limits
 
 The app defaults to **5 GiB total** under `/app/data` and **512 MiB per tabletop**.
-Stored PNG images, unit/map catalogs, and saved boards count toward both
-limits; the root session/membership catalog counts toward the total. Image
+Stored PNG images, unit/map libraries, and saved boards count toward both
+limits; the root session/membership library counts toward the total. Image
 sizes are measured after conversion to PNG. The app
 rejects growth that would cross either limit and explains the storage problem
 in the form or save response. Existing data stays readable; deletions and
@@ -127,7 +136,7 @@ including existing files after restart and artwork retained for placed units
 or saved boards. Deleting a unit definition preserves its artwork; deleting a
 map removes that map's image. Existing data is never automatically deleted.
 
-These limits cap committed file bytes written by the app. Atomic catalog/image
+These limits cap committed file bytes written by the app. Atomic library/image
 updates temporarily keep both old and new files on disk, so leave additional
 free space. Filesystem overhead, Docker images/logs, backups, and writes from
 other processes are outside this cap. An ordinary Docker named volume has no

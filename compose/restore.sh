@@ -34,4 +34,4 @@ PY
     fi
     tar -xzf - -C /data
 ' < "$1"
-printf 'Backup restored to the configured data volume. Start tabletop to use it.\n'
+printf 'File backup restored to the configured data volume. If using MongoDB, restore the matching database backup before starting tabletop.\n'

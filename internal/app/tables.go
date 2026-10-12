@@ -49,7 +49,7 @@ func NewTableLibrary(dir string, limits ...*StorageLimits) (*TableLibrary, error
 	seen := make(map[string]bool)
 	for _, table := range library.tables {
 		if !tableIDPattern.MatchString(table.ID) || seen[table.ID] || strings.TrimSpace(table.Name) == "" || table.OwnerID == "" || !table.HasMember(table.OwnerID) {
-			return nil, errors.New("invalid tabletop session catalog")
+			return nil, errors.New("invalid tabletop session library")
 		}
 		seen[table.ID] = true
 	}

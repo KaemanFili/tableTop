@@ -1,17 +1,64 @@
 package app
 
-import "errors"
+import (
+	"errors"
+	"regexp"
+	"slices"
+	"strings"
+	"sync"
+	"unicode/utf8"
+)
 
 type UnitStatus string
 
 type UnitStatusOption struct {
-	Value UnitStatus
-	Color string
+	Value UnitStatus `bson:"value"`
+	Color string     `bson:"color"`
 }
 
-// eventually we should be able to add custom statuses, but for now we will just use a fixed set of statuses with colors. Good excuse for some kind of document store
-// we could probably use the same document based storage for unit library
+// Definitions are loaded once at startup; readers receive their own slice.
+var statusDefinitions = struct {
+	sync.RWMutex
+	options []UnitStatusOption
+}{options: defaultUnitStatuses()}
+
 func UnitStatuses() []UnitStatusOption {
+	statusDefinitions.RLock()
+	defer statusDefinitions.RUnlock()
+	return slices.Clone(statusDefinitions.options)
+}
+
+var statusColorPattern = regexp.MustCompile(`^#[0-9a-fA-F]{6}$`)
+
+func validateUnitStatuses(options []UnitStatusOption) error {
+	if len(options) == 0 {
+		return errors.New("at least one status definition is required")
+	}
+	if len(options) > 256 {
+		return errors.New("too many status definitions")
+	}
+	seen := make(map[UnitStatus]bool)
+	for _, option := range options {
+		name := string(option.Value)
+		if name == "" || strings.TrimSpace(name) != name || !utf8.ValidString(name) || utf8.RuneCountInString(name) > 80 || seen[option.Value] || !statusColorPattern.MatchString(option.Color) {
+			return errors.New("invalid status definition: names must be unique and colors must use #RRGGBB")
+		}
+		seen[option.Value] = true
+	}
+	return nil
+}
+
+func setUnitStatuses(options []UnitStatusOption) error {
+	if err := validateUnitStatuses(options); err != nil {
+		return err
+	}
+	statusDefinitions.Lock()
+	defer statusDefinitions.Unlock()
+	statusDefinitions.options = slices.Clone(options)
+	return nil
+}
+
+func defaultUnitStatuses() []UnitStatusOption {
 	return []UnitStatusOption{
 		{"Blinded", "#64748B"},
 		{"Charmed", "#EC4899"},

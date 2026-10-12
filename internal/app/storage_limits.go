@@ -99,7 +99,7 @@ func (limits *StorageLimits) check(path string, size int64) error {
 	if growth <= 0 {
 		return nil
 	}
-	// A local development board shares the root. The sessions catalog counts
+	// A local development board shares the root. The sessions library counts
 	// only toward the global limit; session files count toward both limits.
 	tableRoot := limits.root
 	parts := strings.Split(relative, string(filepath.Separator))

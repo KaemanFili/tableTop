@@ -33,7 +33,7 @@ func storedBytes(t *testing.T, dir string) int64 {
 	return size
 }
 
-func TestStorageLimitsRollbackImagesWhenCatalogExceedsLimit(t *testing.T) {
+func TestStorageLimitsRollbackImagesWhenLibraryExceedsLimit(t *testing.T) {
 	for _, kind := range []string{"unit", "map"} {
 		t.Run(kind, func(t *testing.T) {
 			root := t.TempDir()
@@ -159,19 +159,19 @@ func TestStorageLimitsTableIsolationAndMembership(t *testing.T) {
 	if _, err := second.Create(definition, bytes.Repeat([]byte("x"), 800)); err != nil {
 		t.Fatalf("another table inherited the first table's usage: %v", err)
 	}
-	catalog, _ := NewTableLibrary(root, limits)
-	table, err := catalog.Create("First", "owner")
+	library, _ := NewTableLibrary(root, limits)
+	table, err := library.Create("First", "owner")
 	if err != nil {
 		t.Fatal(err)
 	}
 	limits.total = storedBytes(t, root)
-	if _, err := catalog.Create("Second", "owner"); !errors.Is(err, ErrStorageLimit) {
+	if _, err := library.Create("Second", "owner"); !errors.Is(err, ErrStorageLimit) {
 		t.Fatalf("session metadata bypassed global cap: %v", err)
 	}
-	if _, err := catalog.Join(table.ID, "player"); !errors.Is(err, ErrStorageLimit) {
+	if _, err := library.Join(table.ID, "player"); !errors.Is(err, ErrStorageLimit) {
 		t.Fatalf("membership bypassed global cap: %v", err)
 	}
-	saved, _ := catalog.ByID(table.ID)
+	saved, _ := library.ByID(table.ID)
 	if saved.HasMember("player") {
 		t.Fatal("rejected membership was committed")
 	}

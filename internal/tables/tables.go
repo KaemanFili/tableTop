@@ -21,9 +21,14 @@ type Manager struct {
 	mu          sync.Mutex
 	boards      map[string]http.Handler
 	limits      *app.StorageLimits
+	store       app.LibraryStore
 }
 
 func New(dir, assets string, limits ...*app.StorageLimits) (*Manager, error) {
+	return NewWithStore(dir, assets, nil, limits...)
+}
+
+func NewWithStore(dir, assets string, store app.LibraryStore, limits ...*app.StorageLimits) (*Manager, error) {
 	var storage *app.StorageLimits
 	if len(limits) > 0 {
 		storage = limits[0]
@@ -32,7 +37,7 @@ func New(dir, assets string, limits ...*app.StorageLimits) (*Manager, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Manager{library: library, dir: dir, assets: assets, boards: make(map[string]http.Handler), limits: storage}, nil
+	return &Manager{library: library, dir: dir, assets: assets, boards: make(map[string]http.Handler), limits: storage, store: store}, nil
 }
 
 func (m *Manager) RegisterRoutes(mux *http.ServeMux) {
@@ -146,11 +151,17 @@ func (m *Manager) handler(id string) (http.Handler, error) {
 		return handler, nil
 	}
 	dir := filepath.Join(m.dir, "sessions", id)
-	units, err := app.NewUnitLibrary(dir, m.limits)
+	var unitStore app.DocumentStore[app.UnitDefinition]
+	var mapStore app.DocumentStore[app.MapDefinition]
+	if m.store != nil {
+		unitStore = m.store.Units(id)
+		mapStore = m.store.Maps(id)
+	}
+	units, err := app.NewUnitLibraryWithStore(dir, unitStore, m.limits)
 	if err != nil {
 		return nil, err
 	}
-	maps, err := app.NewMapLibrary(dir, m.limits)
+	maps, err := app.NewMapLibraryWithStore(dir, mapStore, m.limits)
 	if err != nil {
 		return nil, err
 	}

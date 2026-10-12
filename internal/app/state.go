@@ -6,15 +6,15 @@ import (
 )
 
 type UnitData struct {
-	Left     int
-	Top      int
-	ID       string
-	ImageID  string
-	Name     string
-	UnitType string
-	Status   UnitStatus
-	Size     UnitSize
-	ImageFit ImageFit
+	Left     int        `bson:"left"`
+	Top      int        `bson:"top"`
+	ID       string     `bson:"id"`
+	ImageID  string     `bson:"imageID"`
+	Name     string     `bson:"name"`
+	UnitType string     `bson:"unitType"`
+	Status   UnitStatus `bson:"status"`
+	Size     UnitSize   `bson:"size"`
+	ImageFit ImageFit   `bson:"imageFit"`
 }
 
 const (

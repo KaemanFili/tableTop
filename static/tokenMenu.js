@@ -50,7 +50,7 @@
         statusToggle.focus({preventScroll: true});
     });
     statusToggle.addEventListener('keydown', event => {
-        if (statuses.hidden || event.key !== 'ArrowDown') return;
+        if (statuses.hidden || event.key !== 'ArrowDown' || circles.length === 0) return;
         event.preventDefault();
         circles[0].focus({preventScroll: true});
     });

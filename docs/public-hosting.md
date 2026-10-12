@@ -60,7 +60,11 @@ files are preserved. These bounds complement the [disk quota](containers.md#stor
 
 ## Backups and restore
 
-Back up the default named volume:
+The file backup below covers artwork and local settings. Map/unit documents and
+status definitions live in MongoDB and require a separate database backup; see
+[MongoDB backup and restore](mongodb.md#imports-backups-and-limits).
+
+Back up the default app volume:
 
 ```sh
 ./compose/backup.sh
@@ -73,20 +77,33 @@ default to `backups/` with private file permissions. Run one backup at a time;
 copy successful archives to another machine or storage service. These tools
 require Docker and gzip; restore validation also requires Python 3.
 
-Restore to a new volume, retaining the original:
+Restore a matching file and MongoDB backup into **new volumes**, retaining the
+original volumes. For the bundled MongoDB service:
 
 ```sh
-./compose/compose.sh stop tabletop
+./compose/compose.sh stop tabletop mongo
 export TABLETOP_DATA_VOLUME=tabletop-restored-data
+export TABLETOP_MONGODB_DATA_VOLUME=tabletop-restored-mongodb-data
+export TABLETOP_MONGODB_CONFIG_VOLUME=tabletop-restored-mongodb-config
 ./compose/restore.sh backups/tabletop-YOUR-BACKUP.tar.gz
-./compose/compose.sh up -d
+./compose/compose.sh up -d --wait mongo
+./compose/compose.sh exec -T mongo mongorestore --archive --gzip --stopOnError < backups/tabletop-YOUR-BACKUP.archive.gz
+./compose/compose.sh up -d tabletop
 ```
 
-Save live board state before stopping. The app must be stopped and the target
-empty. Restore validates archive paths and refuses links or special files. It
-creates a stopped app container to initialize volume ownership before extracting
-the archive. Keep the selected volume name in `compose/.env` afterward. A restore
-requires signing in again. Verify admitted membership, saved maps, and artwork.
+Choose unused volume names and keep the database name used by the backup. Finish
+both restores successfully before starting the app. Restoring only the files
+would pair older artwork and session membership with the current database's
+map/unit documents. See [paired backup instructions](mongodb.md#imports-backups-and-limits).
+For an external MongoDB server, restore into a new database and configure
+`TABLETOP_MONGODB_URI` and `TABLETOP_MONGODB_DATABASE` before starting the app.
+
+Save live board state before stopping. The app must be stopped and the file
+restore target empty. File restore validates archive paths and refuses links or
+special files. It creates a stopped app container to initialize volume ownership
+before extracting the archive. Keep all selected volume names in `compose/.env`
+afterward. A restore requires signing in again. Verify admitted membership,
+saved maps, status definitions, and artwork.
 
 For the host-data override, export `TABLETOP_HOST_DATA=1`, `TABLETOP_UID`, and
 `TABLETOP_GID` before using the wrapper or backup scripts; the helper uses the

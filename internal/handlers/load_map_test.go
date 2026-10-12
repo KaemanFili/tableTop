@@ -160,7 +160,7 @@ func TestLoadSavedMapRestoresSharedBoard(t *testing.T) {
 		t.Error("late stroke changed restored board")
 	}
 	ws.boardMutex.Unlock()
-	// The original saved record remains reusable and gets overwritten by Save Map.
+	// The original saved document remains reusable and gets overwritten by Save Map.
 	request(http.MethodPost, "/board/save?gm=true", http.StatusNoContent)
 	reloaded, err := app.NewMapLibrary(dir)
 	if err != nil {
@@ -201,5 +201,39 @@ func TestLoadImageOnlyMapAndUnavailableArtwork(t *testing.T) {
 	mux.ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/map-library/"+definition.ID+"/load?gm=true", nil))
 	if response.Code != 500 || state.UnitCount() != 1 || ws.boardGeneration != 1 {
 		t.Fatal("missing artwork changed current board")
+	}
+}
+
+func TestOversizedSavedMapCanBeDeletedWithoutLoading(t *testing.T) {
+	dir := t.TempDir()
+	maps, err := app.NewMapLibrary(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	definition, err := maps.Create(app.MapDefinition{Name: "Legacy map", Width: 20, Height: 20, Board: &app.SavedBoard{Units: make([]app.UnitData, app.MaxBoardUnits+1)}}, testPNG(t, 2, 2))
+	if err != nil {
+		t.Fatal(err)
+	}
+	maps, err = app.NewMapLibrary(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	state := app.NewState()
+	state.AddRandomUnit(app.PCUnitImageID)
+	ws := NewWebSocketHandler(state)
+	handler := newTestEndpointHandler(t, state, ws, newTestLibrary(t), maps)
+	request := httptest.NewRequest(http.MethodPost, "/map-library/"+definition.ID+"/load?gm=true", nil)
+	request.SetPathValue("id", definition.ID)
+	response := httptest.NewRecorder()
+	handler.loadMap(response, request)
+	if response.Code != http.StatusConflict || state.UnitCount() != 1 || ws.boardGeneration != 0 {
+		t.Fatal("oversized load did not preserve the current board")
+	}
+	request = httptest.NewRequest(http.MethodDelete, "/map-library/"+definition.ID+"?gm=true", nil)
+	request.SetPathValue("id", definition.ID)
+	response = httptest.NewRecorder()
+	handler.deleteMap(response, request)
+	if response.Code != http.StatusOK || len(maps.Maps()) != 0 {
+		t.Fatal("oversized map was not deletable")
 	}
 }
