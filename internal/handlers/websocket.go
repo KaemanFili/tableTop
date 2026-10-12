@@ -55,6 +55,7 @@ type WebSocketHandler struct {
 	socketSlots              chan struct{}
 	socketMutex              sync.Mutex
 	socketDone               map[*websocket.Conn]chan struct{}
+	socketClosed             bool
 }
 
 func NewWebSocketHandler(state *app.AppState) *WebSocketHandler {
@@ -158,6 +159,12 @@ func (h *WebSocketHandler) broadcastUnitsLocked(data []byte) {
 
 // Upgrade reserves a slot before hijacking. Each handler releases it on exit.
 func (h *WebSocketHandler) upgrade(w http.ResponseWriter, r *http.Request) (*websocket.Conn, error) {
+	h.socketMutex.Lock()
+	defer h.socketMutex.Unlock()
+	if h.socketClosed {
+		http.Error(w, "This tabletop has been deleted.", http.StatusGone)
+		return nil, fmt.Errorf("tabletop sockets are closed")
+	}
 	select {
 	case h.socketSlots <- struct{}{}:
 	default:
@@ -189,10 +196,18 @@ func (h *WebSocketHandler) upgrade(w http.ResponseWriter, r *http.Request) (*web
 		}
 	}()
 	// Keep cleanup scoped to the handler via releaseSocket.
-	h.socketMutex.Lock()
 	h.socketDone[conn] = done
-	h.socketMutex.Unlock()
 	return conn, nil
+}
+
+// Close prevents new upgrades and disconnects every socket on this tabletop.
+func (h *WebSocketHandler) Close() {
+	h.socketMutex.Lock()
+	defer h.socketMutex.Unlock()
+	h.socketClosed = true
+	for conn := range h.socketDone {
+		conn.Close()
+	}
 }
 
 func (h *WebSocketHandler) releaseSocket(conn *websocket.Conn) {

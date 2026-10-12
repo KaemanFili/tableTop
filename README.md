@@ -46,7 +46,10 @@ volume. See [public hosting](docs/public-hosting.md) for limits and backup/resto
 
 Players use **Sign in with Discord**, then create or join a tabletop session.
 The creator is its GM; joining users are players. Each session has an independent
-board and libraries. See [Discord setup and sessions](docs/authentication.md) for
+board and libraries. Owners can use **Delete tabletop** in the lobby, review the
+confirmation page, and permanently remove a tabletop. Deletion disconnects its
+players and removes its saved maps, units, and uploaded artwork. If cleanup fails,
+only the owner sees the pending entry and can retry deletion. See [Discord setup and sessions](docs/authentication.md) for
 the one-time application credentials and redirect URL configuration.
 
 With Discord configured, session ownership controls GM access. Explicit `-dev`
@@ -308,3 +311,6 @@ Sizes persist with the library and are retained when tokens move or reload.
 - [ ] Optimize large saved boards by separating strokes and ordered fog into
   referenced documents or bounded batches if board limits increase; see
   [MongoDB storage](docs/mongodb.md).
+
+The proposed [content plugin system](spec/plugin-system-spec.md) describes choosing
+one plugin when creating a tabletop to supply its default maps, units, and statuses.

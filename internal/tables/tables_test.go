@@ -1,12 +1,14 @@
 package tables
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"net/http/cookiejar"
 	"net/http/httptest"
 	"net/url"
+	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -14,8 +16,21 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
+	"tableTop/main/internal/app"
 	"tableTop/main/internal/auth"
 )
+
+type cleanupFailureStore struct {
+	err    error
+	scopes []string
+}
+
+func (*cleanupFailureStore) Maps(string) app.DocumentStore[app.MapDefinition]   { return nil }
+func (*cleanupFailureStore) Units(string) app.DocumentStore[app.UnitDefinition] { return nil }
+func (s *cleanupFailureStore) DeleteScope(scope string) error {
+	s.scopes = append(s.scopes, scope)
+	return s.err
+}
 
 type discordTransport struct{}
 
@@ -32,7 +47,150 @@ func (discordTransport) RoundTrip(request *http.Request) (*http.Response, error)
 	return &http.Response{StatusCode: 200, Body: io.NopCloser(strings.NewReader(body)), Header: http.Header{"Content-Type": {"application/json"}}}, nil
 }
 
-func TestCreateJoinOwnershipAndBoardIsolation(t *testing.T) {
+type testSession struct{ path, id string }
+
+func (f tableTestFixture) createSession(t *testing.T, client *http.Client, name string) testSession {
+	t.Helper()
+	response, _ := f.request(client, "POST", "/sessions", url.Values{"name": {name}}.Encode(), http.StatusSeeOther)
+	path := response.Header.Get("Location")
+	return testSession{path, strings.Split(path, "/")[2]}
+}
+
+func (f tableTestFixture) joinSession(client *http.Client, session testSession) {
+	f.request(client, "POST", "/sessions/join", "code="+session.id, http.StatusSeeOther)
+}
+
+func TestSessionCreatorGetsGMRoleAndRequestPrefix(t *testing.T) {
+	f := newTableTestFixture(t)
+	owner := f.login("owner")
+	session := f.createSession(t, owner, "First")
+	_, html := f.request(owner, "GET", session.path, "", http.StatusOK)
+	for _, expected := range []string{`data-gm="true"`, `hx-get="` + session.path + `loadExistingUnits"`, `data-session-prefix="` + strings.TrimSuffix(session.path, "/") + `"`} {
+		if !strings.Contains(html, expected) {
+			t.Fatalf("board is missing %s", expected)
+		}
+	}
+}
+
+func TestNonmemberIsOfferedSessionJoinCode(t *testing.T) {
+	f := newTableTestFixture(t)
+	session := f.createSession(t, f.login("owner"), "First")
+	response, _ := f.request(f.login("player"), "GET", session.path, "", http.StatusSeeOther)
+	if !strings.Contains(response.Header.Get("Location"), "invite="+session.id) {
+		t.Fatal("nonmember was not offered the join code")
+	}
+}
+
+func TestJoinedPlayerCannotElevateGMRole(t *testing.T) {
+	f := newTableTestFixture(t)
+	owner, player := f.login("owner"), f.login("player")
+	session := f.createSession(t, owner, "First")
+	f.joinSession(player, session)
+	_, html := f.request(player, "GET", session.path+"?gm=true", "", http.StatusOK)
+	if !strings.Contains(html, `data-gm="false"`) || strings.Contains(html, `id="gm-button"`) {
+		t.Fatal("query flag elevated player role")
+	}
+	f.request(player, "POST", session.path+"board/clear?gm=true", "", http.StatusForbidden)
+	f.request(owner, "POST", session.path+"board/clear", "", http.StatusNoContent)
+}
+
+func TestNonmembersCannotReadOrChangeBoardContent(t *testing.T) {
+	f := newTableTestFixture(t)
+	session := f.createSession(t, f.login("owner"), "First")
+	stranger := f.login("stranger")
+	f.request(stranger, "GET", session.path+"loadExistingUnits", "", http.StatusForbidden)
+	f.request(stranger, "POST", session.path+"unit?unitID=knight", "", http.StatusForbidden)
+}
+
+func TestSessionTokensAndArtworkAreIsolated(t *testing.T) {
+	f := newTableTestFixture(t)
+	owner := f.login("owner")
+	first, second := f.createSession(t, owner, "First"), f.createSession(t, owner, "Second")
+	f.request(owner, "POST", first.path+"unit?unitID=knight", "", http.StatusOK)
+	_, firstUnits := f.request(owner, "GET", first.path+"loadExistingUnits", "", http.StatusOK)
+	_, secondUnits := f.request(owner, "GET", second.path+"loadExistingUnits", "", http.StatusOK)
+	if !strings.Contains(firstUnits, `class="unit"`) || strings.Contains(secondUnits, `class="unit"`) {
+		t.Fatal("tokens crossed session boundaries")
+	}
+	if !strings.Contains(firstUnits, `src="`+first.path+`images/knight"`) {
+		t.Fatal("token artwork is not scoped to its session")
+	}
+	f.request(owner, "GET", first.path+"images/knight", "", http.StatusOK)
+}
+
+func TestDiceBroadcastsStayWithinSession(t *testing.T) {
+	f := newTableTestFixture(t)
+	owner := f.login("owner")
+	first, second := f.createSession(t, owner, "First"), f.createSession(t, owner, "Second")
+	firstSocket, secondSocket := f.connect(owner, first.path), f.connect(owner, second.path)
+	for _, test := range []struct {
+		session testSession
+		socket  *websocket.Conn
+		id      string
+	}{{first, firstSocket, "first"}, {second, secondSocket, "second"}} {
+		roll := fmt.Sprintf(`{"requestId":%q,"groups":[{"qty":1,"sides":6,"modifier":0}]}`, test.id)
+		f.request(owner, "POST", test.session.path+"dice/roll", roll, http.StatusOK)
+		var event map[string]any
+		if err := test.socket.ReadJSON(&event); err != nil || event["type"] != "diceRolled" || event["requestId"] != test.id {
+			t.Fatalf("wrong session broadcast: %v %v", event, err)
+		}
+	}
+}
+
+func TestPlayerSocketCannotPaintFogThroughGMQuery(t *testing.T) {
+	f := newTableTestFixture(t)
+	owner, player := f.login("owner"), f.login("player")
+	session := f.createSession(t, owner, "First")
+	f.joinSession(player, session)
+	socket := f.connect(player, session.path)
+	if err := socket.WriteJSON(map[string]any{"type": "fogMark", "id": "1", "mode": "paint", "width": 2, "points": []map[string]int{{"x": 1, "y": 1}}, "generation": 0}); err != nil {
+		t.Fatal(err)
+	}
+	// Messages on this socket are processed in order. Receiving the allowed
+	// ruler confirms the server has already handled the forbidden fog message.
+	if err := socket.WriteJSON(map[string]any{"type": "rulerChanged", "start": map[string]int{"x": 1, "y": 1}, "end": map[string]int{"x": 2, "y": 2}, "generation": 0}); err != nil {
+		t.Fatal(err)
+	}
+	var event map[string]any
+	if err := socket.ReadJSON(&event); err != nil || event["type"] != "rulerChanged" {
+		t.Fatalf("player socket changed fog: %v %v", event, err)
+	}
+}
+
+func TestSessionOwnershipAndMembershipSurviveRestart(t *testing.T) {
+	f := newTableTestFixture(t)
+	owner, player := f.login("owner"), f.login("player")
+	session := f.createSession(t, owner, "First")
+	f.joinSession(player, session)
+	reloaded, err := New(f.dir, f.assets)
+	if err != nil {
+		t.Fatal(err)
+	}
+	table, exists := reloaded.library.ByID(session.id)
+	if !exists || table.OwnerID != "owner" || !table.HasMember("player") {
+		t.Fatal("session membership did not persist")
+	}
+}
+
+func TestLogoutRequiresSignInToReopenSession(t *testing.T) {
+	f := newTableTestFixture(t)
+	owner := f.login("owner")
+	session := f.createSession(t, owner, "First")
+	f.request(owner, "POST", "/auth/logout", "", http.StatusSeeOther)
+	f.request(owner, "GET", session.path, "", http.StatusSeeOther)
+}
+
+type tableTestFixture struct {
+	authentication *auth.Manager
+	manager        *Manager
+	dir, assets    string
+	login          func(string) *http.Client
+	request        func(*http.Client, string, string, string, int) (*http.Response, string)
+	connect        func(*http.Client, string) *websocket.Conn
+}
+
+func newTableTestFixture(t *testing.T) tableTestFixture {
+	t.Helper()
 	_, file, _, _ := runtime.Caller(0)
 	assets := filepath.Clean(filepath.Join(filepath.Dir(file), "../.."))
 	dir := t.TempDir()
@@ -48,7 +206,7 @@ func TestCreateJoinOwnershipAndBoardIsolation(t *testing.T) {
 	tables.RegisterRoutes(mux)
 	authentication.RegisterRoutes(mux)
 	server := httptest.NewServer(authentication.Middleware(mux))
-	defer server.Close()
+	t.Cleanup(server.Close)
 	login := func(id string) *http.Client {
 		t.Helper()
 		jar, _ := cookiejar.New(nil)
@@ -84,44 +242,6 @@ func TestCreateJoinOwnershipAndBoardIsolation(t *testing.T) {
 		}
 		return response, string(data)
 	}
-	owner, player, stranger := login("owner"), login("player"), login("stranger")
-	response, _ := request(owner, "POST", "/sessions", "name=First", 303)
-	first := response.Header.Get("Location")
-	firstID := strings.Split(first, "/")[2]
-	_, html := request(owner, "GET", first, "", 200)
-	if !strings.Contains(html, `data-gm="true"`) || !strings.Contains(html, `hx-get="`+first+`loadExistingUnits"`) || !strings.Contains(html, `data-session-prefix="`+strings.TrimSuffix(first, "/")+`"`) {
-		t.Fatal("creator board lacks its role or request prefix")
-	}
-	request(player, "POST", first+"board/clear?gm=true", "", 403)
-	response, _ = request(player, "GET", first, "", 303)
-	if !strings.Contains(response.Header.Get("Location"), "invite="+firstID) {
-		t.Fatal("nonmember was not offered a join form")
-	}
-	request(player, "POST", "/sessions/join", "code="+firstID, 303)
-	_, html = request(player, "GET", first+"?gm=true", "", 200)
-	if !strings.Contains(html, `data-gm="false"`) || strings.Contains(html, `id="gm-button"`) {
-		t.Fatal("joining player elevated role through query")
-	}
-	request(player, "POST", first+"board/clear?gm=true", "", 403)
-	request(owner, "POST", first+"board/clear", "", 204)
-	response, _ = request(player, "POST", "/sessions", "name=Second", 303)
-	second := response.Header.Get("Location")
-	_, html = request(player, "GET", second, "", 200)
-	if !strings.Contains(html, `data-gm="true"`) {
-		t.Fatal("player is not GM of their own session")
-	}
-	request(stranger, "GET", first+"loadExistingUnits", "", 403)
-	request(stranger, "POST", first+"unit?unitID=knight", "", 403)
-	request(owner, "POST", first+"unit?unitID=knight", "", 200)
-	_, firstUnits := request(player, "GET", first+"loadExistingUnits", "", 200)
-	_, secondUnits := request(player, "GET", second+"loadExistingUnits", "", 200)
-	if !strings.Contains(firstUnits, `class="unit"`) || strings.Contains(secondUnits, `class="unit"`) {
-		t.Fatal("units crossed session boundaries")
-	}
-	if !strings.Contains(firstUnits, `src="`+first+`images/knight"`) {
-		t.Fatal("token artwork is not scoped to its session")
-	}
-	request(player, "GET", first+"images/knight", "", 200)
 	connect := func(client *http.Client, path string) *websocket.Conn {
 		t.Helper()
 		u, _ := url.Parse(server.URL)
@@ -142,30 +262,126 @@ func TestCreateJoinOwnershipAndBoardIsolation(t *testing.T) {
 		}
 		return conn
 	}
-	sameBoard := connect(player, first)
-	otherBoard := connect(player, second)
-	// A player's gm=true socket cannot paint fog. Its next received message
-	// must be the valid shared dice roll from that same table.
-	sameBoard.WriteJSON(map[string]any{"type": "fogMark", "x": 1, "y": 1, "radius": 1, "generation": 1})
-	roll := `{"requestId":"first","groups":[{"qty":2,"sides":6,"modifier":3}]}`
-	request(owner, "POST", first+"dice/roll", roll, 200)
+	return tableTestFixture{manager: tables, dir: dir, assets: assets, login: login, request: request, connect: connect, authentication: authentication}
+}
+
+func TestTabletopDeleteControlsAreLimitedToOwner(t *testing.T) {
+	f := newTableTestFixture(t)
+	owner, player, stranger := f.login("owner"), f.login("player"), f.login("stranger")
+	first, second := f.createSession(t, owner, "First"), f.createSession(t, player, "Second")
+	f.joinSession(player, first)
+	_, html := f.request(owner, "GET", "/lobby", "", http.StatusOK)
+	if !strings.Contains(html, first.path+"delete") || strings.Contains(html, second.path+"delete") {
+		t.Fatal("delete links are not limited to owned tabletops")
+	}
+	f.request(player, "GET", first.path+"delete", "", http.StatusForbidden)
+	f.request(player, "POST", first.path+"delete", "confirm=delete", http.StatusForbidden)
+	f.request(stranger, "POST", first.path+"delete", "confirm=delete", http.StatusForbidden)
+}
+
+func TestTabletopDeletionRequiresConfirmation(t *testing.T) {
+	f := newTableTestFixture(t)
+	owner := f.login("owner")
+	session := f.createSession(t, owner, "First")
+	f.request(owner, "POST", session.path+"delete", "", http.StatusBadRequest)
+	f.request(owner, "GET", session.path+"delete", "", http.StatusOK)
+	if _, exists := f.manager.library.ByID(session.id); !exists {
+		t.Fatal("confirmation page deleted tabletop")
+	}
+}
+
+func TestTabletopDeletionRemovesFilesAndDisconnectsOnlyItsPlayers(t *testing.T) {
+	f := newTableTestFixture(t)
+	owner := f.login("owner")
+	first, second := f.createSession(t, owner, "First"), f.createSession(t, owner, "Second")
+	firstSocket, secondSocket := f.connect(owner, first.path), f.connect(owner, second.path)
+	firstFile, secondFile := f.addArtwork(t, first), f.addArtwork(t, second)
+	response, _ := f.request(owner, "POST", first.path+"delete", "confirm=delete", http.StatusSeeOther)
+	if response.Header.Get("Location") != "/lobby" {
+		t.Fatal("deletion did not return to lobby")
+	}
 	var event map[string]any
-	if err := sameBoard.ReadJSON(&event); err != nil || event["type"] != "diceRolled" || event["requestId"] != "first" {
-		t.Fatalf("role check or same-table broadcast failed: %v %v", event, err)
+	if err := firstSocket.ReadJSON(&event); err == nil {
+		t.Fatal("deleted tabletop kept socket connected")
 	}
-	roll = strings.Replace(roll, "first", "second", 1)
-	request(player, "POST", second+"dice/roll", roll, 200)
-	if err := otherBoard.ReadJSON(&event); err != nil || event["requestId"] != "second" {
-		t.Fatalf("roll leaked between tables: %v %v", event, err)
+	if _, err := os.Stat(filepath.Dir(firstFile)); !os.IsNotExist(err) {
+		t.Fatal("deleted tabletop retained files")
 	}
-	reloaded, err := New(dir, assets)
+	if _, err := os.Stat(secondFile); err != nil {
+		t.Fatal("another tabletop lost artwork")
+	}
+	f.request(owner, "GET", first.path, "", http.StatusNotFound)
+	f.request(owner, "GET", second.path, "", http.StatusOK)
+	f.request(owner, "POST", second.path+"dice/roll", `{"requestId":"survivor","groups":[{"qty":1,"sides":6,"modifier":0}]}`, http.StatusOK)
+	if err := secondSocket.ReadJSON(&event); err != nil || event["requestId"] != "survivor" {
+		t.Fatal("another tabletop lost its socket")
+	}
+	reloaded, err := New(f.dir, f.assets)
 	if err != nil {
 		t.Fatal(err)
 	}
-	table, ok := reloaded.library.ByID(firstID)
-	if !ok || table.OwnerID != "owner" || !table.HasMember("player") {
-		t.Fatal("session ownership or membership did not persist")
+	if _, exists := reloaded.library.ByID(first.id); exists {
+		t.Fatal("deleted tabletop returned after restart")
 	}
-	request(owner, "POST", "/auth/logout", "", 303)
-	request(owner, "GET", first, "", 303)
+}
+
+func TestPendingTabletopDeletionCanBeRetriedAfterRestart(t *testing.T) {
+	f := newTableTestFixture(t)
+	owner, player := f.login("owner"), f.login("player")
+	session := f.createSession(t, owner, "First")
+	f.joinSession(player, session)
+	f.request(owner, "GET", session.path, "", http.StatusOK)
+	artwork := f.addArtwork(t, session)
+	cleanup := &cleanupFailureStore{err: errors.New("database unavailable")}
+	f.manager.store = cleanup
+	f.request(owner, "POST", session.path+"delete", "confirm=delete", http.StatusInternalServerError)
+	f.request(owner, "GET", session.path, "", http.StatusNotFound)
+	f.request(player, "POST", "/sessions/join", "code="+session.id, http.StatusBadRequest)
+	_, html := f.request(owner, "GET", "/lobby", "", http.StatusOK)
+	if !strings.Contains(html, "Retry deletion") {
+		t.Fatal("owner has no cleanup retry action")
+	}
+	_, html = f.request(player, "GET", "/lobby", "", http.StatusOK)
+	if strings.Contains(html, session.id) {
+		t.Fatal("pending tabletop remains in player lobby")
+	}
+	if _, err := os.Stat(artwork); err != nil {
+		t.Fatal("failed database cleanup removed artwork")
+	}
+	reloaded, err := NewWithStore(f.dir, f.assets, cleanup)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if table, exists := reloaded.library.ByID(session.id); !exists || !table.Deleting {
+		t.Fatal("deletion intent did not survive restart")
+	}
+	// Serve the reloaded manager with the existing signed-in user.
+	mux := http.NewServeMux()
+	reloaded.RegisterRoutes(mux)
+	server := httptest.NewServer(f.authentication.Middleware(mux))
+	defer server.Close()
+	cleanup.err = nil
+	response, err := owner.PostForm(server.URL+session.path+"delete", url.Values{"confirm": {"delete"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	response.Body.Close()
+	if response.StatusCode != http.StatusSeeOther {
+		t.Fatalf("retry returned %d", response.StatusCode)
+	}
+	if _, exists := reloaded.library.ByID(session.id); exists {
+		t.Fatal("retry did not finish deletion")
+	}
+	if len(cleanup.scopes) != 2 || cleanup.scopes[0] != session.id || cleanup.scopes[1] != session.id {
+		t.Fatal("cleanup used the wrong scope")
+	}
+}
+
+func (f tableTestFixture) addArtwork(t *testing.T, session testSession) string {
+	t.Helper()
+	path := filepath.Join(f.dir, "sessions", session.id, "artwork.png")
+	if err := os.WriteFile(path, []byte("artwork"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	return path
 }

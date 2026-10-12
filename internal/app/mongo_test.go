@@ -73,6 +73,54 @@ func TestMongoConfirmsDeleteAfterLostResponse(t *testing.T) {
 	}
 }
 
+func TestMongoTabletopDeletionOnlyRemovesItsScope(t *testing.T) {
+	f := newMongoLibraryFixture(t)
+	scope, other := rand.Text(), rand.Text()
+	f.libraries(t, scope)
+	f.libraries(t, other)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	_, err := f.store.db.Collection("settings").InsertMany(ctx, []any{
+		bson.M{"_id": "unit_statuses/" + scope},
+		bson.M{"_id": "unit_statuses/" + other},
+		bson.M{"_id": "unit_statuses"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for range 2 {
+		if err := f.store.DeleteScope(scope); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, name := range []string{"maps", "units"} {
+		count, err := f.store.db.Collection(name).CountDocuments(ctx, bson.M{"scope": scope})
+		if err != nil || count != 0 {
+			t.Fatalf("%s retained deleted scope: %v", name, err)
+		}
+		count, err = f.store.db.Collection(name).CountDocuments(ctx, bson.M{"scope": other})
+		if err != nil || count == 0 {
+			t.Fatalf("%s lost other scope: %v", name, err)
+		}
+	}
+	_, initialized, err := f.store.Maps(scope).Load()
+	if err != nil || initialized {
+		t.Fatal("map initialization marker survived deletion")
+	}
+	_, initialized, err = f.store.Units(scope).Load()
+	if err != nil || initialized {
+		t.Fatal("unit initialization marker survived deletion")
+	}
+	count, err := f.store.db.Collection("settings").CountDocuments(ctx, bson.M{"_id": "unit_statuses/" + scope})
+	if err != nil || count != 0 {
+		t.Fatal("session statuses survived deletion")
+	}
+	count, err = f.store.db.Collection("settings").CountDocuments(ctx, bson.M{"_id": bson.M{"$in": []string{"unit_statuses/" + other, "unit_statuses"}}})
+	if err != nil || count != 2 {
+		t.Fatal("deletion removed other or server-wide statuses")
+	}
+}
+
 func TestEmbeddedBoardBSONSizeAndRoundTrip(t *testing.T) {
 	board := SavedBoard{}
 	for i := range MaxBoardUnits {

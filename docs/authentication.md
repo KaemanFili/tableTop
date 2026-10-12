@@ -96,3 +96,16 @@ identity, cookie handling, replay rejection, failed requests, and revocation.
 Tabletop tests cover creation, joining, ownership, stored membership, request
 scoping, and independent broadcasts. A real Discord application is required to
 verify the live provider login.
+
+## Delete a tabletop
+
+Only the tabletop's creator can delete it. **Delete tabletop** in the lobby opens
+a confirmation page; confirming permanently removes the session for all members,
+its saved maps and unit library, uploaded artwork, and scoped database documents.
+Connected players are disconnected. Other tabletops and installed plugins are
+retained.
+
+Deletion intent is saved before cleanup begins. If cleanup fails, the owner sees
+**Retry deletion** in the lobby, including after restarting the server. Pending
+tabletops cannot be opened or joined. Retrying finishes cleanup without restoring
+partially deleted content.

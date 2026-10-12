@@ -19,7 +19,8 @@ type Manager struct {
 	library     *app.TableLibrary
 	dir, assets string
 	mu          sync.Mutex
-	boards      map[string]http.Handler
+	boards      map[string]*managedBoard
+	deleteMu    sync.Mutex
 	limits      *app.StorageLimits
 	store       app.LibraryStore
 }
@@ -37,13 +38,15 @@ func NewWithStore(dir, assets string, store app.LibraryStore, limits ...*app.Sto
 	if err != nil {
 		return nil, err
 	}
-	return &Manager{library: library, dir: dir, assets: assets, boards: make(map[string]http.Handler), limits: storage, store: store}, nil
+	return &Manager{library: library, dir: dir, assets: assets, boards: make(map[string]*managedBoard), limits: storage, store: store}, nil
 }
 
 func (m *Manager) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /lobby", m.lobby)
 	mux.HandleFunc("POST /sessions", m.create)
 	mux.HandleFunc("POST /sessions/join", m.join)
+	mux.HandleFunc("GET /sessions/{table}/delete", m.confirmDelete)
+	mux.HandleFunc("POST /sessions/{table}/delete", m.delete)
 	mux.HandleFunc("/sessions/{table}/{path...}", m.board)
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/" {
@@ -54,7 +57,7 @@ func (m *Manager) RegisterRoutes(mux *http.ServeMux) {
 	})
 }
 
-var lobbyTemplate = template.Must(template.New("lobby").Parse(`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Your sessions · tableTop</title><link rel="stylesheet" href="/static/style.css?v=42"></head><body class="lobby-page"><main><header><h1>Your sessions</h1><span>{{.User.Name}}</span>{{if .User.IsAdmin}}<a href="/admin/invites">Invite players</a>{{end}}<form action="/auth/logout" method="post"><button>Sign out</button></form></header>{{if .Error}}<p role="alert">{{.Error}}</p>{{end}}<section><h2>Create a session</h2><p>You will be the GM.</p><form action="/sessions" method="post"><label>Session name<input name="name" maxlength="80" required></label><button>Create session</button></form></section><section><h2>Join a session</h2><p>Enter the code shared by your GM.</p><form action="/sessions/join" method="post"><label>Join code<input name="code" value="{{.Invite}}" required autocomplete="off"></label><button>Join as player</button></form></section><section><h2>Your tabletops</h2>{{range .Tables}}<article><a href="/sessions/{{.ID}}/">{{.Name}}</a><span>{{if eq .OwnerID $.User.ID}}GM{{else}}Player{{end}}</span><label>Join code<input readonly value="{{.ID}}" aria-label="Join code for {{.Name}}"></label></article>{{else}}<p>Create or join a session to get started.</p>{{end}}</section></main></body></html>`))
+var lobbyTemplate = template.Must(template.New("lobby").Parse(`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Your sessions · tableTop</title><link rel="stylesheet" href="/static/style.css?v=42"></head><body class="lobby-page"><main><header><h1>Your sessions</h1><span>{{.User.Name}}</span>{{if .User.IsAdmin}}<a href="/admin/invites">Invite players</a>{{end}}<form action="/auth/logout" method="post"><button>Sign out</button></form></header>{{if .Error}}<p role="alert">{{.Error}}</p>{{end}}<section><h2>Create a session</h2><p>You will be the GM.</p><form action="/sessions" method="post"><label>Session name<input name="name" maxlength="80" required></label><button>Create session</button></form></section><section><h2>Join a session</h2><p>Enter the code shared by your GM.</p><form action="/sessions/join" method="post"><label>Join code<input name="code" value="{{.Invite}}" required autocomplete="off"></label><button>Join as player</button></form></section><section><h2>Your tabletops</h2>{{range .Tables}}<article><a href="/sessions/{{.ID}}/">{{.Name}}</a><span>{{if eq .OwnerID $.User.ID}}GM{{else}}Player{{end}}</span><label>Join code<input readonly value="{{.ID}}" aria-label="Join code for {{.Name}}"></label>{{if eq .OwnerID $.User.ID}}<a href="/sessions/{{.ID}}/delete">{{if .Deleting}}Retry deletion{{else}}Delete tabletop{{end}}</a>{{end}}</article>{{else}}<p>Create or join a session to get started.</p>{{end}}</section></main></body></html>`))
 
 func (m *Manager) renderLobby(w http.ResponseWriter, r *http.Request, message string, status int) {
 	user := auth.CurrentUser(r)
@@ -117,7 +120,7 @@ func (m *Manager) join(w http.ResponseWriter, r *http.Request) {
 
 func (m *Manager) board(w http.ResponseWriter, r *http.Request) {
 	table, exists := m.library.ByID(r.PathValue("table"))
-	if !exists {
+	if !exists || table.Deleting {
 		http.NotFound(w, r)
 		return
 	}
@@ -132,6 +135,10 @@ func (m *Manager) board(w http.ResponseWriter, r *http.Request) {
 	}
 	handler, err := m.handler(table.ID)
 	if err != nil {
+		if errors.Is(err, app.ErrTableNotFound) {
+			http.NotFound(w, r)
+			return
+		}
 		log.Println("Load tabletop:", err)
 		http.Error(w, "Could not load this session.", http.StatusInternalServerError)
 		return
@@ -147,6 +154,9 @@ func (m *Manager) board(w http.ResponseWriter, r *http.Request) {
 func (m *Manager) handler(id string) (http.Handler, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	if table, exists := m.library.ByID(id); !exists || table.Deleting {
+		return nil, app.ErrTableNotFound
+	}
 	if handler := m.boards[id]; handler != nil {
 		return handler, nil
 	}
@@ -172,6 +182,7 @@ func (m *Manager) handler(id string) (http.Handler, error) {
 	endpoints.RegisterRoutes(mux)
 	sockets.RegisterRoutes(mux)
 	sockets.StartPositionBroadcast()
-	m.boards[id] = mux
-	return mux, nil
+	board := &managedBoard{handler: mux, sockets: sockets}
+	m.boards[id] = board
+	return board, nil
 }

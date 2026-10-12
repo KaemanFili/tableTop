@@ -33,4 +33,5 @@ func deleteDocument[T any](store DocumentStore[T], id string) error {
 type LibraryStore interface {
 	Maps(scope string) DocumentStore[MapDefinition]
 	Units(scope string) DocumentStore[UnitDefinition]
+	DeleteScope(scope string) error
 }

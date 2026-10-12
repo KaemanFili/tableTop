@@ -56,6 +56,29 @@ func (s *MongoStore) Units(scope string) DocumentStore[UnitDefinition] {
 	return &mongoDocumentStore[UnitDefinition]{s, "units", scope, func(u UnitDefinition) string { return u.ID }}
 }
 
+// Cleanup is idempotent: a tabletop remains marked for deletion until all
+// scoped documents, initialization markers, and local files are removed.
+func (s *MongoStore) DeleteScope(scope string) error {
+	if !tableIDPattern.MatchString(scope) {
+		return errors.New("invalid tabletop ID")
+	}
+	for _, name := range []string{"maps", "units"} {
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		_, err := s.db.Collection(name).DeleteMany(ctx, bson.M{"scope": scope})
+		cancel()
+		if err != nil {
+			return err
+		}
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if _, err := s.db.Collection("settings").DeleteOne(ctx, bson.M{"_id": "unit_statuses/" + scope}); err != nil {
+		return err
+	}
+	_, err := s.db.Collection("library_initialization").DeleteMany(ctx, bson.M{"_id": bson.M{"$in": []string{"maps/" + scope, "units/" + scope}}})
+	return err
+}
+
 type mongoDocumentStore[T any] struct {
 	store       *MongoStore
 	name, scope string

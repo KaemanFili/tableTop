@@ -14,10 +14,11 @@ import (
 )
 
 type TableDefinition struct {
-	ID      string   `json:"id"`
-	Name    string   `json:"name"`
-	OwnerID string   `json:"ownerID"`
-	Members []string `json:"members"`
+	ID       string   `json:"id"`
+	Name     string   `json:"name"`
+	OwnerID  string   `json:"ownerID"`
+	Members  []string `json:"members"`
+	Deleting bool     `json:"deleting,omitempty"`
 }
 
 func (table TableDefinition) HasMember(id string) bool { return slices.Contains(table.Members, id) }
@@ -73,7 +74,7 @@ func (library *TableLibrary) ForUser(id string) []TableDefinition {
 	defer library.mu.RUnlock()
 	var tables []TableDefinition
 	for _, table := range library.tables {
-		if table.HasMember(id) {
+		if table.HasMember(id) && (!table.Deleting || table.OwnerID == id) {
 			table.Members = slices.Clone(table.Members)
 			tables = append(tables, table)
 		}
@@ -115,6 +116,9 @@ func (library *TableLibrary) Join(id, user string) (TableDefinition, error) {
 		if table.ID != id {
 			continue
 		}
+		if table.Deleting {
+			return TableDefinition{}, errors.New("This tabletop is being deleted.")
+		}
 		if !table.HasMember(user) {
 			if len(table.Members) >= MaxTabletopMembers {
 				return TableDefinition{}, ErrCapacity
@@ -131,4 +135,70 @@ func (library *TableLibrary) Join(id, user string) (TableDefinition, error) {
 		return table, nil
 	}
 	return TableDefinition{}, errors.New("Session not found. Check the join code.")
+}
+
+var ErrTableNotFound = errors.New("tabletop not found")
+var ErrTableNotOwner = errors.New("only the tabletop owner can delete it")
+
+// Persist deletion intent before removing files or documents. Failed cleanup
+// remains retryable by the owner and cannot reopen a partially deleted board.
+func (library *TableLibrary) BeginDelete(id, owner string) error {
+	library.mu.Lock()
+	defer library.mu.Unlock()
+	library.limits.lock()
+	defer library.limits.unlock()
+	for index, table := range library.tables {
+		if table.ID != id {
+			continue
+		}
+		if owner == "" || table.OwnerID != owner {
+			return ErrTableNotOwner
+		}
+		if table.Deleting {
+			return nil
+		}
+		proposed := slices.Clone(library.tables)
+		proposed[index].Deleting = true
+		// Deletion must remain available even when the configured quota is full.
+		if err := writeJSONFile(library.path, proposed); err != nil {
+			return err
+		}
+		library.tables = proposed
+		return nil
+	}
+	return ErrTableNotFound
+}
+
+func (library *TableLibrary) FinishDelete(id, owner string) error {
+	library.mu.Lock()
+	defer library.mu.Unlock()
+	library.limits.lock()
+	defer library.limits.unlock()
+	for index, table := range library.tables {
+		if table.ID != id {
+			continue
+		}
+		if owner == "" || table.OwnerID != owner {
+			return ErrTableNotOwner
+		}
+		if !table.Deleting {
+			return errors.New("tabletop deletion has not started")
+		}
+		proposed := slices.Delete(slices.Clone(library.tables), index, index+1)
+		if err := writeJSONFile(library.path, proposed, library.limits); err != nil {
+			return err
+		}
+		library.tables = proposed
+		return nil
+	}
+	return ErrTableNotFound
+}
+
+func RemoveTableFiles(dir, id string, limits *StorageLimits) error {
+	if !tableIDPattern.MatchString(id) {
+		return errors.New("invalid tabletop ID")
+	}
+	limits.lock()
+	defer limits.unlock()
+	return os.RemoveAll(filepath.Join(dir, "sessions", id))
 }
