@@ -3,11 +3,13 @@ package handlers
 import (
 	"bytes"
 	"errors"
+	"golang.org/x/text/unicode/norm"
 	"io"
 	"log"
 	"net/http"
 	"strconv"
 	"strings"
+	"unicode"
 
 	"tableTop/main/internal/app"
 	"tableTop/main/internal/artwork"
@@ -16,43 +18,109 @@ import (
 const maxUnitImageBytes = 5 << 20
 
 type libraryGroup[T any] struct {
-	Owned    []T
-	Defaults []T
+	Owned          []T
+	Defaults       []T
+	OwnedMatches   int
+	DefaultMatches int
+	Expanded       bool
 }
 
-func (group libraryGroup[T]) Total() int { return len(group.Owned) + len(group.Defaults) }
+func (group libraryGroup[T]) OwnedTotal() int { return max(len(group.Owned), group.OwnedMatches) }
+func (group libraryGroup[T]) DefaultTotal() int {
+	return max(len(group.Defaults), group.DefaultMatches)
+}
+func (group libraryGroup[T]) Total() int { return group.OwnedTotal() + group.DefaultTotal() }
 
 type spawnMenuData struct {
-	Open     bool
-	Creating bool
-	PCs      libraryGroup[app.UnitDefinition]
-	NPCs     libraryGroup[app.UnitDefinition]
-	CopyID   string
-	Name     string
-	UnitType string
-	Size     app.UnitSize
-	Sizes    []app.UnitSizeOption
-	ImageFit app.ImageFit
-	Error    string
-	Notice   string
+	Open         bool
+	Creating     bool
+	PCs          libraryGroup[app.UnitDefinition]
+	NPCs         libraryGroup[app.UnitDefinition]
+	CopyID       string
+	Name         string
+	UnitType     string
+	Size         app.UnitSize
+	Sizes        []app.UnitSizeOption
+	ImageFit     app.ImageFit
+	Error        string
+	Notice       string
+	ServerSearch bool
+	Search       string
+	Shown        int
+	Page         int
 }
 
+func (data spawnMenuData) MatchCount() int { return data.PCs.Total() + data.NPCs.Total() }
+
+const unitMenuGroupLimit = 60
+
 func (h *EndpointHandler) menuData(open bool) spawnMenuData {
-	data := spawnMenuData{Open: open}
-	if open {
-		for _, unit := range h.library.Units() {
-			group := &data.NPCs
-			if unit.UnitType == "pc" {
-				group = &data.PCs
+	return h.searchMenuData(open, "")
+}
+
+// Large catalogs use bounded server results instead of thousands of HTMX controls.
+func (h *EndpointHandler) searchMenuData(open bool, query string) spawnMenuData {
+	return h.searchMenuPageData(open, query, 0)
+}
+
+func (data spawnMenuData) NextPage() int     { return data.Page + 1 }
+func (data spawnMenuData) PreviousPage() int { return max(0, data.Page-1) }
+func (data spawnMenuData) HasNextPage() bool {
+	limit := (data.Page + 1) * unitMenuGroupLimit
+	return data.PCs.OwnedTotal() > limit || data.PCs.DefaultTotal() > limit || data.NPCs.OwnedTotal() > limit || data.NPCs.DefaultTotal() > limit
+}
+
+func (h *EndpointHandler) searchMenuPageData(open bool, query string, page int) spawnMenuData {
+	data := spawnMenuData{Open: open, Search: query, Page: max(0, min(page, 10000))}
+	offset := data.Page * unitMenuGroupLimit
+	if !open {
+		return data
+	}
+	units := h.library.Units()
+	data.ServerSearch = len(units) > 4*unitMenuGroupLimit
+	terms := strings.Fields(normalizeLibrarySearch(query))
+	for _, unit := range units {
+		matches := true
+		name := normalizeLibrarySearch(unit.Name)
+		for _, term := range terms {
+			if !strings.Contains(name, term) {
+				matches = false
+				break
 			}
-			if unit.ReadOnly {
+		}
+		if data.ServerSearch && !matches {
+			continue
+		}
+		group := &data.NPCs
+		if unit.UnitType == "pc" {
+			group = &data.PCs
+		}
+		group.Expanded = query != "" || data.Page > 0
+		if unit.ReadOnly {
+			group.DefaultMatches++
+			if !data.ServerSearch || (group.DefaultMatches > offset && group.DefaultMatches <= offset+unitMenuGroupLimit) {
 				group.Defaults = append(group.Defaults, unit)
-			} else {
+				data.Shown++
+			}
+		} else {
+			group.OwnedMatches++
+			if !data.ServerSearch || (group.OwnedMatches > offset && group.OwnedMatches <= offset+unitMenuGroupLimit) {
 				group.Owned = append(group.Owned, unit)
+				data.Shown++
 			}
 		}
 	}
 	return data
+}
+
+// Match the browser search's case and accent handling.
+func normalizeLibrarySearch(value string) string {
+	return strings.Map(func(r rune) rune {
+		if unicode.Is(unicode.Mn, r) {
+			return -1
+		}
+		return unicode.ToLower(r)
+	}, norm.NFKD.String(value))
 }
 
 func (h *EndpointHandler) renderSpawnMenu(w http.ResponseWriter, data spawnMenuData) {

@@ -178,3 +178,10 @@ With Discord configured, the root URL redirects to the login page. Finish a
 Discord login, create a tabletop, and reconnect after recreating the container
 to check persisted membership and saved maps. Keep runtime credentials out of
 build arguments and Dockerfile `ENV` instructions.
+
+## Possible future architecture
+
+Session creation could launch a dedicated container and Go process for each
+tabletop, with shared plugin metadata cached in Redis. This would require worker
+orchestration, session routing, and live-state persistence. See
+[proposed session workers](session-workers.md) for the design and tradeoffs.

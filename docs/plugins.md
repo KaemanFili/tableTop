@@ -75,6 +75,10 @@ count caps; existing board and status limits apply.
 Install a complete version directory before exposing it to the app. The manifest
 identity must match its folders. Different versions coexist; duplicate exact
 ID/version installations are unavailable. Discovery refreshes with the lobby.
+Decoded packs are cached in memory (up to 32 versions). Discovery still validates
+file identity before reuse; changed or removed files invalidate cached content.
+For a possible shared Redis cache when running separate session processes, see
+[proposed session workers](session-workers.md).
 Never change a version's content after it has been used: tabletops pin its
 fingerprint. Publish changed content under a new version instead.
 

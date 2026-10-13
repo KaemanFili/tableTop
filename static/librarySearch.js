@@ -11,6 +11,12 @@
         if (!input || !results || !empty) return;
         initialized.add(container);
         const kind = container.dataset.librarySearch;
+        if (container.hasAttribute('data-library-server-search')) {
+            input.addEventListener('htmx:afterRequest', event => {
+                if (!event.detail.successful) results.textContent = 'Could not search units. Try again.';
+            });
+            return;
+        }
         const noun = kind === 'maps' ? 'map' : 'unit';
         const entries = [...container.querySelectorAll('[data-library-name]')].map(element => ({
             element,

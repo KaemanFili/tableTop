@@ -5,7 +5,7 @@
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>VTT</title>
         <script src="/static/vendor/htmx-2.0.11.min.js"></script>
-        <link rel="stylesheet" href="/static/style.css?v=47">
+        <link rel="stylesheet" href="/static/style.css?v=50">
     </head>
     <body data-gm="{{ .IsGM }}" data-session-prefix="{{ boardPrefix }}">
         <div
@@ -77,7 +77,7 @@
             {{ template "spawn-controls" . }}
             {{ template "utilities-controls" false }}
             {{ if .IsGM }}
-            <button type="button" id="gm-button" title="Hide GM controls" aria-label="Hide GM controls" aria-expanded="true" aria-controls="gm-panel">GM</button>
+            <button type="button" id="gm-button" class="utility-button" title="Hide GM controls" aria-label="Hide GM controls" aria-expanded="true" aria-controls="gm-panel">GM</button>
             <div id="gm-panel">
                 <div id="gm-controls" role="group" aria-label="GM utilities">
                     <button type="button" id="utility-map" class="utility-button" title="Map Options" aria-label="Map Options" aria-expanded="false" aria-controls="map-options">
@@ -171,7 +171,7 @@
         <script src="/static/dice.js?v=8"></script>
         <script src="/static/mapEditor.js?v=2"></script>
         <script src="/static/imageFit.js?v=3"></script>
-        <script src="/static/librarySearch.js?v=2"></script>
+        <script src="/static/librarySearch.js?v=3"></script>
         <script src="/static/boardView.js?v=2"></script>
     </body>
 </html>

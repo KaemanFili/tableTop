@@ -12,7 +12,7 @@ import (
 	"tableTop/main/internal/auth"
 )
 
-var deleteTemplate = template.Must(template.New("delete-tabletop").Parse(`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Delete tabletop · tableTop</title><link rel="stylesheet" href="/static/style.css?v=42"></head><body class="lobby-page"><main><h1>Delete {{.Name}}?</h1><p>This permanently deletes the tabletop for everyone, including its saved maps, unit library, and uploaded artwork. Connected players will be disconnected.</p><form action="/sessions/{{.ID}}/delete" method="post"><input type="hidden" name="confirm" value="delete"><button>Delete tabletop permanently</button> <a href="/lobby">Cancel</a></form></main></body></html>`))
+var deleteTemplate = template.Must(template.New("delete-tabletop").Parse(`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Delete tabletop · tableTop</title><link rel="stylesheet" href="/static/style.css?v=50"></head><body class="lobby-page"><main><section class="lobby-delete-confirmation"><h1>Delete {{.Name}}?</h1><p>This permanently deletes the tabletop for everyone, including its saved maps, unit library, and uploaded artwork. Connected players will be disconnected.</p><form action="/sessions/{{.ID}}/delete" method="post"><input type="hidden" name="confirm" value="delete"><button class="danger-button">Delete tabletop permanently</button> <a href="/lobby">Cancel</a></form></section></main></body></html>`))
 
 func (m *Manager) confirmDelete(w http.ResponseWriter, r *http.Request) {
 	table, exists := m.library.ByID(r.PathValue("table"))

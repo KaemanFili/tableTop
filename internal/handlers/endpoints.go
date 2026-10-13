@@ -109,7 +109,8 @@ func (h *EndpointHandler) spawnMenu(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusServiceUnavailable)
 		return
 	}
-	h.renderSpawnMenu(w, h.menuData(r.URL.Query().Get("open") == "true"))
+	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
+	h.renderSpawnMenu(w, h.searchMenuPageData(r.URL.Query().Get("open") == "true", r.URL.Query().Get("q"), page))
 }
 
 func (h *EndpointHandler) grid(w http.ResponseWriter, r *http.Request) {

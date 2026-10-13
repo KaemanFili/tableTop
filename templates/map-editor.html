@@ -4,7 +4,7 @@
 {{ else }}
 <div class="spawn-menu-heading">
     <h2>Create New Map</h2>
-    <button type="button" data-close-map-editor>Cancel</button>
+    <button type="button" class="secondary-button" data-close-map-editor>Cancel</button>
 </div>
 <p>Upload a map and align it with the grid. Each square represents 5 feet.</p>
 {{ if .Error }}<p class="menu-error" role="alert">{{ .Error }} Choose the image again before saving.</p>{{ end }}
@@ -28,14 +28,14 @@
         <input id="map-offset-x" name="offsetX" type="hidden" value="{{ .OffsetX }}">
         <input id="map-offset-y" name="offsetY" type="hidden" value="{{ .OffsetY }}">
         <div class="image-fit-actions">
-            <button type="button" id="fit-map-image" disabled>Fit image</button>
-            <button type="button" id="center-map-image" disabled>Center image</button>
+            <button type="button" class="secondary-button" id="fit-map-image" disabled>Fit image</button>
+            <button type="button" class="secondary-button" id="center-map-image" disabled>Center image</button>
         </div>
         <p id="map-preview-error" class="menu-error" role="alert" hidden></p>
     </fieldset>
     <div class="unit-form-actions">
-        <button type="button" data-close-map-editor>Cancel</button>
-        <button type="submit">Save and Use Map</button>
+        <button type="button" class="secondary-button" data-close-map-editor>Cancel</button>
+        <button type="submit" class="primary-button"><span class="save-label">Save and Use Map</span><span class="saving-label">Saving…</span></button>
     </div>
 </form>
 {{ end }}

@@ -66,7 +66,68 @@ func (m *Manager) RegisterRoutes(mux *http.ServeMux) {
 	})
 }
 
-var lobbyTemplate = template.Must(template.New("lobby").Parse(`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Your sessions · tableTop</title><link rel="stylesheet" href="/static/style.css?v=42"></head><body class="lobby-page"><main><header><h1>Your sessions</h1><span>{{.User.Name}}</span>{{if .User.IsAdmin}}<a href="/admin/invites">Invite players</a>{{end}}<form action="/auth/logout" method="post"><button>Sign out</button></form></header>{{if .Error}}<p role="alert">{{.Error}}</p>{{end}}<section><h2>Create a session</h2><p>You will be the GM.</p><form action="/sessions" method="post"><label>Session name<input name="name" maxlength="80" required></label><label>Plugin<select name="plugin" required>{{range .Plugins}}<option value="{{.Selection}}" {{if eq .ID "builtin"}}selected{{end}}>{{.Name}} v{{.Version}} — {{.Description}}</option>{{end}}</select></label><button>Create session</button></form></section><section><h2>Join a session</h2><p>Enter the code shared by your GM.</p><form action="/sessions/join" method="post"><label>Join code<input name="code" value="{{.Invite}}" required autocomplete="off"></label><button>Join as player</button></form></section><section><h2>Your tabletops</h2>{{range .Tables}}<article>{{if .Initialization}}<span>{{.Name}}</span><p>Initialization pending: {{.Initialization}}</p><form action="/sessions/{{.ID}}/initialize" method="post"><button>Retry initialization</button></form>{{else}}<a href="/sessions/{{.ID}}/">{{.Name}}</a>{{end}}<span>{{if eq .OwnerID $.User.ID}}GM{{else}}Player{{end}}</span><label>Join code<input readonly value="{{.ID}}" aria-label="Join code for {{.Name}}"></label>{{if eq .OwnerID $.User.ID}}<a href="/sessions/{{.ID}}/delete">{{if .Deleting}}Retry deletion{{else}}Delete tabletop{{end}}</a>{{end}}</article>{{else}}<p>Create or join a session to get started.</p>{{end}}</section></main></body></html>`))
+var lobbyTemplate = template.Must(template.New("lobby").Parse(`<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Your sessions · tableTop</title>
+  <link rel="stylesheet" href="/static/style.css?v=50">
+</head>
+<body class="lobby-page">
+<p class="lobby-loading" data-lobby-loading role="status" aria-live="polite" hidden></p>
+<main>
+  <header class="lobby-header">
+    <h1>Your sessions</h1>
+    <div class="lobby-account">
+      <span>{{.User.Name}}</span>
+      {{if .User.IsAdmin}}<a href="/admin/invites">Invite players</a>{{end}}
+      <form action="/auth/logout" method="post"><button>Sign out</button></form>
+    </div>
+  </header>
+  {{if .Error}}<p class="lobby-error" role="alert">{{.Error}}</p>{{end}}
+  <div class="lobby-actions">
+    <section>
+      <h2>Create a session</h2>
+      <p>You will be the GM.</p>
+      <form action="/sessions" method="post">
+        <label>Session name<input name="name" maxlength="80" placeholder="e.g. The northern expedition" required></label>
+        <label>Plugin<select name="plugin" required>{{range .Plugins}}<option value="{{.Selection}}" {{if eq .ID "builtin"}}selected{{end}}>{{.Name}} v{{.Version}} — {{.Description}}</option>{{end}}</select></label>
+        <button class="primary-button">Create session</button>
+      </form>
+    </section>
+    <section>
+      <h2>Join a session</h2>
+      <p>Enter the code shared by your GM.</p>
+      <form action="/sessions/join" method="post">
+        <label>Join code<input name="code" value="{{.Invite}}" placeholder="Paste your join code" required autocomplete="off" spellcheck="false"></label>
+        <button class="primary-button">Join as player</button>
+      </form>
+    </section>
+  </div>
+  <section class="lobby-tabletops">
+    <h2>Your tabletops</h2>
+    <div class="lobby-table-list">
+      {{range .Tables}}
+      <article>
+        <div class="lobby-table-heading">
+          {{if .Initialization}}<span class="lobby-table-name">{{.Name}}</span>{{else}}<a class="lobby-table-name" href="/sessions/{{.ID}}/">{{.Name}}</a>{{end}}
+          <span class="lobby-role {{if eq .OwnerID $.User.ID}}lobby-role-gm{{end}}">{{if eq .OwnerID $.User.ID}}GM{{else}}Player{{end}}</span>
+        </div>
+        {{if .Initialization}}
+        <p class="lobby-pending">Initialization pending: {{.Initialization}}</p>
+        <form action="/sessions/{{.ID}}/initialize" method="post"><button>Retry initialization</button></form>
+        {{end}}
+        <label>Join code<input readonly value="{{.ID}}" aria-label="Join code for {{.Name}}" spellcheck="false"></label>
+        {{if eq .OwnerID $.User.ID}}<a class="lobby-delete" href="/sessions/{{.ID}}/delete">{{if .Deleting}}Retry deletion{{else}}Delete tabletop{{end}}</a>{{end}}
+      </article>
+      {{else}}<p class="lobby-empty">Create or join a session to get started.</p>{{end}}
+    </div>
+  </section>
+</main>
+<script src="/static/lobby.js?v=1" defer></script>
+</body>
+</html>`))
 
 func (m *Manager) renderLobby(w http.ResponseWriter, r *http.Request, message string, status int) {
 	user := auth.CurrentUser(r)

@@ -236,3 +236,35 @@ func TestRestoringPluginFilesRecoversCachedReader(t *testing.T) {
 		t.Fatalf("original version not recovered: %v", err)
 	}
 }
+
+func TestCachedDiscoveryReusesUnchangedContent(t *testing.T) {
+	f := newPackFixture(t)
+	bounds := Bounds{1 << 20, 16 << 20}
+	first := Discover([]string{f.root}, bounds)
+	second := Discover([]string{f.root}, bounds)
+	var original, reused *reader
+	for _, p := range first {
+		if p.ID == "forest" {
+			original = p.reader
+		}
+	}
+	for _, p := range second {
+		if p.ID == "forest" {
+			reused = p.reader
+		}
+	}
+	if original == nil || original != reused {
+		t.Fatal("unchanged content was reloaded")
+	}
+	f.write(t, "units.json", []unitEntry{{Key: "scout", Image: "forest.png", UnitDefinition: app.UnitDefinition{Name: "Updated scout", UnitType: "npc"}}})
+	changed := Discover([]string{f.root}, bounds)
+	for _, p := range changed {
+		if p.ID == "forest" {
+			if p.reader == original || p.Units()[0].Name != "Updated scout" {
+				t.Fatal("cached content ignored changed file")
+			}
+			return
+		}
+	}
+	t.Fatal("changed valid plugin disappeared")
+}

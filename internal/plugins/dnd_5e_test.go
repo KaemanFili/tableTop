@@ -93,3 +93,31 @@ func TestDND5ePluginMatchesCatalog(t *testing.T) {
 		t.Fatalf("cannot serve monster portrait: %v", err)
 	}
 }
+
+func BenchmarkDNDPluginLoading(b *testing.B) {
+	dir := filepath.Join("..", "..", "plugins", "dnd-5e", "1")
+	bounds := Bounds{1 << 20, 16 << 20}
+	pack, err := openVersion(dir, "dnd-5e", "1", bounds)
+	if err != nil {
+		b.Fatal(err)
+	}
+	b.Run("cold_decode", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			p := pack
+			if err := p.load(); err != nil {
+				b.Fatal(err)
+			}
+		}
+	})
+	if err := loadCachedPack(&pack); err != nil {
+		b.Fatal(err)
+	}
+	b.Run("reuse_validated", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			p := pack
+			if err := loadCachedPack(&p); err != nil {
+				b.Fatal(err)
+			}
+		}
+	})
+}

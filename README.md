@@ -124,8 +124,16 @@ appear with your content; searching opens any matching dropdowns.
 
 **Search units** and **Search maps** filter their libraries as you type. Searches
 match names without regard to case or accents; multiple words can appear in any
-order. Result counts update immediately, and clearing the search restores the
-full list. Search text is kept when copying or deleting refreshes a menu.
+order. Small libraries filter immediately in the browser and keep search text
+when copying or deleting refreshes a menu. Unit catalogs with more than 240 entries
+search on the server after a 200 ms typing pause, showing up to 60 entries in each
+owned/default group. **Previous** and **Next** browse the remaining results;
+clearing the search returns to the first page. Counts include all matches.
+
+The spawn button shows a loading state while opening its menu. The lobby shows
+progress immediately when creating, joining, or opening a session. Plugin discovery
+reuses decoded content in memory while checking for changed or removed files,
+so repeated session loads avoid decoding the entire monster and map collection.
 
 Loading a map or reopening a board centers the map in each viewer's screen.
 Panning stays local to that viewer, and updates or saves of the same background
@@ -319,6 +327,8 @@ Sizes persist with the library and are retained when tokens move or reload.
 
 ## Todo
 
+- [ ] Explore dedicated Docker/Go workers for sessions and a shared Redis plugin
+  metadata cache; see [proposed session workers](docs/session-workers.md).
 - [x] Add an option to delete saved units from the unit library.
 - [x] Add an option to delete saved maps from the map library.
 - [ ] Optimize large saved boards by separating strokes and ordered fog into

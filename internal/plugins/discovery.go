@@ -14,6 +14,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"tableTop/main/internal/app"
 
 	bundled "tableTop/main/plugins"
@@ -146,6 +147,42 @@ func discoverBundled(bounds Bounds) []Pack {
 	}
 	return []Pack{pack}
 }
+
+type packCacheKey struct {
+	root   string
+	bounds Bounds
+}
+
+var validatedPacks = struct {
+	sync.Mutex
+	packs map[packCacheKey]Pack
+}{packs: make(map[packCacheKey]Pack)}
+
+func loadCachedPack(p *Pack) error {
+	key := packCacheKey{p.root, p.bounds}
+	validatedPacks.Lock()
+	defer validatedPacks.Unlock()
+	if cached, ok := validatedPacks.packs[key]; ok && cached.Manifest == p.Manifest {
+		if err := cached.Validate(); err == nil {
+			p.reader = cached.reader
+			return nil
+		}
+	}
+	if err := p.load(); err != nil {
+		delete(validatedPacks.packs, key)
+		return err
+	}
+	// Bound memory when administrators replace or install many versions.
+	if len(validatedPacks.packs) >= 32 {
+		for keyToEvict := range validatedPacks.packs {
+			delete(validatedPacks.packs, keyToEvict)
+			break
+		}
+	}
+	validatedPacks.packs[key] = *p
+	return nil
+}
+
 func loadUniquePacks(candidates []Pack) []Pack {
 	counts := map[string]int{}
 	for _, p := range candidates {
@@ -157,7 +194,7 @@ func loadUniquePacks(candidates []Pack) []Pack {
 			log.Printf("Duplicate plugin version %s is unavailable", p.Selection())
 			continue
 		}
-		if err := p.load(); err != nil {
+		if err := loadCachedPack(&p); err != nil {
 			log.Printf("Invalid plugin %s: %v", p.Selection(), err)
 			continue
 		}
