@@ -15,11 +15,19 @@ import (
 
 const maxUnitImageBytes = 5 << 20
 
+type libraryGroup[T any] struct {
+	Owned    []T
+	Defaults []T
+}
+
+func (group libraryGroup[T]) Total() int { return len(group.Owned) + len(group.Defaults) }
+
 type spawnMenuData struct {
 	Open     bool
 	Creating bool
-	PCs      []app.UnitDefinition
-	NPCs     []app.UnitDefinition
+	PCs      libraryGroup[app.UnitDefinition]
+	NPCs     libraryGroup[app.UnitDefinition]
+	CopyID   string
 	Name     string
 	UnitType string
 	Size     app.UnitSize
@@ -33,10 +41,14 @@ func (h *EndpointHandler) menuData(open bool) spawnMenuData {
 	data := spawnMenuData{Open: open}
 	if open {
 		for _, unit := range h.library.Units() {
+			group := &data.NPCs
 			if unit.UnitType == "pc" {
-				data.PCs = append(data.PCs, unit)
+				group = &data.PCs
+			}
+			if unit.ReadOnly {
+				group.Defaults = append(group.Defaults, unit)
 			} else {
-				data.NPCs = append(data.NPCs, unit)
+				group.Owned = append(group.Owned, unit)
 			}
 		}
 	}
@@ -57,11 +69,24 @@ func (h *EndpointHandler) renderSpawnMenu(w http.ResponseWriter, data spawnMenuD
 }
 
 func (h *EndpointHandler) newUnitForm(w http.ResponseWriter, r *http.Request) {
-	h.renderSpawnMenu(w, spawnMenuData{Open: true, Creating: true, UnitType: "pc", Size: app.SizeMedium, ImageFit: app.DefaultImageFit()})
+	data := spawnMenuData{Open: true, Creating: true, UnitType: "pc", Size: app.SizeMedium, ImageFit: app.DefaultImageFit()}
+	if id := r.URL.Query().Get("copy"); id != "" {
+		u, ok := h.library.UnitByID(id)
+		if !ok || !u.ReadOnly {
+			http.NotFound(w, r)
+			return
+		}
+		data.CopyID = id
+		data.Name = u.Name
+		data.UnitType = u.UnitType
+		data.Size = u.Size
+		data.ImageFit = u.ImageFit
+	}
+	h.renderSpawnMenu(w, data)
 }
 
 func (h *EndpointHandler) createUnit(w http.ResponseWriter, r *http.Request) {
-	data := spawnMenuData{Open: true, Creating: true, UnitType: "pc", Size: app.SizeMedium, ImageFit: app.DefaultImageFit()}
+	data := spawnMenuData{Open: true, Creating: true, UnitType: "pc", Size: app.SizeMedium, ImageFit: app.DefaultImageFit(), CopyID: r.PathValue("id")}
 	// Return a rendered form on validation failures so HTMX displays the error.
 	fail := func(message string) {
 		data.Error = message
@@ -76,42 +101,16 @@ func (h *EndpointHandler) createUnit(w http.ResponseWriter, r *http.Request) {
 		fail("The upload could not be read. Choose a PNG, JPEG, or GIF image up to 5 MB.")
 		return
 	}
-	data.Name = strings.TrimSpace(r.FormValue("name"))
-	data.UnitType = r.FormValue("unitType")
-	data.Size = app.UnitSize(r.FormValue("size"))
-	data.ImageFit, err = parseImageFit(r)
+	if err := parseUnitForm(r, &data); err != nil {
+		fail(err.Error())
+		return
+	}
+	pngImage, err := readUnitImage(r)
 	if err != nil {
 		fail(err.Error())
 		return
 	}
-	if err := app.ValidateUnitDefinition(data.Name, data.UnitType, data.Size); err != nil {
-		fail(err.Error())
-		return
-	}
-	var pngImage []byte
-	file, header, err := r.FormFile("image")
-	if err != nil && !errors.Is(err, http.ErrMissingFile) {
-		fail("The image could not be read. Please choose it again.")
-		return
-	}
-	if err == nil {
-		defer file.Close()
-		if header.Size > maxUnitImageBytes {
-			fail("The image must be 5 MB or smaller.")
-			return
-		}
-		upload, err := io.ReadAll(io.LimitReader(file, maxUnitImageBytes+1))
-		if err != nil || len(upload) > maxUnitImageBytes {
-			fail("The image could not be read or is larger than 5 MB.")
-			return
-		}
-		pngImage, err = normalizeUnitImage(upload)
-		if err != nil {
-			fail(err.Error())
-			return
-		}
-	}
-	unit, err := h.library.Create(data.Name, data.UnitType, data.Size, data.ImageFit, pngImage)
+	unit, err := h.saveLibraryUnit(data, pngImage)
 	if err != nil {
 		log.Println("Save unit:", err)
 		if errors.Is(err, app.ErrStorageLimit) {
@@ -124,6 +123,45 @@ func (h *EndpointHandler) createUnit(w http.ResponseWriter, r *http.Request) {
 	menu := h.menuData(true)
 	menu.Notice = unit.Name + " saved. Select it below to spawn a copy."
 	h.renderSpawnMenu(w, menu)
+}
+
+// Update form data before validation so errors preserve the submitted fields.
+func parseUnitForm(r *http.Request, data *spawnMenuData) error {
+	data.Name = strings.TrimSpace(r.FormValue("name"))
+	data.UnitType = r.FormValue("unitType")
+	data.Size = app.UnitSize(r.FormValue("size"))
+	var err error
+	data.ImageFit, err = parseImageFit(r)
+	if err != nil {
+		return err
+	}
+	return app.ValidateUnitDefinition(data.Name, data.UnitType, data.Size)
+}
+
+func readUnitImage(r *http.Request) ([]byte, error) {
+	file, header, err := r.FormFile("image")
+	if errors.Is(err, http.ErrMissingFile) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, errors.New("The image could not be read. Please choose it again.")
+	}
+	defer file.Close()
+	if header.Size > maxUnitImageBytes {
+		return nil, errors.New("The image must be 5 MB or smaller.")
+	}
+	upload, err := io.ReadAll(io.LimitReader(file, maxUnitImageBytes+1))
+	if err != nil || len(upload) > maxUnitImageBytes {
+		return nil, errors.New("The image could not be read or is larger than 5 MB.")
+	}
+	return normalizeUnitImage(upload)
+}
+
+func (h *EndpointHandler) saveLibraryUnit(data spawnMenuData, pngImage []byte) (app.UnitDefinition, error) {
+	if data.CopyID != "" {
+		return h.library.CreateCopy(data.CopyID, data.Name, data.UnitType, data.Size, data.ImageFit, pngImage)
+	}
+	return h.library.Create(data.Name, data.UnitType, data.Size, data.ImageFit, pngImage)
 }
 
 func parseImageFit(r *http.Request) (app.ImageFit, error) {
@@ -150,6 +188,10 @@ func normalizeUnitImage(upload []byte) ([]byte, error) { return artwork.Normaliz
 func (h *EndpointHandler) deleteLibraryUnit(w http.ResponseWriter, r *http.Request) {
 	menu := h.menuData(true)
 	if err := h.library.Delete(r.PathValue("id")); err != nil {
+		if errors.Is(err, app.ErrReadOnly) {
+			http.Error(w, err.Error(), http.StatusConflict)
+			return
+		}
 		log.Println("Delete unit:", err)
 		menu.Error = "The unit could not be deleted. Please try again."
 	} else {

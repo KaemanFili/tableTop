@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"tableTop/main/internal/app"
+	"tableTop/main/internal/plugins"
 )
 
 //go:embed testdata/browser.js
@@ -30,10 +31,28 @@ func TestBrowserSync(t *testing.T) {
 	}
 	state := app.NewState()
 	library := newTestLibrary(t)
+	for _, pack := range plugins.Discover(plugins.Directories(testAssetRoot(t)), plugins.Bounds{Metadata: 1 << 20, Content: 16 << 20}) {
+		if pack.ID == "builtin" {
+			library.SetDefaults(pack)
+			break
+		}
+	}
 	knight, _ := library.UnitByID("knight")
 	state.AddUnit(knight)
 	ws := NewWebSocketHandler(state)
-	handler := newTestEndpointHandler(t, state, ws, library)
+	maps, err := app.NewMapLibrary(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, definition := range []app.MapDefinition{
+		{Name: "Forest Clearing", Width: 20, Height: 20, OffsetX: -8, OffsetY: -4},
+		{Name: "Desert Oasis", Width: 20, Height: 20, OffsetX: 64, OffsetY: 64},
+	} {
+		if _, err := maps.Create(definition, testPNG(t, 2, 2)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	handler := newTestEndpointHandler(t, state, ws, library, maps)
 	mux := http.NewServeMux()
 	handler.RegisterRoutes(mux)
 	ws.RegisterRoutes(mux)
@@ -49,6 +68,7 @@ func TestBrowserSync(t *testing.T) {
 	})
 	mux.HandleFunc("/browser/progress", func(w http.ResponseWriter, r *http.Request) { t.Log(r.URL.Query().Get("stage")) })
 	mux.HandleFunc("/browser/state", func(w http.ResponseWriter, r *http.Request) { json.NewEncoder(w).Encode(state.Units()) })
+	mux.HandleFunc("/browser/maps", func(w http.ResponseWriter, r *http.Request) { json.NewEncoder(w).Encode(maps.Maps()) })
 	// Send one production-format position update without starting a permanent ticker.
 	mux.HandleFunc("/browser/positions", func(w http.ResponseWriter, r *http.Request) {
 		data, err := json.Marshal(state.Units())

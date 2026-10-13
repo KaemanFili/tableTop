@@ -6,15 +6,16 @@ import (
 )
 
 type UnitData struct {
-	Left     int        `bson:"left"`
-	Top      int        `bson:"top"`
-	ID       string     `bson:"id"`
-	ImageID  string     `bson:"imageID"`
-	Name     string     `bson:"name"`
-	UnitType string     `bson:"unitType"`
-	Status   UnitStatus `bson:"status"`
-	Size     UnitSize   `bson:"size"`
-	ImageFit ImageFit   `bson:"imageFit"`
+	Artwork  *ArtworkReference `json:"artwork,omitempty" bson:"artwork,omitempty"`
+	Left     int               `bson:"left"`
+	Top      int               `bson:"top"`
+	ID       string            `bson:"id"`
+	ImageID  string            `bson:"imageID"`
+	Name     string            `bson:"name"`
+	UnitType string            `bson:"unitType"`
+	Status   UnitStatus        `bson:"status"`
+	Size     UnitSize          `bson:"size"`
+	ImageFit ImageFit          `bson:"imageFit"`
 }
 
 const (
@@ -83,6 +84,7 @@ func (s *AppState) AddUnit(definition UnitDefinition) UnitData {
 		Top:      150,
 		ID:       id,
 		ImageID:  definition.ImageID,
+		Artwork:  definition.Artwork,
 		Name:     definition.Name,
 		UnitType: definition.UnitType,
 		Size:     definition.Size,

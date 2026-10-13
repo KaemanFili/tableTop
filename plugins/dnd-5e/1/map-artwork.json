@@ -1,0 +1,84 @@
+{
+  "generatedOn": "2026-10-13",
+  "generatedWith": "built-in image_gen",
+  "style": "Gridless top-down fantasy encounter maps",
+  "entries": [
+    {
+      "key": "field",
+      "file": "maps/field.png",
+      "pixelWidth": 1254,
+      "pixelHeight": 1254,
+      "prompt": "Use case: stylized-concept. Asset type: square fantasy tabletop battle map for a virtual tabletop, 1024 by 1024 pixels. Strict orthographic overhead view looking straight down; never isometric, never tilted perspective. Hand-painted detailed natural terrain with readable shapes and restrained texture, consistent professional fantasy cartography. Entire image is usable map, with no border, no labels, no lettering, no grid, no people, no creatures, no tokens. Design for a 30 by 30 square encounter area with each square representing 5 feet; objects at believable human scale, generous playable space and clear paths. Soft daylight and short consistent shadows. Scene/backdrop: An open green grassy meadow with a wide central open battle area, irregular patches of wildflowers and bare earth, a few scattered small boulders, and low shrubs near the edges. A narrow dirt footpath gently curves across the meadow. Calm temperate countryside. Most of the meadow remains open for movement."
+    },
+    {
+      "key": "desert",
+      "file": "maps/desert.png",
+      "pixelWidth": 1254,
+      "pixelHeight": 1254,
+      "prompt": "Use case: stylized-concept. Asset type: square fantasy tabletop battle map for a virtual tabletop, 1024 by 1024 pixels. Strict orthographic overhead view looking straight down; never isometric, never tilted perspective. Hand-painted detailed natural terrain with readable shapes and restrained texture, consistent professional fantasy cartography. Entire image is usable map, with no border, no labels, no lettering, no grid, no people, no creatures, no tokens. Design for a 30 by 30 square encounter area with each square representing 5 feet; objects at believable human scale, generous playable space and clear paths. Soft daylight and short consistent shadows. Scene/backdrop: A sandy desert encounter site with low rolling dunes around the perimeter, a small turquoise oasis pool off-center, a few palms beside it, scattered sandstone rocks, and generous open sandy ground. Clear winding approaches between dunes. Dry golden sands, warm sandstone, restrained oasis greenery."
+    },
+    {
+      "key": "city-square",
+      "file": "maps/city-square.png",
+      "pixelWidth": 1254,
+      "pixelHeight": 1254,
+      "prompt": "Use case: stylized-concept. Asset type: square fantasy tabletop battle map for a virtual tabletop, 1024 by 1024 pixels. Strict orthographic overhead view looking straight down; never isometric, never tilted perspective. Hand-painted detailed natural terrain with readable shapes and restrained texture, consistent professional fantasy cartography. Entire image is usable map, with no border, no labels, no lettering, no grid, no people, no creatures, no tokens. Design for a 30 by 30 square encounter area with each square representing 5 feet; objects at believable human scale, generous playable space and clear paths. Soft daylight and short consistent shadows. Scene/backdrop: A medieval stone-paved city square, central modest round fountain, wide open plaza, a few market stalls around the edges, benches, and roofless cutaway ground-floor shop interiors along two edges so all floors are visible and playable. Multiple broad streets exit the square. No modern objects, no text on signs. Warm grey cobblestone, plaster walls and timber market stalls."
+    },
+    {
+      "key": "mountain-region",
+      "file": "maps/mountain-region.png",
+      "pixelWidth": 1254,
+      "pixelHeight": 1254,
+      "prompt": "Use case: stylized-concept. Asset type: square fantasy tabletop battle map for a virtual tabletop, 1024 by 1024 pixels. Strict orthographic overhead view looking straight down; never isometric, never tilted perspective. Hand-painted detailed natural terrain with readable shapes and restrained texture, consistent professional fantasy cartography. Entire image is usable map, with no border, no labels, no lettering, no grid, no people, no creatures, no tokens. Design for a 30 by 30 square encounter area with each square representing 5 feet; objects at believable human scale, generous playable space and clear paths. Soft daylight and short consistent shadows. Scene/backdrop: A rocky highland mountain region at encounter scale, with broad winding gravel trails crossing a sheltered saddle, steep grey cliff edges, several rocky ledges and boulders for cover, sparse hardy grasses, and a few small alpine conifers. Show the directly overhead rock surfaces rather than a landscape panorama. Clear traversable center and readable changes in elevation."
+    },
+    {
+      "key": "village-center",
+      "file": "maps/village-center.png",
+      "pixelWidth": 1254,
+      "pixelHeight": 1254,
+      "prompt": "Use case: stylized-concept. Asset type: square fantasy tabletop battle map for a virtual tabletop, 1024 by 1024 pixels. Strict orthographic overhead view looking straight down; never isometric, never tilted perspective. Hand-painted detailed natural terrain with readable shapes and restrained texture, consistent professional fantasy cartography. Entire image is usable map, with no border, no labels, no lettering, no grid, no people, no creatures, no tokens. Design for a 30 by 30 square encounter area with each square representing 5 feet; objects at believable human scale, generous playable space and clear paths. Soft daylight and short consistent shadows. Scene/backdrop: A small medieval rural village center with an open dirt-and-stone common, a modest stone well, a few wooden carts and barrels along the edges, grassy paths between cottages, and simple thatched cottage roofs around the perimeter. Keep the large center and connecting paths open and playable. Rustic timber, thatch, earth and green grass. No city-scale masonry plaza."
+    },
+    {
+      "key": "forest",
+      "file": "maps/forest.png",
+      "pixelWidth": 1254,
+      "pixelHeight": 1254,
+      "prompt": "Use case: stylized-concept. Asset type: square fantasy tabletop battle map for a virtual tabletop, 1024 by 1024 pixels. Strict orthographic overhead view looking straight down; never isometric, never tilted perspective. Hand-painted detailed natural terrain with readable shapes and restrained texture, consistent professional fantasy cartography. Entire image is usable map, with no border, no labels, no lettering, no grid, no people, no creatures, no tokens. Design for a 30 by 30 square encounter area with each square representing 5 feet; objects at believable human scale, generous playable space and clear paths. Soft daylight and short consistent shadows. Scene/backdrop: A temperate woodland clearing with winding dirt trails connecting the edges, a broad playable clearing in the center, groups of overhead tree crowns around the edges, visible roots, fallen logs and mossy rocks as cover. Rich but restrained green canopy and brown forest floor. Tree crowns must leave plenty of exposed forest-floor spaces for tokens."
+    },
+    {
+      "key": "river-crossing",
+      "file": "maps/river-crossing.png",
+      "pixelWidth": 1254,
+      "pixelHeight": 1254,
+      "prompt": "Use case: stylized-concept. Asset type: square fantasy tabletop battle map for a virtual tabletop, 1024 by 1024 pixels. Strict orthographic overhead view looking straight down; never isometric, never tilted perspective. Hand-painted detailed natural terrain with readable shapes and restrained texture, consistent professional fantasy cartography. Entire image is usable map, with no border, no labels, no lettering, no grid, no people, no creatures, no tokens. Design for a 30 by 30 square encounter area with each square representing 5 feet; objects at believable human scale, generous playable space and clear paths. Soft daylight and short consistent shadows. Scene/backdrop: A shallow blue-green river flows from the top edge to the bottom edge across a grassy woodland encounter site. A sturdy narrow old stone bridge crosses it near the center, with a parallel line of broad stepping stones nearby. Dirt paths approach both banks. A few riverbank boulders, reeds and sparse trees provide cover, with broad clear banks suitable for encounters. The bridge must clearly connect two traversable banks."
+    },
+    {
+      "key": "boat",
+      "file": "maps/boat.png",
+      "pixelWidth": 1254,
+      "pixelHeight": 1254,
+      "prompt": "Use case: stylized-concept. Asset type: square fantasy tabletop battle map for a virtual tabletop, 1024 by 1024 pixels. Strict orthographic overhead view looking straight down; never isometric, never tilted perspective. Hand-painted detailed natural terrain with readable shapes and restrained texture, consistent professional fantasy cartography. Entire image is usable map, with no border, no labels, no lettering, no grid, no people, no creatures, no tokens. Design for a 30 by 30 square encounter area with each square representing 5 feet; objects at believable human scale, generous playable space and clear paths. Soft daylight and short consistent shadows. Scene/backdrop: A wooden medieval sailing boat floating on deep blue water, seen directly from above. The complete hull fits in the image, aligned vertically, with a broad open main deck, a small raised stern deck, railing, a central mast with its sails furled so it does not obscure the deck, clearly visible stairs, deck hatch, coils of rope, and a few barrels along the rail. Keep most deck space clear for combat and movement. Scale the boat about 85 feet long, with surrounding water visible. No crew, no unfurled sails, no cutaway hidden lower deck."
+    },
+    {
+      "key": "wagon-road",
+      "file": "maps/wagon-road.png",
+      "pixelWidth": 1254,
+      "pixelHeight": 1254,
+      "prompt": "Use case: stylized-concept. Asset type: square fantasy tabletop battle map for a virtual tabletop, 1024 by 1024 pixels. Strict orthographic overhead view looking straight down; never isometric, never tilted perspective. Hand-painted detailed natural terrain with readable shapes and restrained texture, consistent professional fantasy cartography. Entire image is usable map, with no border, no labels, no lettering, no grid, no people, no creatures, no tokens. Design for a 30 by 30 square encounter area with each square representing 5 feet; objects at believable human scale, generous playable space and clear paths. Soft daylight and short consistent shadows. Scene/backdrop: A rural dirt road running from the bottom edge to the top edge through lightly wooded grassy countryside. One wooden merchant wagon with a canvas cover stands near the center along one side of the road, with a couple of crates beside it. Clear space around the wagon and on the road for an ambush encounter. Low bushes, a few trees near the perimeter, stones, and wheel ruts. No horses, people or creatures. Wagon at plausible scale, about 12 feet long, within the 150-foot square encounter site."
+    },
+    {
+      "key": "ancient-ruins",
+      "file": "maps/ancient-ruins.png",
+      "pixelWidth": 1254,
+      "pixelHeight": 1254,
+      "prompt": "Use case: stylized-concept. Asset type: square fantasy tabletop battle map for a virtual tabletop, 1024 by 1024 pixels. Strict orthographic overhead view looking straight down; never isometric, never tilted perspective. Hand-painted detailed natural terrain with readable shapes and restrained texture, consistent professional fantasy cartography. Entire image is usable map, with no border, no labels, no lettering, no grid, no people, no creatures, no tokens. Design for a 30 by 30 square encounter area with each square representing 5 feet; objects at believable human scale, generous playable space and clear paths. Soft daylight and short consistent shadows. Scene/backdrop: An overgrown ancient stone ruin at encounter scale: broken low walls outlining several roofless rooms around an open courtyard, a few fallen columns, worn stone steps and fragments of paving, moss, vines, sparse shrubs, and small rubble piles. Clear entrances and multiple navigable routes between the courtyard and rooms. Everything seen directly overhead; no intact roofs blocking playable interiors. Weathered grey limestone and muted natural greens."
+    },
+    {
+      "key": "rocky-outcropping",
+      "file": "maps/rocky-outcropping.png",
+      "pixelWidth": 1254,
+      "pixelHeight": 1254,
+      "prompt": "Use case: stylized-concept. Asset type: square fantasy tabletop battle map for a virtual tabletop, 1024 by 1024 pixels. Strict orthographic overhead view looking straight down; never isometric, never tilted perspective. Hand-painted detailed natural terrain with readable shapes and restrained texture, consistent professional fantasy cartography. Entire image is usable map, with no border, no labels, no lettering, no grid, no people, no creatures, no tokens. Design for a 30 by 30 square encounter area with each square representing 5 feet; objects at believable human scale, generous playable space and clear paths. Soft daylight and short consistent shadows. Scene/backdrop: A broad low natural rocky outcropping amid dry grassland: several clusters of irregular grey granite boulders, low flat stone shelves, patches of gravel and scrub grass, with winding walkable passages between rock clusters and a clear central encounter area. The outcropping feels rugged but not a mountain chasm. Show overhead top surfaces, readable ledges and short shadows. Sparse small shrubs, no buildings."
+    }
+  ]
+}

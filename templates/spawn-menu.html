@@ -31,9 +31,9 @@
                 <form
                     id="create-unit-form"
                     method="post"
-                    action="/unit-library"
+                    action="{{ boardPrefix }}/unit-library{{if .CopyID}}/{{.CopyID}}/copy{{end}}"
                     enctype="multipart/form-data"
-                    hx-post="{{ boardPrefix }}/unit-library"
+                    hx-post="{{ boardPrefix }}/unit-library{{if .CopyID}}/{{.CopyID}}/copy{{end}}"
                     hx-encoding="multipart/form-data"
                     hx-target="#spawn-controls"
                     hx-swap="outerHTML"
@@ -86,33 +86,55 @@
                     </div>
                 </form>
             {{ else }}
-                <div class="spawn-menu-heading">
-                    <h2>Spawn unit</h2>
-                    <button type="button" id="create-unit-toggle" class="primary-button" hx-get="{{ boardPrefix }}/unit-library/new" hx-target="#spawn-controls" hx-swap="outerHTML" autofocus>+ Create new unit</button>
+                <div class="library-browser" data-library-search="units">
+                    <div class="spawn-menu-heading">
+                        <h2>Spawn unit</h2>
+                        <button type="button" id="create-unit-toggle" class="primary-button" hx-get="{{ boardPrefix }}/unit-library/new" hx-target="#spawn-controls" hx-swap="outerHTML">+ Create new unit</button>
+                    </div>
+                    <p>Select a unit to add it to the tabletop.</p>
+                    <label class="library-search" for="unit-library-search">Search units
+                        <input id="unit-library-search" type="search" data-library-search-input placeholder="Search monster or unit names…" aria-describedby="unit-search-results" autocomplete="off" autofocus>
+                    </label>
+                    <p id="unit-search-results" class="library-search-results" data-library-search-results role="status" aria-live="polite"></p>
+                    <p data-library-search-empty hidden>No units match your search.</p>
+                    {{ if .Error }}<p class="menu-error" role="alert">{{ .Error }}</p>{{ end }}
+                    {{ if .Notice }}<p class="menu-notice" role="status">{{ .Notice }}</p>{{ end }}
+                    <details class="unit-library-group" id="pc-list" data-library-group open>
+                        <summary>PCs <span class="unit-count" data-library-count>{{ .PCs.Total }}</span></summary>
+                        {{ template "unit-library-content" .PCs }}
+                    </details>
+                    <details class="unit-library-group" id="npc-list" data-library-group open>
+                        <summary>NPCs <span class="unit-count" data-library-count>{{ .NPCs.Total }}</span></summary>
+                        {{ template "unit-library-content" .NPCs }}
+                    </details>
                 </div>
-                <p>Select a unit to add it to the tabletop.</p>
-                {{ if .Error }}<p class="menu-error" role="alert">{{ .Error }}</p>{{ end }}
-                {{ if .Notice }}<p class="menu-notice" role="status">{{ .Notice }}</p>{{ end }}
-                <details class="unit-library-group" id="pc-list" open>
-                    <summary>PCs <span class="unit-count">{{ len .PCs }}</span></summary>
-                    <ul class="unit-library-list">
-                        {{ range .PCs }}{{ template "library-unit" . }}{{ else }}<li class="empty-library">No PCs yet. Create one to get started.</li>{{ end }}
-                    </ul>
-                </details>
-                <details class="unit-library-group" id="npc-list" open>
-                    <summary>NPCs <span class="unit-count">{{ len .NPCs }}</span></summary>
-                    <ul class="unit-library-list">
-                        {{ range .NPCs }}{{ template "library-unit" . }}{{ else }}<li class="empty-library">No NPCs yet. Create one to get started.</li>{{ end }}
-                    </ul>
-                </details>
             {{ end }}
         {{ end }}
     </section>
 </div>
 {{ end }}
 
+{{ define "unit-library-content" }}
+<div class="library-content-groups">
+    <details class="library-content-group" data-library-group data-library-owned open>
+        <summary>Your units <span class="unit-count" data-library-count>{{ len .Owned }}</span></summary>
+        <ul class="unit-library-list">
+            {{ range .Owned }}{{ template "library-unit" . }}{{ else }}<li class="empty-library">No units created yet.</li>{{ end }}
+        </ul>
+    </details>
+    {{ if .Defaults }}
+    <details class="library-content-group" data-library-group data-library-defaults>
+        <summary>Defaults <span class="unit-count" data-library-count>{{ len .Defaults }}</span></summary>
+        <ul class="unit-library-list">
+            {{ range .Defaults }}{{ template "library-unit" . }}{{ end }}
+        </ul>
+    </details>
+    {{ end }}
+</div>
+{{ end }}
+
 {{ define "library-unit" }}
-<li class="library-entry">
+<li class="library-entry" data-library-name="{{.Name}}">
     <button
         type="button"
         class="library-unit"
@@ -128,9 +150,14 @@
         <span class="library-unit-name">{{ .Name }}<span class="library-unit-size">{{ .Size.Label }}</span></span>
         <span class="spawn-action" aria-hidden="true">Spawn</span>
     </button>
+    {{if .ReadOnly}}
+    <small>Plugin default</small>
+    <button type="button" hx-get="{{boardPrefix}}/unit-library/new?copy={{.ID}}" hx-target="#spawn-controls" hx-swap="outerHTML">Create copy</button>
+    {{else}}
     <button type="button" class="library-delete" aria-label="Delete {{ .Name }} permanently"
         hx-delete="{{ boardPrefix }}/unit-library/{{ .ID }}" hx-target="#spawn-controls" hx-swap="outerHTML"
         hx-confirm="Permanently delete {{ .Name }} from the unit library? Existing copies on boards will remain. This cannot be undone."
         hx-disabled-elt="this">Delete</button>
+    {{end}}
 </li>
 {{ end }}

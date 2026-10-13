@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 2,
+  "id": "builtin",
+  "version": 1,
+  "name": "Built-in",
+  "description": "Knight, Goblin, and the standard conditions.",
+  "maps": "maps.json",
+  "statuses": "statuses.json",
+  "units": "units.json"
+}

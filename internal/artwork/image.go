@@ -9,7 +9,13 @@ import (
 	"image/png"
 )
 
-func Normalize(upload []byte) ([]byte, error) {
+// Validate fully decodes an image without encoding a copy that would be discarded.
+func Validate(upload []byte) error {
+	_, err := decode(upload)
+	return err
+}
+
+func decode(upload []byte) (image.Image, error) {
 	config, _, err := image.DecodeConfig(bytes.NewReader(upload))
 	if err != nil {
 		return nil, errors.New("Choose a valid PNG, JPEG, or GIF image.")
@@ -20,6 +26,14 @@ func Normalize(upload []byte) ([]byte, error) {
 	decoded, _, err := image.Decode(bytes.NewReader(upload))
 	if err != nil {
 		return nil, errors.New("This image is damaged or incomplete. Please choose another image.")
+	}
+	return decoded, nil
+}
+
+func Normalize(upload []byte) ([]byte, error) {
+	decoded, err := decode(upload)
+	if err != nil {
+		return nil, err
 	}
 	var output bytes.Buffer
 	if err := png.Encode(&output, decoded); err != nil {

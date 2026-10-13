@@ -2,7 +2,8 @@
 
 Set `TABLETOP_MONGODB_URI` to enable MongoDB for map and unit libraries and
 status definitions. `TABLETOP_MONGODB_DATABASE` defaults to `tabletop`. Without
-a URI, libraries use JSON files and statuses use their built-in definitions.
+a URI, owned libraries and status additions use JSON files. Plugin defaults are
+read from installed version folders in both modes.
 
 For a host process connected to a local MongoDB server:
 
@@ -76,45 +77,48 @@ be loaded, spawned, or saved; it stays listed so you can retry Delete.
 Artwork stays in the data directory. Session membership and server access
 settings also stay in local files. Run one app process per data directory.
 
-## Status document
+## Status additions
 
-Status names and colors are an ordered list in one server-wide `settings` document:
+Plugin status defaults come from the selected version's `statuses.json` and are
+read-only. Each tabletop stores only its own additions in `settings`:
 
 ```json
 {
-  "_id": "unit_statuses",
-  "schemaVersion": 1,
+  "_id": "unit_statuses/TABLETOP_ID",
+  "schemaVersion": 2,
   "options": [
-    { "value": "Poisoned", "color": "#65A30D" },
     { "value": "Marked", "color": "#123456" }
   ]
 }
 ```
 
-On first use, the app creates this document with the existing statuses. Later
-starts read it without overwriting it. The list drives the picker, accepted status
-names, and token colors. Restart after editing definitions in MongoDB; this
-change does not add a status-editing UI.
+The initial additions list is empty. The picker, accepted values, and token
+colors use the plugin's ordered defaults followed by these additions. Names
+cannot duplicate defaults. The combined list contains 1–256 unique UTF-8 names,
+at most 80 characters each without surrounding whitespace, and `#RRGGBB` colors.
+Restart after editing additions in MongoDB; no status management UI is included.
 
-Names must be unique, nonempty, valid UTF-8, and at most 80 characters, without
-leading or trailing whitespace. Colors must use `#RRGGBB`. Between 1 and 256 definitions
-are accepted. Invalid definitions stop startup. Removing a definition preserves
-its name on saved tokens; its color becomes transparent until the definition is
-restored or the token's status changes.
+## Initialization, backups, and limits
 
-## Imports, backups, and limits
+New tabletops store a plugin ID/version/fingerprint binding and initialize empty
+owned map/unit libraries and status additions. No plugin default documents or
+artwork are imported into MongoDB or session storage. Saving a default map creates
+an owned map document with its embedded board and a plugin artwork reference;
+further saves update that owned document. Defaults cannot be deleted.
 
-Each library imports its JSON file when first opened with MongoDB enabled.
-Authenticated libraries open when their tabletop is first accessed. Legacy unit
-entries retain their defaults and starter-unit deletions. Without a unit file,
-the initial library contains Knight and Goblin.
+The `library_initialization` collection distinguishes initialized empty owned
+libraries from unfinished initialization. Failed session initialization remains
+owner-only with Retry and Delete controls. There are no plugin import phases or
+staged assets to resume. Old per-tabletop imports and data migration are outside
+this change; create new bound tabletops.
 
-The `library_initialization` collection tracks completed imports independently
-of their documents, preserving intentionally empty libraries. Interrupted imports
-can be retried before a board becomes available. Original JSON files remain, but
-subsequent writes go only to MongoDB; disabling MongoDB would load those older files.
+Backups also require every exact referenced installed plugin folder, including
+read-only operator mounts and older built-in versions retained across upgrades.
+The existing file backup scripts cover application data, not external plugins.
+See [plugin deployment](plugins.md) for the directory layout and retention rules.
 
-Back up MongoDB and the entire data directory together while the app is stopped.
+Back up MongoDB, the data directory, and required plugin folders together while
+the app is stopped.
 Existing file backup/restore scripts cover only the data directory. For the
 bundled database, make a separate compressed database archive:
 

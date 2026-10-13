@@ -35,16 +35,16 @@ func TestSessionStatusDefinitionsAreIsolated(t *testing.T) {
 }
 func TestSessionStatusesPersistAndDoNotReseed(t *testing.T) {
 	dir := t.TempDir()
-	before, err := LoadSessionStatuses(dir, "session", nil, nil)
+	before, err := LoadStatusAdditions(dir, "session", nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	path := filepath.Join(dir, "statuses.json")
 	custom := []UnitStatusOption{{Value: "Marked", Color: "#123456"}}
-	if err := writeJSONFile(path, statusDocument{Version: 1, Options: custom}); err != nil {
+	if err := writeJSONFile(path, statusDocument{Version: 2, Options: custom}); err != nil {
 		t.Fatal(err)
 	}
-	after, err := LoadSessionStatuses(dir, "session", nil, nil)
+	after, err := LoadStatusAdditions(dir, "session", nil, nil)
 	if err != nil || !reflect.DeepEqual(after, custom) {
 		t.Fatalf("persisted definitions replaced: %v", err)
 	}

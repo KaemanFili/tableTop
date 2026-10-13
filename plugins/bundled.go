@@ -3,5 +3,5 @@ package plugins
 
 import "embed"
 
-//go:embed builtin/*.json
+//go:embed builtin/1/*.json
 var Builtin embed.FS

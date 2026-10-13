@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 2,
+  "id": "dnd-5e",
+  "version": 1,
+  "name": "D&D 5e Monsters",
+  "description": "3,617 D&D Beyond monsters, 2,760 individual portraits, and 11 environment maps.",
+  "maps": "maps.json",
+  "units": "units.json",
+  "statuses": "statuses.json"
+}

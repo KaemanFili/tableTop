@@ -17,13 +17,15 @@ import (
 
 // UnitDefinition is a reusable unit in the library, separate from a placed token.
 type UnitDefinition struct {
-	Source   *ContentSource `json:"source,omitempty" bson:"source,omitempty"`
-	ID       string         `json:"id" bson:"id"`
-	Name     string         `json:"name" bson:"name"`
-	UnitType string         `json:"unitType" bson:"unitType"`
-	ImageID  string         `json:"imageID" bson:"imageID"`
-	Size     UnitSize       `json:"size" bson:"size"`
-	ImageFit ImageFit       `json:"imageFit" bson:"imageFit"`
+	ReadOnly bool              `json:"-" bson:"-"`
+	Artwork  *ArtworkReference `json:"artwork,omitempty" bson:"artwork,omitempty"`
+	Source   *ContentSource    `json:"source,omitempty" bson:"source,omitempty"`
+	ID       string            `json:"id" bson:"id"`
+	Name     string            `json:"name" bson:"name"`
+	UnitType string            `json:"unitType" bson:"unitType"`
+	ImageID  string            `json:"imageID" bson:"imageID"`
+	Size     UnitSize          `json:"size" bson:"size"`
+	ImageFit ImageFit          `json:"imageFit" bson:"imageFit"`
 }
 
 type UnitLibrary struct {
@@ -33,6 +35,7 @@ type UnitLibrary struct {
 	limits         *StorageLimits
 	store          DocumentStore[UnitDefinition]
 	pendingDeletes map[string]bool
+	defaults       PluginDefaults
 }
 
 const unitDocumentVersion = 1
@@ -145,7 +148,7 @@ func normalizeSavedUnit(unit UnitDefinition) (UnitDefinition, error) {
 	if err := unit.ImageFit.Validate(); err != nil {
 		return UnitDefinition{}, err
 	}
-	if unit.ImageID != unit.ID && unit.ImageID != PCUnitImageID && unit.ImageID != NPCUnitImageID {
+	if unit.Artwork == nil && unit.ImageID != unit.ID && unit.ImageID != PCUnitImageID && unit.ImageID != NPCUnitImageID {
 		return UnitDefinition{}, errors.New("invalid image ID")
 	}
 	return unit, nil
@@ -168,6 +171,9 @@ func (l *UnitLibrary) Units() []UnitDefinition {
 	l.mutex.RLock()
 	defer l.mutex.RUnlock()
 	units := make([]UnitDefinition, 0, len(l.units))
+	if l.defaults != nil {
+		units = append(units, l.defaults.Units()...)
+	}
 	for _, unit := range l.units {
 		units = append(units, unit)
 	}
@@ -187,8 +193,10 @@ func (l *UnitLibrary) UnitByID(id string) (UnitDefinition, bool) {
 	if l.pendingDeletes[id] {
 		return UnitDefinition{}, false
 	}
-	unit, exists := l.units[id]
-	return unit, exists
+	if unit, exists := l.units[id]; exists {
+		return unit, true
+	}
+	return l.defaultUnitByID(id)
 }
 
 func (l *UnitLibrary) ImagePath(id string) (string, bool) {
@@ -205,13 +213,24 @@ func (l *UnitLibrary) ImagePath(id string) (string, bool) {
 // Create commits the image and library before making the new unit visible.
 // pngImage, when present, must be a validated, re-encoded PNG from the handler.
 func (l *UnitLibrary) Create(name, unitType string, size UnitSize, fit ImageFit, pngImage []byte) (UnitDefinition, error) {
-	name = strings.TrimSpace(name)
-	if err := ValidateUnitDefinition(name, unitType, size); err != nil {
+	return l.create(UnitDefinition{Name: strings.TrimSpace(name), UnitType: unitType, Size: size, ImageFit: fit}, pngImage)
+}
+func (l *UnitLibrary) CreateCopy(id, name, unitType string, size UnitSize, fit ImageFit, pngImage []byte) (UnitDefinition, error) {
+	original, ok := l.UnitByID(id)
+	if !ok {
+		return UnitDefinition{}, os.ErrNotExist
+	}
+	if !original.ReadOnly {
+		return UnitDefinition{}, errors.New("choose a plugin default to copy")
+	}
+	original.Name, original.UnitType, original.Size, original.ImageFit = strings.TrimSpace(name), unitType, size, fit
+	return l.create(original, pngImage)
+}
+func (l *UnitLibrary) create(unit UnitDefinition, pngImage []byte) (UnitDefinition, error) {
+	if err := l.validateNewUnit(unit); err != nil {
 		return UnitDefinition{}, err
 	}
-	if err := fit.Validate(); err != nil {
-		return UnitDefinition{}, err
-	}
+	unit.ReadOnly = false
 	l.mutex.Lock()
 	defer l.mutex.Unlock()
 	l.limits.lock()
@@ -220,74 +239,130 @@ func (l *UnitLibrary) Create(name, unitType string, size UnitSize, fit ImageFit,
 	if _, err := rand.Read(randomID[:]); err != nil {
 		return UnitDefinition{}, err
 	}
-	unit := UnitDefinition{ID: hex.EncodeToString(randomID[:]), Name: name, UnitType: unitType, ImageID: NPCUnitImageID, Size: size, ImageFit: fit}
-	if unitType == "pc" {
-		unit.ImageID = PCUnitImageID
-	}
-	imagePath := ""
-	if len(pngImage) > 0 {
-		unit.ImageID = unit.ID
-		imagePath = filepath.Join(l.dir, "images", unit.ID+".png")
-		if err := writeStorageFile(imagePath, pngImage, 0644, l.limits); err != nil {
-			return UnitDefinition{}, err
-		}
-	}
-	var err error
-	if l.store != nil {
-		err = l.store.Put(unit)
-	} else {
-		saved := []UnitDefinition{unit}
-		for _, existing := range l.units {
-			saved = append(saved, existing)
-		}
-		err = l.save(saved)
-	}
+	unit.ID = hex.EncodeToString(randomID[:])
+	imagePath, err := l.storeUnitArtwork(&unit, pngImage)
 	if err != nil {
-		// A MongoDB timeout may follow a committed write; retain its artwork.
-		if imagePath != "" && l.store == nil {
-			os.Remove(imagePath)
-		}
+		return UnitDefinition{}, err
+	}
+	if err := l.persistUnit(unit); err != nil {
+		l.discardUncommittedArtwork(imagePath)
 		return UnitDefinition{}, err
 	}
 	l.units[unit.ID] = unit
 	return unit, nil
+}
+func (l *UnitLibrary) validateNewUnit(unit UnitDefinition) error {
+	if err := ValidateUnitDefinition(unit.Name, unit.UnitType, unit.Size); err != nil {
+		return err
+	}
+	if err := unit.ImageFit.Validate(); err != nil {
+		return err
+	}
+	if unit.Artwork == nil {
+		return nil
+	}
+	_, err := pluginImage(l.defaults, unit.Artwork)
+	return err
+}
+
+// The caller holds the library and storage locks while writing artwork/documents.
+func (l *UnitLibrary) storeUnitArtwork(unit *UnitDefinition, pngImage []byte) (string, error) {
+	if len(pngImage) > 0 {
+		unit.ImageID, unit.Artwork = unit.ID, nil
+		path := filepath.Join(l.dir, "images", unit.ID+".png")
+		return path, writeStorageFile(path, pngImage, 0644, l.limits)
+	}
+	if unit.Artwork != nil || unit.ImageID != "" {
+		return "", nil
+	}
+	unit.ImageID = NPCUnitImageID
+	if unit.UnitType == "pc" {
+		unit.ImageID = PCUnitImageID
+	}
+	return "", nil
+}
+func (l *UnitLibrary) persistUnit(unit UnitDefinition) error {
+	if l.store != nil {
+		return l.store.Put(unit)
+	}
+	saved := make([]UnitDefinition, 0, len(l.units)+1)
+	saved = append(saved, unit)
+	for _, existing := range l.units {
+		saved = append(saved, existing)
+	}
+	return l.save(saved)
+}
+func (l *UnitLibrary) discardUncommittedArtwork(path string) {
+	// A MongoDB timeout may follow a committed write; retain that artwork.
+	if l.store != nil || path == "" {
+		return
+	}
+	os.Remove(path)
 }
 
 func (l *UnitLibrary) save(units []UnitDefinition) error {
 	return writeJSONFile(filepath.Join(l.dir, "units.json"), unitDocument{Version: unitDocumentVersion, Units: units}, l.limits)
 }
 
-// Delete removes a reusable definition; placed copies retain their artwork.
+// Delete removes an owned definition; placed copies retain their artwork.
 func (l *UnitLibrary) Delete(id string) error {
 	l.mutex.Lock()
 	defer l.mutex.Unlock()
+
+	if _, owned := l.units[id]; !owned {
+		return l.defaultDeletionError(id)
+	}
+
 	l.limits.lock()
 	defer l.limits.unlock()
-	if _, exists := l.units[id]; !exists {
-		return nil
-	}
-	units := make([]UnitDefinition, 0, len(l.units)-1)
-	for _, unit := range l.units {
-		if unit.ID != id {
-			units = append(units, unit)
-		}
-	}
-	var err error
-	if l.store != nil {
-		err = deleteDocument(l.store, id)
-	} else {
-		err = l.save(units)
-	}
-	if err != nil {
-		if l.store != nil {
-			if l.pendingDeletes == nil {
-				l.pendingDeletes = make(map[string]bool)
-			}
-			l.pendingDeletes[id] = true
-		}
+	if err := l.persistUnitDeletion(id); err != nil {
+		l.markDeletePending(id)
 		return err
 	}
 	delete(l.units, id)
 	delete(l.pendingDeletes, id)
 	return nil
+}
+
+func (l *UnitLibrary) defaultUnitByID(id string) (UnitDefinition, bool) {
+	if l.defaults == nil {
+		return UnitDefinition{}, false
+	}
+	return l.defaults.UnitByID(id)
+}
+
+func (l *UnitLibrary) defaultDeletionError(id string) error {
+	if _, exists := l.defaultUnitByID(id); exists {
+		return ErrReadOnly
+	}
+	return nil
+}
+
+// The caller holds the library and storage locks throughout persistence.
+func (l *UnitLibrary) persistUnitDeletion(id string) error {
+	if l.store != nil {
+		return deleteDocument(l.store, id)
+	}
+	return l.save(l.unitsExcluding(id))
+}
+
+func (l *UnitLibrary) unitsExcluding(id string) []UnitDefinition {
+	units := make([]UnitDefinition, 0, len(l.units)-1)
+	for _, unit := range l.units {
+		if unit.ID == id {
+			continue
+		}
+		units = append(units, unit)
+	}
+	return units
+}
+
+func (l *UnitLibrary) markDeletePending(id string) {
+	if l.store == nil {
+		return
+	}
+	if l.pendingDeletes == nil {
+		l.pendingDeletes = make(map[string]bool)
+	}
+	l.pendingDeletes[id] = true
 }

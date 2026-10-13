@@ -7,6 +7,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
 	"tableTop/main/internal/auth"
@@ -58,7 +59,10 @@ func (h *EndpointHandler) createMap(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	data := mapEditorData{MapDefinition: app.MapDefinition{Width: 20, Height: 20}}
-	fail := func(message string) { data.Error = message; h.renderMapEditor(w, data) }
+	fail := func(message string) {
+		data.Error = message
+		h.renderMapEditor(w, data)
+	}
 	r.Body = http.MaxBytesReader(w, r.Body, maxMapImageBytes+(64<<10))
 	if err := r.ParseMultipartForm(maxMapImageBytes + (64 << 10)); err != nil {
 		if r.MultipartForm != nil {
@@ -68,35 +72,11 @@ func (h *EndpointHandler) createMap(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer r.MultipartForm.RemoveAll()
-	data.Name = strings.TrimSpace(r.FormValue("name"))
-	for name, value := range map[string]*float64{"width": &data.Width, "height": &data.Height, "offsetX": &data.OffsetX, "offsetY": &data.OffsetY} {
-		parsed, err := strconv.ParseFloat(r.FormValue(name), 64)
-		if err != nil {
-			fail("Enter valid grid dimensions and position.")
-			return
-		}
-		*value = parsed
-	}
-	if err := data.MapDefinition.Validate(); err != nil {
+	if err := parseMapForm(r, &data.MapDefinition); err != nil {
 		fail(err.Error())
 		return
 	}
-	file, header, err := r.FormFile("image")
-	if err != nil {
-		fail("Choose a map image.")
-		return
-	}
-	defer file.Close()
-	if header.Size > maxMapImageBytes {
-		fail("The map image must be 10 MB or smaller.")
-		return
-	}
-	upload, err := io.ReadAll(io.LimitReader(file, maxMapImageBytes+1))
-	if err != nil || len(upload) > maxMapImageBytes {
-		fail("The map image could not be read or is larger than 10 MB.")
-		return
-	}
-	image, err := normalizeUnitImage(upload)
+	image, err := readMapImage(r)
 	if err != nil {
 		fail(err.Error())
 		return
@@ -124,14 +104,55 @@ func (h *EndpointHandler) createMap(w http.ResponseWriter, r *http.Request) {
 	h.renderMapEditor(w, mapEditorData{MapDefinition: definition, Saved: true})
 }
 
+// Update the definition before validation so errors preserve submitted values.
+func parseMapForm(r *http.Request, definition *app.MapDefinition) error {
+	definition.Name = strings.TrimSpace(r.FormValue("name"))
+	for name, value := range map[string]*float64{
+		"width": &definition.Width, "height": &definition.Height,
+		"offsetX": &definition.OffsetX, "offsetY": &definition.OffsetY,
+	} {
+		parsed, err := strconv.ParseFloat(r.FormValue(name), 64)
+		if err != nil {
+			return errors.New("Enter valid grid dimensions and position.")
+		}
+		*value = parsed
+	}
+	return definition.Validate()
+}
+
+func readMapImage(r *http.Request) ([]byte, error) {
+	file, header, err := r.FormFile("image")
+	if err != nil {
+		return nil, errors.New("Choose a map image.")
+	}
+	defer file.Close()
+	if header.Size > maxMapImageBytes {
+		return nil, errors.New("The map image must be 10 MB or smaller.")
+	}
+	upload, err := io.ReadAll(io.LimitReader(file, maxMapImageBytes+1))
+	if err != nil || len(upload) > maxMapImageBytes {
+		return nil, errors.New("The map image could not be read or is larger than 10 MB.")
+	}
+	return normalizeUnitImage(upload)
+}
+
 func (h *EndpointHandler) mapImage(w http.ResponseWriter, r *http.Request) {
 	if h.mapLibrary == nil {
 		http.NotFound(w, r)
 		return
 	}
-	path, exists := h.mapLibrary.ImagePath(r.PathValue("id"))
-	if !exists {
-		http.NotFound(w, r)
+	path, data, err := h.mapLibrary.Artwork(r.PathValue("id"))
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			http.NotFound(w, r)
+		} else {
+			http.Error(w, "The map image is unavailable.", http.StatusServiceUnavailable)
+		}
+		return
+	}
+	if data != nil {
+		w.Header().Set("Content-Type", "image/png")
+		w.Write(data)
 		return
 	}
 	http.ServeFile(w, r, path)
@@ -157,7 +178,8 @@ func (h *EndpointHandler) saveBoard(w http.ResponseWriter, r *http.Request) {
 	for _, ruler := range ws.rulers {
 		board.Rulers = append(board.Rulers, ruler)
 	}
-	if err := h.mapLibrary.SaveBoard(*ws.currentMap, board); err != nil {
+	saved, err := h.mapLibrary.SaveMap(*ws.currentMap, board)
+	if err != nil {
 		log.Println("Save board:", err)
 		if errors.Is(err, app.ErrCapacity) {
 			http.Error(w, err.Error(), http.StatusConflict)
@@ -170,5 +192,11 @@ func (h *EndpointHandler) saveBoard(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "The map could not be saved. Please try again.", http.StatusInternalServerError)
 		return
 	}
+	if saved.ID != ws.currentMap.ID {
+		saved.Board = nil
+		ws.currentMap = &saved
+		ws.broadcastValueLocked(map[string]any{"type": "boardMapChanged", "map": saved})
+	}
+	w.Header().Set("X-Map-ID", saved.ID)
 	w.WriteHeader(http.StatusNoContent)
 }

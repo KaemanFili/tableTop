@@ -41,7 +41,7 @@ func validateUnitStatuses(options []UnitStatusOption) error {
 }
 
 func defaultUnitStatuses() []UnitStatusOption {
-	data, err := bundled.Builtin.ReadFile("builtin/statuses.json")
+	data, err := bundled.Builtin.ReadFile("builtin/1/statuses.json")
 	if err != nil {
 		panic(err)
 	}

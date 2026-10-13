@@ -73,16 +73,22 @@ func (h *EndpointHandler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /map-library", h.mapPicker)
 	mux.HandleFunc("POST /map-library/{id}/load", h.loadMap)
 	mux.HandleFunc("POST /map-library", h.createMap)
+	mux.HandleFunc("POST /map-library/{id}/copy", h.copyMap)
 	mux.HandleFunc("DELETE /map-library/{id}", h.deleteMap)
 	mux.HandleFunc("GET /maps/images/{id}", h.mapImage)
 	mux.HandleFunc("GET /spawn-menu", h.spawnMenu)
 	mux.HandleFunc("GET /unit-library/new", h.newUnitForm)
 	mux.HandleFunc("POST /unit-library", h.createUnit)
+	mux.HandleFunc("POST /unit-library/{id}/copy", h.createUnit)
 	mux.HandleFunc("DELETE /unit-library/{id}", h.deleteLibraryUnit)
 	mux.HandleFunc("GET /images/{id}", h.unitImage)
 }
 
 func (h *EndpointHandler) index(w http.ResponseWriter, r *http.Request) {
+	if err := h.library.ValidateDefaults(); err != nil {
+		http.Error(w, err.Error(), http.StatusServiceUnavailable)
+		return
+	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-store")
 	sizes, _ := json.Marshal(app.UnitSizes())
@@ -99,6 +105,10 @@ func (h *EndpointHandler) index(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *EndpointHandler) spawnMenu(w http.ResponseWriter, r *http.Request) {
+	if err := h.library.ValidateDefaults(); err != nil {
+		http.Error(w, err.Error(), http.StatusServiceUnavailable)
+		return
+	}
 	h.renderSpawnMenu(w, h.menuData(r.URL.Query().Get("open") == "true"))
 }
 
@@ -112,6 +122,10 @@ func (h *EndpointHandler) grid(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *EndpointHandler) newUnit(w http.ResponseWriter, r *http.Request) {
+	if err := h.library.ValidateDefaults(); err != nil {
+		http.Error(w, err.Error(), http.StatusServiceUnavailable)
+		return
+	}
 	definition := app.UnitDefinition{ImageID: app.DefaultUnitImageID}
 	if id := r.URL.Query().Get("unitID"); id != "" {
 		var exists bool

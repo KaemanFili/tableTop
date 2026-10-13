@@ -414,6 +414,117 @@ async function testNotificationLifecycle(browser) {
     await until(() => container.children.length === 0, 'Notification did not expire');
 }
 
+async function testLibrarySearch(browser) {
+    const {w, d} = browser;
+    function search(id, query) {
+        const input = d.getElementById(id);
+        input.value = query;
+        input.dispatchEvent(new w.Event('input', {bubbles: true}));
+    }
+    const visibleEntries = kind => [...d.querySelectorAll(`[data-library-search="${kind}"] [data-library-name]`)]
+        .filter(entry => entry.getClientRects().length > 0);
+
+    d.getElementById('spawn-menu-toggle').click();
+    await until(() => d.getElementById('unit-search-results')?.textContent === '4 units', 'Unit search did not initialize');
+    const defaults = d.querySelector('#pc-list [data-library-defaults]');
+    const owned = d.querySelector('#pc-list [data-library-owned]');
+    assert(defaults && !defaults.open && owned?.open, 'Defaults and owned units were not separated into dropdowns');
+    assert(defaults.querySelectorAll('[data-library-name]').length === 1 && owned.querySelectorAll('[data-library-name]').length === 1, 'Unit dropdowns mixed owned content with defaults');
+    search('unit-library-search', '  KnIgHt  ');
+    let entries = visibleEntries('units');
+    assert(entries.length === 2 && entries.every(entry => entry.dataset.libraryName === 'Knight'), 'Unit search did not filter both owned and default names case-insensitively');
+    assert(defaults.open && d.getElementById('npc-list').hidden && d.querySelector('#pc-list .unit-count').textContent === '2', 'Unit search did not open matching defaults or update groups and counts');
+    await w.htmx.ajax('GET', '/spawn-menu?open=true', {target: '#spawn-controls', swap: 'outerHTML'});
+    await until(() => d.getElementById('unit-library-search')?.value === '  KnIgHt  ', 'Unit search was lost during menu refresh');
+    assert(visibleEntries('units').length === 2, 'Refreshed unit results were not filtered');
+    search('unit-library-search', 'nothing-matches-this-name');
+    assert(visibleEntries('units').length === 0 && !d.querySelector('[data-library-search="units"] [data-library-search-empty]').hidden, 'Unit search did not show the empty state');
+    search('unit-library-search', '');
+    assert(d.querySelectorAll('[data-library-search="units"] [data-library-name]:not([hidden])').length === 4 && !d.getElementById('npc-list').hidden, 'Clearing unit search did not restore entries');
+    await until(() => !d.querySelector('#spawn-controls.htmx-settling'), 'Unit menu refresh did not settle');
+    d.getElementById('spawn-menu-toggle').click();
+    await until(() => d.getElementById('spawn-menu').hidden, 'Unit menu did not close');
+
+    d.getElementById('utility-map').click();
+    d.getElementById('load-map').click();
+    await until(() => d.getElementById('map-search-results')?.textContent === '2 maps', 'Map search did not initialize');
+    search('map-library-search', 'OASIS desert');
+    entries = visibleEntries('maps');
+    assert(entries.length === 1 && entries[0].dataset.libraryName === 'Desert Oasis', 'Map search did not match all name terms');
+    assert(d.getElementById('map-search-results').textContent === '1 map found', 'Map search result count is incorrect');
+    await w.htmx.ajax('GET', '/map-library?gm=true', {target: '#map-editor', swap: 'innerHTML'});
+    await until(() => d.getElementById('map-library-search')?.value === 'OASIS desert', 'Map search was lost during menu refresh');
+    assert(visibleEntries('maps').length === 1, 'Refreshed map results were not filtered');
+    search('map-library-search', 'nothing-matches-this-name');
+    assert(visibleEntries('maps').length === 0 && !d.querySelector('[data-library-search="maps"] [data-library-search-empty]').hidden, 'Map search did not show the empty state');
+    search('map-library-search', '');
+    assert(visibleEntries('maps').length === 2, 'Clearing map search did not restore entries');
+    await until(() => !d.querySelector('#map-editor.htmx-settling'), 'Map menu refresh did not settle');
+    d.querySelector('#map-editor [data-close-map-editor]').click();
+}
+
+async function testMapViewCentering(browser) {
+    const frame = document.getElementById('app');
+    const maps = await (await fetch('/browser/maps')).json();
+    function centered(w) {
+        const d = w.document;
+        const map = d.getElementById('map-layer');
+        if (!map || map.hidden) return false;
+        const bounds = map.getBoundingClientRect();
+        return Math.abs(bounds.left + bounds.width / 2 - d.documentElement.clientWidth / 2) < 2 &&
+            Math.abs(bounds.top + bounds.height / 2 - d.documentElement.clientHeight / 2) < 2;
+    }
+    async function load(name) {
+        const map = maps.find(map => map.name === name);
+        const response = await fetch(`/map-library/${map.id}/load?gm=true`, {method: 'POST'});
+        assert(response.ok, 'Map could not load for view test');
+        try {
+            await until(() => browser.d.getElementById('map-layer').alt === name && centered(browser.w), 'Loaded map was not centered in the viewport');
+        } catch (error) {
+            const bounds = browser.d.getElementById('map-layer').getBoundingClientRect();
+            throw new Error(`${name}: ${error.message}; bounds=${JSON.stringify(bounds.toJSON())}; viewport=${browser.d.documentElement.clientWidth}x${browser.d.documentElement.clientHeight}; scroll=${browser.w.scrollX},${browser.w.scrollY}; world=${browser.d.getElementById('board-world').style.cssText}`);
+        }
+        return map;
+    }
+    const first = await load('Forest Clearing');
+    browser.w.scrollBy(100, 80);
+    const left = browser.w.scrollX, top = browser.w.scrollY;
+    browser.d.dispatchEvent(new browser.w.CustomEvent('boardMapChanged', {detail: {map: first}}));
+    await pause(50);
+    assert(browser.w.scrollX === left && browser.w.scrollY === top, 'An update to the same map reset manual panning');
+    await browser.remoteSpawn();
+    await until(() => browser.units().length === 1, 'Token did not appear on the centered map');
+    const token = browser.units()[0];
+    const originalLeft = parseInt(token.style.left), originalTop = parseInt(token.style.top);
+    const bounds = token.getBoundingClientRect();
+    browser.mouse(token, 'mousedown', bounds.left + 5, bounds.top + 5);
+    browser.mouse(browser.d, 'mousemove', bounds.left + 45, bounds.top + 40);
+    browser.mouse(browser.d, 'mouseup', bounds.left + 45, bounds.top + 40);
+    await until(async () => {
+        const units = await (await fetch('/browser/state')).json();
+        const moved = units.find(unit => unit.ID === token.id);
+        return moved?.Left === originalLeft + 40 && moved?.Top === originalTop + 35;
+    }, 'Dragging after centering changed shared token coordinates');
+    const grid = browser.d.getElementById('grid-container');
+    const gridBounds = grid.getBoundingClientRect();
+    const point = browser.w.eval('boardGeometry').point(grid, {clientX: gridBounds.left + 200, clientY: gridBounds.top + 200});
+    assert(point.x === 5 && point.y === 5, 'Drawing coordinates changed after centering and panning');
+    await load('Desert Oasis');
+
+    browser.w.scrollBy(85, 65);
+    const oldDocument = frame.contentDocument;
+    frame.style.width = '360px';
+    frame.style.height = '640px';
+    frame.src = '/?gm=true';
+    try {
+        await until(() => frame.contentDocument !== oldDocument && frame.contentDocument?.getElementById('map-layer')?.alt === 'Desert Oasis' && centered(frame.contentWindow), 'Reloaded map was not centered in the smaller viewport');
+    } catch (error) {
+        const w = frame.contentWindow, d = w.document;
+        const map = d.getElementById('map-layer');
+        throw new Error(`${error.message}; map=${map?.alt}; hidden=${map?.hidden}; bounds=${JSON.stringify(map?.getBoundingClientRect().toJSON())}; viewport=${d.documentElement.clientWidth}x${d.documentElement.clientHeight}; scroll=${w.scrollX},${w.scrollY}; ready=${d.readyState}`);
+    }
+}
+
 // These scenarios share one board: each spawn changes the count expected by
 // the next scenario, and the movement check leaves the status menu open.
 const scenarios = [
@@ -427,6 +538,8 @@ const scenarios = [
     ['dice without WebGL', testDiceWithoutWebGL],
     ['private GM rolls', testPrivateGMRolls],
     ['notification lifecycle', testNotificationLifecycle],
+    ['unit and map library search', testLibrarySearch],
+    ['map view centers on load and reload', testMapViewCentering],
 ];
 
 async function runBrowserTests() {

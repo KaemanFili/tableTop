@@ -28,7 +28,8 @@ func Guard(next http.Handler) http.Handler {
 				return
 			}
 		}
-		if r.Method == http.MethodPost && (strings.HasSuffix(r.URL.Path, "/unit-library") || strings.HasSuffix(r.URL.Path, "/map-library")) {
+		copyUpload := strings.HasSuffix(r.URL.Path, "/copy") && (strings.Contains(r.URL.Path, "/unit-library/") || strings.Contains(r.URL.Path, "/map-library/"))
+		if r.Method == http.MethodPost && (copyUpload || strings.HasSuffix(r.URL.Path, "/unit-library") || strings.HasSuffix(r.URL.Path, "/map-library")) {
 			select {
 			case uploads <- struct{}{}:
 				defer func() { <-uploads }()

@@ -1,7 +1,9 @@
 package handlers
 
 import (
+	"errors"
 	"net/http"
+	"os"
 	"path/filepath"
 
 	"tableTop/main/internal/app"
@@ -16,6 +18,14 @@ var unitImages = map[string]string{
 }
 
 func (h *EndpointHandler) unitImage(w http.ResponseWriter, r *http.Request) {
+	if data, err := h.library.PluginArtwork(r.PathValue("id")); err == nil {
+		w.Header().Set("Content-Type", "image/png")
+		w.Write(data)
+		return
+	} else if !errors.Is(err, os.ErrNotExist) {
+		http.Error(w, "The plugin image is unavailable.", http.StatusServiceUnavailable)
+		return
+	}
 	path, exists := unitImages[r.PathValue("id")]
 	if exists {
 		path = filepath.Join(h.assetRoot, path)

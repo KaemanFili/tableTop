@@ -1,25 +1,50 @@
 {{ define "map-picker" }}
+<div class="library-browser" data-library-search="maps">
 <div class="spawn-menu-heading">
     <h2>Load Map</h2>
     <button type="button" data-close-map-editor>Cancel</button>
 </div>
 <p>Choose a saved map to replace the current board.</p>
+<label class="library-search" for="map-library-search">Search maps
+    <input id="map-library-search" type="search" data-library-search-input placeholder="Search map names…" aria-describedby="map-search-results" autocomplete="off">
+</label>
+<p id="map-search-results" class="library-search-results" data-library-search-results role="status" aria-live="polite"></p>
+<p data-library-search-empty hidden>No maps match your search.</p>
 <p id="map-picker-error" class="menu-error" role="alert" hidden></p>
-<div class="saved-map-list">
-{{ range . }}
-    <div class="library-entry">
+<details class="library-content-group" data-library-group data-library-owned open>
+    <summary>Your maps <span class="unit-count" data-library-count>{{ len .Owned }}</span></summary>
+    <div class="saved-map-list">
+        {{ range .Owned }}{{ template "library-map" . }}{{ else }}<p>No maps created yet. Use Create New Map to add one.</p>{{ end }}
+    </div>
+</details>
+{{ if .Defaults }}
+<details class="library-content-group" data-library-group data-library-defaults>
+    <summary>Defaults <span class="unit-count" data-library-count>{{ len .Defaults }}</span></summary>
+    <div class="saved-map-list">
+        {{ range .Defaults }}{{ template "library-map" . }}{{ end }}
+    </div>
+</details>
+{{ end }}
+</div>
+{{ end }}
+
+{{ define "library-map" }}
+    <div class="library-entry" data-library-name="{{.Name}}">
     <button type="button" class="saved-map" data-load-map hx-post="{{ boardPrefix }}/map-library/{{ .ID }}/load?gm=true"
         hx-target="#map-editor" hx-swap="innerHTML" hx-disabled-elt="#map-editor [data-load-map]">
         <img src="{{ boardPrefix }}/maps/images/{{ .ID }}" alt="" loading="lazy">
         <span>{{ .Name }}{{ if not .HasSavedBoard }}<small>Image only</small>{{ end }}</span>
     </button>
+    {{if .ReadOnly}}
+    <small>Plugin default</small>
+    <form hx-post="{{boardPrefix}}/map-library/{{.ID}}/copy?gm=true" hx-target="#map-editor" hx-swap="innerHTML">
+      <label>Copy name<input name="name" value="{{.Name}}" maxlength="80" required></label><button>Create copy</button>
+    </form>
+    {{else}}
     <button type="button" class="library-delete" data-delete-map aria-label="Delete {{ .Name }} permanently"
         hx-delete="{{ boardPrefix }}/map-library/{{ .ID }}?gm=true" hx-target="#map-editor" hx-swap="innerHTML"
         hx-confirm="Permanently delete {{ .Name }} and its saved board? If active, its background will be removed for everyone. This cannot be undone."
         hx-disabled-elt="#map-editor button">Delete</button>
+    {{end}}
     </div>
-{{ else }}
-    <p>No saved maps yet. Use Create New Map to add one.</p>
-{{ end }}
-</div>
 {{ end }}

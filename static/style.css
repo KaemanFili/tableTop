@@ -12,6 +12,18 @@ body, html {
   justify-content: center;
 }
 
+#board-space {
+  width: max-content;
+  padding: 50vh 50vw;
+  background-color: darkgray;
+}
+
+#board-world {
+  position: relative;
+  width: calc(var(--cell-size) * 64);
+  height: calc(var(--cell-size) * 64);
+}
+
 .grid-wrapper {
   position: relative;
   display: inline-block;
@@ -44,7 +56,8 @@ body, html {
   gap: 0.65rem;
 }
 
-#create-map-form input:not([type="checkbox"]) {
+#create-map-form input:not([type="checkbox"]),
+.saved-map-list > .library-entry > form input {
   width: 100%;
   box-sizing: border-box;
   padding: 0.5rem;
@@ -222,8 +235,8 @@ body.map-panning * {
   position: absolute;
   top: 0;
   left: 0;
-  width: 100vw;
-  height: 100vh;
+  width: 100%;
+  height: 100%;
   pointer-events: none; /* allow clicks to pass through if needed */
   z-index: 10;
 }
@@ -515,6 +528,7 @@ body.map-panning * {
 }
 
 .saved-map img {
+  flex-shrink: 0;
   width: 64px;
   height: 48px;
   object-fit: contain;
@@ -522,6 +536,11 @@ body.map-panning * {
 
 .saved-map small {
   display: block;
+}
+
+.saved-map > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 #pen-settings label,
@@ -607,15 +626,56 @@ body.map-panning * {
   gap: 0.75rem;
 }
 
-.unit-library-group {
+.unit-library-group,
+.library-content-group {
   border: 1px solid #484848;
   border-radius: 6px;
 }
 
-.unit-library-group summary {
+.library-browser {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.library-search {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.875rem;
+}
+
+.library-search input {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 0.6rem;
+  border: 1px solid #666;
+  border-radius: 4px;
+  background: #303030;
+  color: white;
+  font: inherit;
+}
+
+.unit-library-group > summary,
+.library-content-group > summary {
   padding: 0.75rem;
   cursor: pointer;
   font-weight: 600;
+}
+
+.library-content-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0 0.5rem 0.5rem;
+}
+
+.library-content-group > summary {
+  font-size: 0.875rem;
+}
+
+.library-content-group > .saved-map-list {
+  padding: 0 0.5rem 0.5rem;
 }
 
 .unit-count {
@@ -708,6 +768,7 @@ body.map-panning * {
 }
 
 .spawn-action {
+  flex-shrink: 0;
   color: #fbbf24;
   font-size: 0.8rem;
 }
@@ -869,6 +930,46 @@ body.map-panning * {
   flex: 1;
   min-width: 0;
 }
+
+.unit-library-list > .library-entry,
+.saved-map-list > .library-entry {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.unit-library-list > .library-entry > .library-unit,
+.saved-map-list > .library-entry > .saved-map {
+  grid-column: 1 / -1;
+  box-sizing: border-box;
+}
+
+.unit-library-list > .library-entry > button:not(.library-unit),
+.saved-map-list > .library-entry > .library-delete {
+  grid-column: 2;
+}
+
+.saved-map-list > .library-entry > form {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: end;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.saved-map-list > .library-entry > form > label {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  gap: 4px;
+}
+
+.saved-map-list > .library-entry > form input {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+}
+
 #ui-overlay .library-delete {
   align-self: stretch;
   display: flex;
@@ -886,6 +987,10 @@ body.map-panning * {
 #ui-overlay .library-delete:focus-visible {
   outline: 2px solid #fbbf24;
   outline-offset: 2px;
+}
+
+[data-library-search] [hidden] {
+  display: none;
 }
 
 

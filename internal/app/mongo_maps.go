@@ -44,8 +44,11 @@ func (c *mongoMapStore) List() ([]MapDefinition, bool, error) {
 	result := []MapDefinition{}
 	for cursor.Next(ctx) {
 		var doc struct {
-			mongoDocument[MapDefinition] `bson:",inline"`
-			Has                          bool `bson:"hasSavedBoard"`
+			Key        string        `bson:"_id"`
+			Scope      string        `bson:"scope"`
+			Version    int           `bson:"schemaVersion"`
+			Definition MapDefinition `bson:"definition"`
+			Has        bool          `bson:"hasSavedBoard"`
 		}
 		if err := cursor.Decode(&doc); err != nil {
 			return nil, false, err

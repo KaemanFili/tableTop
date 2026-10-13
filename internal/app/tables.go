@@ -14,14 +14,13 @@ import (
 )
 
 type TableDefinition struct {
-	ID             string   `json:"id"`
-	Name           string   `json:"name"`
-	OwnerID        string   `json:"ownerID"`
-	Members        []string `json:"members"`
-	PluginID       string   `json:"pluginID,omitempty"`
-	PluginVersion  int      `json:"pluginVersion,omitempty"`
-	Initialization string   `json:"initialization,omitempty"`
-	Deleting       bool     `json:"deleting,omitempty"`
+	ID             string         `json:"id"`
+	Name           string         `json:"name"`
+	OwnerID        string         `json:"ownerID"`
+	Members        []string       `json:"members"`
+	PluginBinding  *PluginBinding `json:"pluginBinding,omitempty"`
+	Initialization string         `json:"initialization,omitempty"`
+	Deleting       bool           `json:"deleting,omitempty"`
 }
 
 func (table TableDefinition) HasMember(id string) bool { return slices.Contains(table.Members, id) }
@@ -88,11 +87,11 @@ func (library *TableLibrary) ForUser(id string) []TableDefinition {
 func (library *TableLibrary) Create(name, owner string) (TableDefinition, error) {
 	return library.create(name, owner, TableDefinition{ID: rand.Text()})
 }
-func (library *TableLibrary) CreatePrepared(name, owner, id, plugin string, version int) (TableDefinition, error) {
-	if !tableIDPattern.MatchString(id) || plugin == "" || version < 1 {
-		return TableDefinition{}, errors.New("invalid prepared session")
+func (library *TableLibrary) CreateBound(name, owner string, binding PluginBinding) (TableDefinition, error) {
+	if binding.PluginID == "" || binding.Version < 1 || len(binding.Fingerprint) != 64 {
+		return TableDefinition{}, errors.New("invalid plugin binding")
 	}
-	return library.create(name, owner, TableDefinition{ID: id, PluginID: plugin, PluginVersion: version, Initialization: "maps"})
+	return library.create(name, owner, TableDefinition{ID: rand.Text(), PluginBinding: &binding, Initialization: "owned"})
 }
 func (library *TableLibrary) create(name, owner string, prepared TableDefinition) (TableDefinition, error) {
 	name = strings.TrimSpace(name)
@@ -221,8 +220,8 @@ func RemoveTableFiles(dir, id string, limits *StorageLimits) error {
 	return os.RemoveAll(filepath.Join(dir, "sessions", id))
 }
 
-// AdvanceInitialization persists a checkpoint only after the step succeeds.
-func (library *TableLibrary) AdvanceInitialization(id, expected, next string) error {
+// FinishInitialization exposes the session only after its owned persistence exists.
+func (library *TableLibrary) FinishInitialization(id string) error {
 	library.mu.Lock()
 	defer library.mu.Unlock()
 	library.limits.lock()
@@ -231,14 +230,11 @@ func (library *TableLibrary) AdvanceInitialization(id, expected, next string) er
 		if t.ID != id {
 			continue
 		}
-		if t.Deleting || t.Initialization != expected {
-			return errors.New("session initialization changed")
-		}
-		if !((expected == "maps" && next == "statuses") || (expected == "statuses" && next == "units") || (expected == "units" && next == "")) {
-			return errors.New("invalid initialization transition")
+		if t.Deleting || t.Initialization != "owned" {
+			return errors.New("session is unavailable")
 		}
 		proposed := slices.Clone(library.tables)
-		proposed[i].Initialization = next
+		proposed[i].Initialization = ""
 		if err := writeJSONFile(library.path, proposed, library.limits); err != nil {
 			return err
 		}
@@ -246,27 +242,4 @@ func (library *TableLibrary) AdvanceInitialization(id, expected, next string) er
 		return nil
 	}
 	return ErrTableNotFound
-}
-func (library *TableLibrary) MigrateLegacyProvenance() error {
-	library.mu.Lock()
-	defer library.mu.Unlock()
-	library.limits.lock()
-	defer library.limits.unlock()
-	proposed := slices.Clone(library.tables)
-	changed := false
-	for i := range proposed {
-		if proposed[i].PluginID == "" {
-			proposed[i].PluginID = "builtin"
-			proposed[i].PluginVersion = 1
-			changed = true
-		}
-	}
-	if !changed {
-		return nil
-	}
-	if err := writeJSONFile(library.path, proposed, library.limits); err != nil {
-		return err
-	}
-	library.tables = proposed
-	return nil
 }

@@ -3,101 +3,57 @@ package plugins
 import (
 	"encoding/json"
 	"errors"
-	"io/fs"
 	"os"
 	"path/filepath"
 
 	"tableTop/main/internal/app"
-	bundled "tableTop/main/plugins"
 )
 
-// InitializeDevelopment installs the bundled pack once for a fresh standalone
-// board. Existing libraries (including empty initialized ones) are preserved.
-func InitializeDevelopment(dir string, store app.LibraryStore, limits *app.StorageLimits) error {
-	progressPath := filepath.Join(dir, ".plugin", "progress.json")
-	data, err := os.ReadFile(progressPath)
-	step := "maps"
+func Development(dir, assets string, store app.LibraryStore, limits *app.StorageLimits) (*Pack, error) {
+	bounds, err := BoundsFromEnvironment()
+	if err != nil {
+		return nil, err
+	}
+	dirs := Directories(assets)
+	binding, err := developmentBinding(dir, dirs, bounds, limits)
+	if err != nil {
+		return nil, err
+	}
+	defaults, err := Resolve(dirs, bounds, binding)
+	if err != nil {
+		return nil, err
+	}
+	if err := app.InitializeOwned(dir, "dev", store, limits); err != nil {
+		return nil, err
+	}
+	return defaults, nil
+}
+
+func developmentBinding(dir string, dirs []string, bounds Bounds, limits *app.StorageLimits) (app.PluginBinding, error) {
+	path := filepath.Join(dir, "plugin-binding.json")
+	data, err := os.ReadFile(path)
 	if err == nil {
-		if err := json.Unmarshal(data, &step); err != nil {
-			return err
-		}
-	} else {
-		if !errors.Is(err, os.ErrNotExist) {
-			return err
-		}
-		for _, file := range []string{"maps.json", "units.json", "statuses.json"} {
-			if _, err := os.Stat(filepath.Join(dir, file)); err == nil {
-				return nil
-			} else if !errors.Is(err, os.ErrNotExist) {
-				return err
-			}
-		}
-		if store != nil {
-			var initialized bool
-			if lazy, ok := store.Maps("dev").(app.MapDocumentStore); ok {
-				_, initialized, err = lazy.List()
-			} else {
-				_, initialized, err = store.Maps("dev").Load()
-			}
-			if err != nil {
-				return err
-			}
-			if initialized {
-				return nil
-			}
-			_, initialized, err = store.Units("dev").Load()
-			if err != nil {
-				return err
-			}
-			if initialized {
-				return nil
-			}
-		}
-		files, _ := fs.Sub(bundled.Builtin, "builtin")
-		bounds, err := BoundsFromEnvironment()
-		if err != nil {
-			return err
-		}
-		pack, err := openPack(files, "", bounds)
-		if err != nil {
-			return err
-		}
-		for _, sub := range []string{filepath.Join(".plugin", "maps"), "maps", "images"} {
-			if err := os.MkdirAll(filepath.Join(dir, sub), 0755); err != nil {
-				return err
-			}
-		}
-		if err := pack.process("dev", func(path string, data []byte) error {
-			return app.WriteContentFile(filepath.Join(dir, path), data, limits)
-		}); err != nil {
-			return err
-		}
-		if err := app.WriteContentJSON(progressPath, step, limits); err != nil {
-			return err
+		var binding app.PluginBinding
+		err := json.Unmarshal(data, &binding)
+		return binding, err
+	}
+	if !errors.Is(err, os.ErrNotExist) {
+		return app.PluginBinding{}, err
+	}
+	binding, err := builtinBinding(dirs, bounds)
+	if err != nil {
+		return binding, err
+	}
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return binding, err
+	}
+	return binding, app.WriteContentJSON(path, binding, limits)
+}
+func builtinBinding(dirs []string, bounds Bounds) (app.PluginBinding, error) {
+	for _, pack := range Discover(dirs, bounds) {
+		if pack.ID == "builtin" && pack.Version == 1 {
+			return pack.Binding(), nil
 		}
 	}
-	for step != "" {
-		var next string
-		var err error
-		switch step {
-		case "maps":
-			err = InitializeMaps(dir, "dev", store, limits)
-			next = "statuses"
-		case "statuses":
-			err = InitializeStatuses(dir, "dev", store, limits)
-			next = "units"
-		case "units":
-			err = InitializeUnits(dir, "dev", store, limits)
-		default:
-			return errors.New("invalid development initialization step")
-		}
-		if err != nil {
-			return err
-		}
-		if err := app.WriteContentJSON(progressPath, next, limits); err != nil {
-			return err
-		}
-		step = next
-	}
-	return os.RemoveAll(filepath.Join(dir, ".plugin"))
+	return app.PluginBinding{}, errors.New("built-in plugin unavailable")
 }

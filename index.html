@@ -5,7 +5,7 @@
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>VTT</title>
         <script src="/static/vendor/htmx-2.0.11.min.js"></script>
-        <link rel="stylesheet" href="/static/style.css?v=42">
+        <link rel="stylesheet" href="/static/style.css?v=47">
     </head>
     <body data-gm="{{ .IsGM }}" data-session-prefix="{{ boardPrefix }}">
         <div
@@ -123,15 +123,19 @@
             </article>
         </template>
         <div id="dice-layer" aria-hidden="true"></div>
-        <div class="grid-wrapper">
-            <img id="map-layer" alt="" draggable="false" hidden>
-            <svg id="drawing-layer" viewBox="0 0 64 64" preserveAspectRatio="none" aria-hidden="true" focusable="false"></svg>
-            <div id = "grid-container" class="grid"></div>
-            <div id="ping-layer" aria-hidden="true"></div>
-            <div id="ruler-layer"></div>
-            <canvas id="fog-layer" width="2560" height="2560" aria-hidden="true"></canvas>
+        <div id="board-space">
+            <div id="board-world">
+                <div class="grid-wrapper">
+                    <img id="map-layer" alt="" draggable="false" hidden>
+                    <svg id="drawing-layer" viewBox="0 0 64 64" preserveAspectRatio="none" aria-hidden="true" focusable="false"></svg>
+                    <div id = "grid-container" class="grid"></div>
+                    <div id="ping-layer" aria-hidden="true"></div>
+                    <div id="ruler-layer"></div>
+                    <canvas id="fog-layer" width="2560" height="2560" aria-hidden="true"></canvas>
+                </div>
+                <div id="unitOverlay" class="unitOverlay"></div>
+            </div>
         </div>
-        <div id="unitOverlay" class="unitOverlay"></div>
         <div id="brush-cursor" aria-hidden="true" hidden></div>
         <div id="token-menu" class="token-menu" role="group" aria-label="Unit actions" hidden>
             <button type="button" id="toggle-token-statuses" aria-expanded="false" aria-controls="token-statuses">Status</button>
@@ -167,5 +171,7 @@
         <script src="/static/dice.js?v=8"></script>
         <script src="/static/mapEditor.js?v=2"></script>
         <script src="/static/imageFit.js?v=3"></script>
+        <script src="/static/librarySearch.js?v=2"></script>
+        <script src="/static/boardView.js?v=2"></script>
     </body>
 </html>

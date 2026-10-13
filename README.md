@@ -118,6 +118,18 @@ copies available. `DELETE /unit/{id}` removes a placed token; repeating it succe
 The base menu shows one **Spawn unit** button. It opens a library with independently
 collapsible PC and NPC lists. Each entry shows a name and image; selecting it
 spawns a copy on the tabletop. Knight (PC) and Goblin (NPC) are included initially.
+Each list separates **Your units** from a collapsed **Defaults** dropdown. The
+map library similarly separates **Your maps** and **Defaults**. Owned copies
+appear with your content; searching opens any matching dropdowns.
+
+**Search units** and **Search maps** filter their libraries as you type. Searches
+match names without regard to case or accents; multiple words can appear in any
+order. Result counts update immediately, and clearing the search restores the
+full list. Search text is kept when copying or deleting refreshes a menu.
+
+Loading a map or reopening a board centers the map in each viewer's screen.
+Panning stays local to that viewer, and updates or saves of the same background
+preserve their view. Maps, tokens, and drawings keep their shared board coordinates.
 
 Open `http://localhost:18080/?gm=true` to show the **GM** button below the utilities.
 GM fog controls appear beneath it. Click **GM** to hide or show its map and fog
@@ -243,10 +255,10 @@ opens the library, `/spawn-menu` closes it, and `/unit-library/new` opens the fo
 `POST /unit-library` saves a definition; `POST /unit?unitID=...` spawns a copy.
 Spawning requires POST; GET, HEAD, and other methods return 405 without changing
 the board.
-Each library entry has a **Delete** button with a permanent-deletion confirmation.
+Owned library entries have a **Delete** button with a permanent-deletion confirmation.
+Plugin defaults are read-only and offer **Create copy**.
 `DELETE /unit-library/{id}` removes its definition across restarts, including
-starter units. Existing placed copies and saved boards keep their artwork.
-Older unit libraries migrate automatically when the library is next changed.
+owned copies. Existing placed copies and saved boards keep their artwork.
 Outside clicks, Escape, and successful spawning close the library. The creation
 form stays open on outside clicks so choosing an image or interacting with the
 board does not accidentally discard input; use Cancel, Back, or the main toggle
@@ -256,8 +268,9 @@ to leave it. Form errors preserve the name, type, size, and image framing; an im
 
 [MongoDB storage](docs/mongodb.md) stores map and unit definitions as documents,
 embeds each saved board in its map, and reads status names and colors from a
-status document. Compose enables it by default; for a host process, set
-`TABLETOP_MONGODB_URI` to enable it. Existing JSON libraries import on first use.
+status additions document. Plugin defaults are read directly from retained
+version folders. Compose enables MongoDB by default; for a host process, set
+`TABLETOP_MONGODB_URI` to enable it. New tabletops initialize empty owned libraries.
 Artwork stays in the data directory. The following file-storage details apply
 when MongoDB is not configured.
 
@@ -312,5 +325,6 @@ Sizes persist with the library and are retained when tokens move or reload.
   referenced documents or bounded batches if board limits increase; see
   [MongoDB storage](docs/mongodb.md).
 
-The proposed [content plugin system](spec/plugin-system-spec.md) describes choosing
-one plugin when creating a tabletop to supply its default maps, units, and statuses.
+Choose one installed plugin version when creating a tabletop. Its defaults stay
+read-only; tabletop additions and copies are persisted separately. See
+[plugin deployment](docs/plugins.md) and the [plugin spec](spec/plugin-system-spec.md).

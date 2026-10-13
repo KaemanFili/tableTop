@@ -52,7 +52,7 @@ type testSession struct{ path, id string }
 
 func (f tableTestFixture) createSession(t *testing.T, client *http.Client, name string) testSession {
 	t.Helper()
-	response, _ := f.request(client, "POST", "/sessions", url.Values{"name": {name}, "plugin": {"builtin"}}.Encode(), http.StatusSeeOther)
+	response, _ := f.request(client, "POST", "/sessions", url.Values{"name": {name}, "plugin": {"builtin/1"}}.Encode(), http.StatusSeeOther)
 	path := response.Header.Get("Location")
 	return testSession{path, strings.Split(path, "/")[2]}
 }

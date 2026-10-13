@@ -392,8 +392,8 @@ func TestMongoMapWriteFailurePreservesSavedBoard(t *testing.T) {
 		t.Fatal("failed deletion reported success")
 	}
 	entries := maps.Maps()
-	if len(entries) != 1 || !reflect.DeepEqual(entries[0].Board, &f.board) {
-		t.Fatal("failed write changed in-memory saved board")
+	if len(entries) != 1 || entries[0].Board != nil || !entries[0].HasSavedBoard {
+		t.Fatal("failed write changed saved-board metadata")
 	}
 	if _, exists := maps.MapByID(f.definition.ID); exists {
 		t.Fatal("unconfirmed deletion remained loadable")
@@ -411,58 +411,35 @@ func TestMongoMapWriteFailurePreservesSavedBoard(t *testing.T) {
 	}
 }
 
-func TestMongoSessionStatusesSeedOnce(t *testing.T) {
+func TestMongoStatusAdditionsSeedEmptyAndStayIsolated(t *testing.T) {
 	store := testMongoStore(t)
-	custom := []UnitStatusOption{{Value: "Marked", Color: "#123456"}}
-	if err := store.InitializeStatuses("first", custom); err != nil {
-		t.Fatal(err)
+	values, err := store.LoadStatusAdditions("first")
+	if err != nil || len(values) != 0 {
+		t.Fatalf("additions not initialized empty: %v", err)
 	}
-	if err := store.InitializeStatuses("first", defaultUnitStatuses()); err != nil {
-		t.Fatal(err)
-	}
-	got, err := store.LoadStatuses("first", defaultUnitStatuses())
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !reflect.DeepEqual(got, custom) {
-		t.Fatal("retry replaced statuses")
-	}
-	other, err := store.LoadStatuses("second", defaultUnitStatuses())
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !reflect.DeepEqual(other, defaultUnitStatuses()) {
-		t.Fatal("status definitions crossed scopes")
-	}
-}
-func TestMongoLegacyStatusesCopiedOnce(t *testing.T) {
-	store := testMongoStore(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	custom := []UnitStatusOption{{Value: "Marked", Color: "#123456"}}
-	if _, err := store.db.Collection("settings").InsertOne(ctx, statusDocument{"unit_statuses", 1, custom}); err != nil {
+	if _, err := store.db.Collection("settings").UpdateOne(ctx, bson.M{"_id": "unit_statuses/first"}, bson.M{"$set": bson.M{"options": custom}}); err != nil {
 		t.Fatal(err)
 	}
-	got, err := store.LoadStatuses("first", defaultUnitStatuses())
-	if err != nil || !reflect.DeepEqual(got, custom) {
-		t.Fatalf("legacy migration: %v", err)
+	values, err = store.LoadStatusAdditions("first")
+	if err != nil || !reflect.DeepEqual(values, custom) {
+		t.Fatalf("additions overwritten: %v", err)
 	}
-	if _, err := store.db.Collection("settings").UpdateOne(ctx, bson.M{"_id": "unit_statuses"}, bson.M{"$set": bson.M{"options": defaultUnitStatuses()}}); err != nil {
-		t.Fatal(err)
-	}
-	got, err = store.LoadStatuses("first", defaultUnitStatuses())
-	if err != nil || !reflect.DeepEqual(got, custom) {
-		t.Fatalf("legacy statuses overwritten: %v", err)
+	other, err := store.LoadStatusAdditions("second")
+	if err != nil || len(other) != 0 {
+		t.Fatalf("additions crossed scopes: %v", err)
 	}
 }
-func TestMongoInvalidSessionStatusesRejected(t *testing.T) {
+func TestMongoInvalidStatusAdditionsRejected(t *testing.T) {
 	store := testMongoStore(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	if _, err := store.db.Collection("settings").InsertOne(ctx, statusDocument{"unit_statuses/first", 1, []UnitStatusOption{{Value: "Marked", Color: "invalid"}}}); err != nil {
+	if _, err := store.db.Collection("settings").InsertOne(ctx, statusDocument{"unit_statuses/first", 2, []UnitStatusOption{{Value: "Marked", Color: "invalid"}}}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := store.LoadStatuses("first", defaultUnitStatuses()); err == nil {
-		t.Fatal("invalid stored statuses accepted")
+	if _, err := store.LoadStatusAdditions("first"); err == nil {
+		t.Fatal("invalid additions accepted")
 	}
 }

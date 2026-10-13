@@ -1,0 +1,66 @@
+[
+  {
+    "value": "Blinded",
+    "color": "#64748B"
+  },
+  {
+    "value": "Charmed",
+    "color": "#EC4899"
+  },
+  {
+    "value": "Deafened",
+    "color": "#5F9EA0"
+  },
+  {
+    "value": "Exhaustion",
+    "color": "#C2410C"
+  },
+  {
+    "value": "Frightened",
+    "color": "#9333EA"
+  },
+  {
+    "value": "Grappled",
+    "color": "#F59E0B"
+  },
+  {
+    "value": "Incapacitated",
+    "color": "#DC2626"
+  },
+  {
+    "value": "Invisible",
+    "color": "#22D3EE"
+  },
+  {
+    "value": "Paralyzed",
+    "color": "#991B1B"
+  },
+  {
+    "value": "Petrified",
+    "color": "#78716C"
+  },
+  {
+    "value": "Poisoned",
+    "color": "#65A30D"
+  },
+  {
+    "value": "Prone",
+    "color": "#EAB308"
+  },
+  {
+    "value": "Restrained",
+    "color": "#D97706"
+  },
+  {
+    "value": "Stunned",
+    "color": "#D946EF"
+  },
+  {
+    "value": "Unconscious",
+    "color": "#7F1D1D"
+  },
+  {
+    "value": "Dead",
+    "color": "#450A0A"
+  }
+]

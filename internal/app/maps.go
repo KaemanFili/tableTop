@@ -15,15 +15,17 @@ import (
 )
 
 type MapDefinition struct {
-	ID            string         `json:"id" bson:"id"`
-	Name          string         `json:"name" bson:"name"`
-	Width         float64        `json:"width" bson:"width"`
-	Height        float64        `json:"height" bson:"height"`
-	OffsetX       float64        `json:"offsetX" bson:"offsetX"`
-	OffsetY       float64        `json:"offsetY" bson:"offsetY"`
-	HasSavedBoard bool           `json:"-" bson:"-"`
-	Source        *ContentSource `json:"source,omitempty" bson:"source,omitempty"`
-	Board         *SavedBoard    `json:"board,omitempty" bson:"board,omitempty"`
+	ReadOnly      bool              `json:"-" bson:"-"`
+	Artwork       *ArtworkReference `json:"artwork,omitempty" bson:"artwork,omitempty"`
+	ID            string            `json:"id" bson:"id"`
+	Name          string            `json:"name" bson:"name"`
+	Width         float64           `json:"width" bson:"width"`
+	Height        float64           `json:"height" bson:"height"`
+	OffsetX       float64           `json:"offsetX" bson:"offsetX"`
+	OffsetY       float64           `json:"offsetY" bson:"offsetY"`
+	HasSavedBoard bool              `json:"-" bson:"-"`
+	Source        *ContentSource    `json:"source,omitempty" bson:"source,omitempty"`
+	Board         *SavedBoard       `json:"board,omitempty" bson:"board,omitempty"`
 }
 
 func (m MapDefinition) Validate() error {
@@ -50,6 +52,7 @@ type MapLibrary struct {
 	limits         *StorageLimits
 	store          DocumentStore[MapDefinition]
 	pendingDeletes map[string]bool
+	defaults       PluginDefaults
 }
 
 func NewMapLibrary(dir string, limits ...*StorageLimits) (*MapLibrary, error) {
@@ -128,8 +131,10 @@ func (l *MapLibrary) MetadataByID(id string) (MapDefinition, bool) {
 	if l.pendingDeletes[id] {
 		return MapDefinition{}, false
 	}
-	m, ok := l.maps[id]
-	return m, ok
+	if definition, owned := l.maps[id]; owned {
+		return definition, true
+	}
+	return l.defaultMapByID(id)
 }
 
 // MapByID is retained for callers that need a full saved document.
@@ -145,8 +150,11 @@ func (l *MapLibrary) MapByID(id string) (MapDefinition, bool) {
 func (l *MapLibrary) LoadMap(id string) (MapDefinition, error) {
 	l.mutex.RLock()
 	defer l.mutex.RUnlock()
-	if _, ok := l.maps[id]; !ok || l.pendingDeletes[id] {
+	if l.pendingDeletes[id] {
 		return MapDefinition{}, os.ErrNotExist
+	}
+	if _, ok := l.maps[id]; !ok && l.defaults != nil {
+		return l.defaults.LoadMap(id)
 	}
 	return l.readMap(id)
 }
@@ -204,6 +212,9 @@ func (l *MapLibrary) Maps() []MapDefinition {
 	l.mutex.RLock()
 	defer l.mutex.RUnlock()
 	maps := make([]MapDefinition, 0, len(l.maps))
+	if l.defaults != nil {
+		maps = append(maps, l.defaults.Maps()...)
+	}
 	for _, definition := range l.maps {
 		maps = append(maps, definition)
 	}
@@ -226,7 +237,7 @@ func (l *MapLibrary) SaveBoard(definition MapDefinition, board SavedBoard) error
 		return errors.New("map deletion is not confirmed; retry deleting the map before saving")
 	}
 	if _, exists := l.maps[definition.ID]; !exists {
-		return errors.New("map is not in the library")
+		return ErrReadOnly
 	}
 	if err := definition.Validate(); err != nil {
 		return err
@@ -234,7 +245,8 @@ func (l *MapLibrary) SaveBoard(definition MapDefinition, board SavedBoard) error
 	if !board.WithinLimits() {
 		return ErrCapacity
 	}
-	if _, err := os.Stat(filepath.Join(l.dir, "maps", definition.ID+".png")); err != nil {
+	definition.Artwork = l.maps[definition.ID].Artwork
+	if _, _, err := l.mapArtwork(l.maps[definition.ID]); err != nil {
 		return err
 	}
 	// JSON copying separates saved data from mutable live drawing slices.
@@ -261,9 +273,17 @@ func (l *MapLibrary) Create(definition MapDefinition, pngImage []byte) (MapDefin
 	if err := definition.Validate(); err != nil {
 		return MapDefinition{}, err
 	}
-	if len(pngImage) == 0 {
+	if len(pngImage) == 0 && definition.Artwork == nil {
 		return MapDefinition{}, errors.New("Choose a map image.")
 	}
+	if len(pngImage) == 0 {
+		if _, err := pluginImage(l.defaults, definition.Artwork); err != nil {
+			return MapDefinition{}, err
+		}
+	} else {
+		definition.Artwork = nil
+	}
+	definition.ReadOnly = false
 	l.mutex.Lock()
 	defer l.mutex.Unlock()
 	l.limits.lock()
@@ -274,8 +294,10 @@ func (l *MapLibrary) Create(definition MapDefinition, pngImage []byte) (MapDefin
 	}
 	definition.ID = hex.EncodeToString(id[:])
 	imagePath := filepath.Join(l.dir, "maps", definition.ID+".png")
-	if err := writeStorageFile(imagePath, pngImage, 0644, l.limits); err != nil {
-		return MapDefinition{}, err
+	if len(pngImage) > 0 {
+		if err := writeStorageFile(imagePath, pngImage, 0644, l.limits); err != nil {
+			return MapDefinition{}, err
+		}
 	}
 	if err := l.save(definition); err != nil {
 		// A MongoDB timeout may follow a committed write; retain its artwork.
@@ -295,59 +317,84 @@ func (l *MapLibrary) save(definition MapDefinition) error {
 	return rewriteMapFile(filepath.Join(l.dir, "maps.json"), definition.ID, &definition, l.limits)
 }
 
-// Delete removes a saved map and its artwork, preserving the entry on failure.
+// Delete removes an owned map and artwork, restoring the full document on failure.
 func (l *MapLibrary) Delete(id string) error {
 	l.mutex.Lock()
 	defer l.mutex.Unlock()
+	if _, owned := l.maps[id]; !owned {
+		return l.defaultDeletionError(id)
+	}
 	l.limits.lock()
 	defer l.limits.unlock()
-	if _, exists := l.maps[id]; !exists {
-		return nil
-	}
 	original, readErr := l.readMap(id)
 	if readErr != nil && !errors.Is(readErr, os.ErrNotExist) {
 		return readErr
 	}
-	var err error
-	if l.store != nil {
-		err = deleteDocument(l.store, id)
-	} else {
-		err = rewriteMapFile(filepath.Join(l.dir, "maps.json"), id, nil, nil)
-	}
-	if err != nil {
-		if l.store != nil {
-			if l.pendingDeletes == nil {
-				l.pendingDeletes = make(map[string]bool)
-			}
-			l.pendingDeletes[id] = true
-		}
+	if err := l.persistMapDeletion(id); err != nil {
+		l.markUnconfirmedDelete(id)
 		return err
 	}
-	if err := os.Remove(filepath.Join(l.dir, "maps", id+".png")); err != nil && !errors.Is(err, os.ErrNotExist) {
-		if readErr != nil {
-			if l.pendingDeletes == nil {
-				l.pendingDeletes = make(map[string]bool)
-			}
-			l.pendingDeletes[id] = true
-			return err
-		}
-		// Restore the previous library even if limits were lowered below its
-		// existing size. This rollback does not grow usage beyond the original.
-		if l.store != nil {
-			rollbackErr := l.store.Put(original)
-			if rollbackErr != nil {
-				if l.pendingDeletes == nil {
-					l.pendingDeletes = make(map[string]bool)
-				}
-				l.pendingDeletes[id] = true
-			} else {
-				delete(l.pendingDeletes, id)
-			}
-			return errors.Join(err, rollbackErr)
-		}
-		return errors.Join(err, rewriteMapFile(filepath.Join(l.dir, "maps.json"), id, &original, nil))
+	if err := l.removeMapArtwork(id); err != nil {
+		return l.rollbackMapDeletion(id, original, readErr, err)
 	}
 	delete(l.maps, id)
 	delete(l.pendingDeletes, id)
 	return nil
+}
+func (l *MapLibrary) defaultMapByID(id string) (MapDefinition, bool) {
+	if l.defaults == nil {
+		return MapDefinition{}, false
+	}
+	return l.defaults.MetadataByID(id)
+}
+func (l *MapLibrary) defaultDeletionError(id string) error {
+	if _, exists := l.defaultMapByID(id); exists {
+		return ErrReadOnly
+	}
+	return nil
+}
+func (l *MapLibrary) persistMapDeletion(id string) error {
+	if l.store != nil {
+		return deleteDocument(l.store, id)
+	}
+	// Shrinking the library must remain possible when the quota is full.
+	return rewriteMapFile(filepath.Join(l.dir, "maps.json"), id, nil, nil)
+}
+func (l *MapLibrary) removeMapArtwork(id string) error {
+	err := os.Remove(filepath.Join(l.dir, "maps", id+".png"))
+	if errors.Is(err, os.ErrNotExist) {
+		return nil
+	}
+	return err
+}
+func (l *MapLibrary) rollbackMapDeletion(id string, original MapDefinition, readErr, removeErr error) error {
+	if readErr != nil {
+		l.markDeletePending(id)
+		return removeErr
+	}
+	return errors.Join(removeErr, l.restoreMap(original))
+}
+func (l *MapLibrary) restoreMap(original MapDefinition) error {
+	// Rollback restores existing data even after the host lowers storage quotas.
+	if l.store == nil {
+		return rewriteMapFile(filepath.Join(l.dir, "maps.json"), original.ID, &original, nil)
+	}
+	if err := l.store.Put(original); err != nil {
+		l.markDeletePending(original.ID)
+		return err
+	}
+	delete(l.pendingDeletes, original.ID)
+	return nil
+}
+func (l *MapLibrary) markUnconfirmedDelete(id string) {
+	if l.store == nil {
+		return
+	}
+	l.markDeletePending(id)
+}
+func (l *MapLibrary) markDeletePending(id string) {
+	if l.pendingDeletes == nil {
+		l.pendingDeletes = make(map[string]bool)
+	}
+	l.pendingDeletes[id] = true
 }

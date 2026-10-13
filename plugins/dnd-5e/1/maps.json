@@ -1,0 +1,101 @@
+[
+  {
+    "key": "field",
+    "name": "Open Field",
+    "image": "maps/field.png",
+    "width": 30,
+    "height": 30,
+    "offsetX": 0,
+    "offsetY": 0
+  },
+  {
+    "key": "desert",
+    "name": "Desert Oasis",
+    "image": "maps/desert.png",
+    "width": 30,
+    "height": 30,
+    "offsetX": 0,
+    "offsetY": 0
+  },
+  {
+    "key": "city-square",
+    "name": "City Square",
+    "image": "maps/city-square.png",
+    "width": 30,
+    "height": 30,
+    "offsetX": 0,
+    "offsetY": 0
+  },
+  {
+    "key": "mountain-region",
+    "name": "Mountain Pass",
+    "image": "maps/mountain-region.png",
+    "width": 30,
+    "height": 30,
+    "offsetX": 0,
+    "offsetY": 0
+  },
+  {
+    "key": "village-center",
+    "name": "Village Center",
+    "image": "maps/village-center.png",
+    "width": 30,
+    "height": 30,
+    "offsetX": 0,
+    "offsetY": 0
+  },
+  {
+    "key": "forest",
+    "name": "Forest Clearing",
+    "image": "maps/forest.png",
+    "width": 30,
+    "height": 30,
+    "offsetX": 0,
+    "offsetY": 0
+  },
+  {
+    "key": "river-crossing",
+    "name": "River Crossing",
+    "image": "maps/river-crossing.png",
+    "width": 30,
+    "height": 30,
+    "offsetX": 0,
+    "offsetY": 0
+  },
+  {
+    "key": "boat",
+    "name": "Sailing Boat",
+    "image": "maps/boat.png",
+    "width": 20,
+    "height": 20,
+    "offsetX": 0,
+    "offsetY": 0
+  },
+  {
+    "key": "wagon-road",
+    "name": "Road with a Wagon",
+    "image": "maps/wagon-road.png",
+    "width": 20,
+    "height": 20,
+    "offsetX": 0,
+    "offsetY": 0
+  },
+  {
+    "key": "ancient-ruins",
+    "name": "Ancient Ruins",
+    "image": "maps/ancient-ruins.png",
+    "width": 30,
+    "height": 30,
+    "offsetX": 0,
+    "offsetY": 0
+  },
+  {
+    "key": "rocky-outcropping",
+    "name": "Rocky Outcropping",
+    "image": "maps/rocky-outcropping.png",
+    "width": 30,
+    "height": 30,
+    "offsetX": 0,
+    "offsetY": 0
+  }
+]
