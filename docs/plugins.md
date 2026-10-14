@@ -65,7 +65,10 @@ ordered `{ "value": "Poisoned", "color": "#65A30D" }` definitions.
 
 Use only contained relative paths. PNG, JPEG, and GIF are accepted within the
 existing 4096 × 4096 image limit and 10 MiB map / 5 MiB unit byte limits. Responses
-normalize plugin artwork to PNG without writing copies. Default content files
+normalize JPEG/GIF artwork to PNG without writing copies; PNGs validated at load
+time are served directly after checking their content hash. Image requests check
+plugin metadata and the requested image, rather than scanning every portrait.
+Full plugin validation still checks all files. Default content files
 are bounded by `TABLETOP_PLUGIN_CONTENT_LIMIT_BYTES` (16 MiB by default), and the
 manifest by `TABLETOP_PLUGIN_METADATA_LIMIT_BYTES` (1 MiB). There are no map/unit
 count caps; existing board and status limits apply.
@@ -77,6 +80,11 @@ identity must match its folders. Different versions coexist; duplicate exact
 ID/version installations are unavailable. Discovery refreshes with the lobby.
 Decoded packs are cached in memory (up to 32 versions). Discovery still validates
 file identity before reuse; changed or removed files invalidate cached content.
+Static assets and board artwork can remain in the browser cache for one hour;
+artwork uses private caching, with content ETags for plugin images. This adds no in-memory artwork
+cache to the Go process. Cached session requests check metadata outside the shared sessions lock.
+The board's scripts download in parallel using `defer`,
+and its grid uses a tiled background instead of thousands of cell elements.
 For a possible shared Redis cache when running separate session processes, see
 [proposed session workers](session-workers.md).
 Never change a version's content after it has been used: tabletops pin its

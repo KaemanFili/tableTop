@@ -56,7 +56,6 @@
         root.querySelectorAll?.('[data-library-search]').forEach(initialize);
     }
 
-    document.addEventListener('htmx:afterSwap', () => initializeWithin(document));
     document.addEventListener('htmx:load', event => initializeWithin(event.detail.elt));
     initializeWithin(document);
 })();

@@ -1,6 +1,7 @@
 // Zoom the shared-coordinate board without scaling the fixed UI.
 const boardZoom = (() => {
     const world = document.getElementById('board-world');
+    const extent = document.getElementById('board-extent');
     const viewport = document.getElementById('board-viewport');
     const space = document.getElementById('board-space');
     const reset = document.getElementById('board-zoom-reset');
@@ -15,12 +16,24 @@ const boardZoom = (() => {
     const pinchThreshold = 10;
     const minimumPinchSpan = 80;
 
+    function updateExtent() {
+        const style = getComputedStyle(world);
+        const marginX = parseFloat(style.marginLeft) || 0;
+        const marginY = parseFloat(style.marginTop) || 0;
+        // Only this small spacer changes layout; the grid keeps its original size.
+        extent.style.width = `${(world.offsetWidth + marginX) * scale}px`;
+        extent.style.height = `${(world.offsetHeight + marginY) * scale}px`;
+        world.style.transform = `translate(${marginX * (scale - 1)}px, ${marginY * (scale - 1)}px) scale(${scale})`;
+    }
+    document.addEventListener('boardBoundsChanged', updateExtent);
+    updateExtent();
+
     function setScale(value, x = viewport.clientWidth / 2, y = viewport.clientHeight / 2, anchor = null) {
         const next = Math.max(0.25, Math.min(3, value));
         const before = world.getBoundingClientRect();
         const point = anchor || {x: (x - before.left) / scale, y: (y - before.top) / scale};
         scale = next;
-        world.style.zoom = scale;
+        updateExtent();
         const after = world.getBoundingClientRect();
         viewport.scrollTo({left: viewport.scrollLeft + after.left + point.x * scale - x,
             top: viewport.scrollTop + after.top + point.y * scale - y, behavior: 'instant'});
@@ -33,9 +46,23 @@ const boardZoom = (() => {
     reset.addEventListener('click', () => setScale(1));
     space.addEventListener('wheel', event => {
         event.preventDefault();
+        // Some mobile browsers emit wheel events alongside multi-touch gestures.
+        if (pointers.size || pinched) return;
         const delta = event.deltaY * (event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? window.innerHeight : 1);
         setScale(scale * Math.exp(-Math.max(-200, Math.min(200, delta)) * 0.003), event.clientX, event.clientY);
     }, {passive: false});
+
+    // Keep Safari's native page pinch separate from the board's pointer gesture.
+    for (const type of ['gesturestart', 'gesturechange', 'gestureend']) {
+        document.addEventListener(type, event => {
+            if (pointers.size || pinched || event.target.closest?.('#board-viewport')) event.preventDefault();
+        }, {passive: false, capture: true});
+    }
+    for (const type of ['touchstart', 'touchmove']) {
+        viewport.addEventListener(type, event => {
+            if (event.touches.length > 1) event.preventDefault();
+        }, {passive: false});
+    }
 
     function pair() {
         const [a, b] = [...pointers.values()];
@@ -51,13 +78,10 @@ const boardZoom = (() => {
         const adjusted = Math.sign(delta) * Math.max(0, Math.abs(delta) - pinchThreshold);
         const targetScale = pinch.zoomDistance === null ? pinch.scale :
             pinch.scale * Math.pow((pinch.zoomDistance + adjusted) / pinch.zoomDistance, pinchSensitivity);
-        const dx = next.x - pinch.x, dy = next.y - pinch.y;
-        const distance = Math.hypot(dx, dy);
-        const movement = distance > 6 ? (distance - 6) / distance : 0;
-        if (!pinch.changed && !adjusted && !movement) return;
+        if (!pinch.changed && !adjusted) return;
         pinch.changed = true;
-        // A fixed board anchor avoids drift from rebasing rounded scroll positions.
-        setScale(targetScale, pinch.x + dx * movement, pinch.y + dy * movement, pinch.anchor);
+        // Thumb drift changes span only; keep the initial board point stationary.
+        setScale(targetScale, pinch.x, pinch.y, pinch.anchor);
     }
     function flushPinch() {
         if (pinchFrame === null) return;
@@ -136,11 +160,8 @@ const boardZoom = (() => {
             clear();
         } else if (pointers.size === 1 && wasPinched) {
             pinch = null;
-            if (!document.body.dataset.tool) {
-                // Continue from the remaining finger, without a jump or a new press.
-                pinched = false;
-                startPan(pointers.keys().next().value, true);
-            }
+            pan = null;
+            // Keep the remaining thumb inert until both thumbs have lifted.
         } else if (!pointers.size) {
             pan = null; pinch = null; pinched = false;
         }
@@ -159,5 +180,5 @@ const boardZoom = (() => {
     }
     window.addEventListener('blur', clear);
     document.addEventListener('visibilitychange', () => { if (document.hidden) clear(); });
-    return {setScale, get scale() { return scale; }};
+    return {setScale, cancel: clear, get scale() { return scale; }};
 })();

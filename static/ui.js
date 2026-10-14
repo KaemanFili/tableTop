@@ -9,12 +9,101 @@
     const mapMenu = menuUI.popover(mapOptions, mapButton ? [mapButton] : []);
     const closeMapOptions = mapMenu.close;
 
+    const boardControls = document.getElementById('board-controls');
+    const toolsToggle = document.getElementById('mobile-tools-toggle');
+    const mobile = menuUI.mobile;
+    const account = document.getElementById('signed-in-user');
+    const accountSlot = document.createComment('account controls');
+    account?.before(accountSlot);
+    let toolsOpen = false;
+    function setToolsOpen(open) {
+        toolsOpen = open;
+        document.body.dataset.mobileTools = open ? 'open' : 'closed';
+        toolsToggle.setAttribute('aria-expanded', String(open));
+    }
+    function applyMobileLayout() {
+        setToolsOpen(false);
+        if (account) {
+            if (mobile.matches) controls.prepend(account);
+            else accountSlot.after(account);
+        }
+        if (mobile.matches && gmPanel) {
+            gmPanel.hidden = true;
+            gmButton.setAttribute('aria-expanded', 'false');
+            gmButton.setAttribute('aria-label', 'Show GM controls');
+            gmButton.title = 'Show GM controls';
+        }
+    }
+    applyMobileLayout();
+    mobile.addEventListener('change', applyMobileLayout);
+    toolsToggle.addEventListener('click', () => setToolsOpen(!toolsOpen));
+    document.addEventListener('toolChanged', () => {
+        if (mobile.matches) setToolsOpen(false);
+        const tool = document.body.dataset.tool;
+        toolsToggle.textContent = tool ? `${tool.replaceAll('-', ' ')} · Tools` : 'Tools';
+    });
+    const panelIDs = ['spawn-menu', 'map-editor', 'dice-menu', 'pen-settings', 'fog-settings', 'map-options'];
+    function addCloseButtons() {
+        for (const id of panelIDs) {
+            const panel = document.getElementById(id);
+            if (!panel || panel.querySelector('[data-mobile-close-panel]')) continue;
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = 'mobile-sheet-close';
+            button.dataset.mobileClosePanel = '';
+            button.textContent = 'Close';
+            button.setAttribute('aria-label', 'Close panel');
+            panel.prepend(button);
+        }
+    }
+    function closePanel(id) {
+        const panel = document.getElementById(id);
+        if (!panel || panel.hidden) return;
+        panel.hidden = true;
+        if (id === 'spawn-menu') htmx.ajax('GET', boardURL('/spawn-menu'), {target: '#spawn-controls', swap: 'outerHTML'});
+    }
+    function closePanels() {
+        document.dispatchEvent(new CustomEvent('uiDismissed'));
+        panelIDs.forEach(closePanel);
+    }
+    addCloseButtons();
+    document.addEventListener('uiPanelOpening', event => {
+        if (!mobile.matches) return;
+        setToolsOpen(false);
+        for (const id of ['spawn-menu', 'map-editor']) {
+            if (id !== event.detail.id) closePanel(id);
+        }
+    });
+    document.addEventListener('click', event => {
+        if (event.target.closest('[data-mobile-close-panel]')) {
+            closePanels();
+            toolsToggle.focus({preventScroll: true});
+        }
+    });
+    document.getElementById('mobile-brush-settings').addEventListener('click', () => {
+        const tool = document.body.dataset.tool;
+        const button = document.getElementById(tool === 'fog' || tool === 'fog-eraser' ? `utility-${tool}` : 'utility-pen');
+        button.dispatchEvent(new MouseEvent('contextmenu', {bubbles: true, cancelable: true, button: 2}));
+    });
     toggle.addEventListener('click', () => {
-        controls.hidden = !controls.hidden;
-        if (controls.hidden) closeMapOptions();
-        toggle.textContent = controls.hidden ? 'Show UI' : 'Hide UI';
-        toggle.title = controls.hidden ? 'Show controls' : 'Hide controls';
-        toggle.setAttribute('aria-expanded', String(!controls.hidden));
+        const hidden = document.body.dataset.uiHidden !== 'true';
+        closePanels();
+        boardInput.cancel();
+        document.body.dataset.uiHidden = String(hidden);
+        controls.hidden = hidden;
+        boardControls.hidden = hidden;
+        toolsToggle.hidden = hidden;
+        setToolsOpen(false);
+        document.dispatchEvent(new CustomEvent('uiVisibilityChanged', {detail: {visible: !hidden}}));
+        toggle.textContent = hidden ? 'Show UI' : 'Hide UI';
+        toggle.title = hidden ? 'Show controls' : 'Hide controls';
+        toggle.setAttribute('aria-expanded', String(!hidden));
+    });
+    document.addEventListener('htmx:afterSwap', event => {
+        addCloseButtons();
+        if (event.detail.target.id === 'spawn-controls' && !document.getElementById('spawn-menu').hidden) {
+            document.dispatchEvent(new CustomEvent('uiPanelOpening', {detail: {id: 'spawn-menu'}}));
+        }
     });
 
     gmButton?.addEventListener('click', () => {
@@ -79,6 +168,7 @@
         if (event.detail.target !== editor) return;
         closeMapOptions();
         editor.hidden = Boolean(editor.querySelector('[data-map-saved]'));
+        if (!editor.hidden) document.dispatchEvent(new CustomEvent('uiPanelOpening', {detail: {id: 'map-editor'}}));
         if (!editor.hidden) {
             const firstControl = editor.querySelector('input') || editor.querySelector('[data-load-map]') || editor.querySelector('button');
             firstControl?.focus({preventScroll: true});
@@ -124,7 +214,6 @@
             error.hidden = false;
         }
     });
-    document.addEventListener('boardCleared', closeMapOptions);
     mapButton.addEventListener('click', () => {
         if (!mapOptions.hidden) {
             closeMapOptions();
@@ -132,6 +221,6 @@
         }
         error.hidden = true;
         success.hidden = true;
-        mapMenu.open(mapButton, mapOptions.querySelector('button'));
+        mapMenu.open(mapButton, mapOptions.querySelector('button:not([data-mobile-close-panel])'));
     });
 })();

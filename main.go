@@ -45,7 +45,7 @@ func run() error {
 		store = mongoStore
 	}
 	mux := http.NewServeMux()
-	mux.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("static"))))
+	mux.Handle("/static/", handlers.StaticAssets(http.Dir("static")))
 	var handler http.Handler = mux
 	if authentication != nil {
 		if err := registerAuthenticatedRoutes(mux, authentication, store, limits); err != nil {

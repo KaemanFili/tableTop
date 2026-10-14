@@ -26,7 +26,7 @@ var adminTemplate = template.Must(template.New("admin").Parse(`<!doctype html>
   <title>Invite players · tableTop</title>
   <link rel="icon" href="/static/favicon.ico?v=1" sizes="16x16 32x32 48x48" type="image/x-icon">
   <link rel="icon" href="/static/favicon-64.png?v=1" sizes="64x64" type="image/png">
-  <link rel="stylesheet" href="/static/style.css?v=52">
+  <link rel="stylesheet" href="/static/style.css?v=67">
 </head>
 <body class="lobby-page admin-page">
 <main>

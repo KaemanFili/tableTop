@@ -151,11 +151,10 @@ func (h *EndpointHandler) mapImage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if data != nil {
-		w.Header().Set("Content-Type", "image/png")
-		w.Write(data)
+		servePluginImage(w, r, data)
 		return
 	}
-	http.ServeFile(w, r, path)
+	serveBoardImageFile(w, r, path)
 }
 
 func (h *EndpointHandler) saveBoard(w http.ResponseWriter, r *http.Request) {

@@ -49,10 +49,15 @@
         pointer = {x: event.clientX, y: event.clientY};
         refresh();
     });
+    document.addEventListener('pointerdown', event => {
+        if (event.pointerType === 'touch') { forgetPointer(); return; }
+        pointer = {x: event.clientX, y: event.clientY};
+        refresh();
+    });
     for (const input of Object.values(widths).filter(Boolean)) {
         input.addEventListener('input', refresh);
     }
-    document.addEventListener('toolChanged', refresh);
+    document.addEventListener('toolChanged', forgetPointer);
     document.addEventListener('viewPanChanged', refresh);
     document.addEventListener('boardCleared', hide);
     document.addEventListener('scroll', refresh, true);

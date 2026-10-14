@@ -39,8 +39,8 @@ type WebSocketHandler struct {
 
 	upgrader websocket.Upgrader
 
-	positionClients          map[*websocket.Conn]bool
-	boardClients             map[*websocket.Conn]bool
+	positionClients          map[*websocket.Conn]*socketWriter
+	boardClients             map[*websocket.Conn]*socketWriter
 	positionMutex            sync.Mutex
 	positionBroadcastEnabled bool
 	positionBroadcastRunning bool
@@ -65,8 +65,8 @@ func NewWebSocketHandler(state *app.AppState) *WebSocketHandler {
 		socketDone:  make(map[*websocket.Conn]chan struct{}),
 		// Gorilla defaults to accepting absent or same-host Origin headers.
 		upgrader:        websocket.Upgrader{HandshakeTimeout: 5 * time.Second},
-		positionClients: make(map[*websocket.Conn]bool),
-		boardClients:    make(map[*websocket.Conn]bool),
+		positionClients: make(map[*websocket.Conn]*socketWriter),
+		boardClients:    make(map[*websocket.Conn]*socketWriter),
 		rulers:          make(map[string]boardRuler),
 		strokes:         make(map[string]penStroke),
 		erasedStrokes:   make(map[string]bool),
@@ -110,10 +110,8 @@ func (h *WebSocketHandler) startPositionBroadcastLocked() {
 				continue
 			}
 
-			for conn := range h.positionClients {
-				if err := writeSocket(conn, data); err != nil {
-					log.Println("Write error, removing client:", err)
-					conn.Close()
+			for conn, writer := range h.positionClients {
+				if !writer.send(data) {
 					delete(h.positionClients, conn)
 				}
 			}
@@ -146,12 +144,10 @@ func (h *WebSocketHandler) broadcastUnits(data []byte) {
 	h.broadcastUnitsLocked(data)
 }
 
-// broadcastUnitsLocked requires boardMutex to serialize writes to each socket.
+// broadcastUnitsLocked requires boardMutex to preserve message order in each queue.
 func (h *WebSocketHandler) broadcastUnitsLocked(data []byte) {
-	for conn := range h.boardClients {
-		if err := writeSocket(conn, data); err != nil {
-			log.Println("Write error, removing client:", err)
-			conn.Close()
+	for conn, writer := range h.boardClients {
+		if !writer.send(data) {
 			delete(h.boardClients, conn)
 		}
 	}
@@ -269,7 +265,12 @@ func (h *WebSocketHandler) updateClientPosition(w http.ResponseWriter, r *http.R
 	defer h.releaseSocket(conn)
 
 	h.positionMutex.Lock()
-	h.positionClients[conn] = true
+	initial, err := json.Marshal(h.state.Units())
+	if err != nil {
+		h.positionMutex.Unlock()
+		return
+	}
+	h.positionClients[conn] = newSocketWriter(conn, [][]byte{initial}, true)
 	h.startPositionBroadcastLocked()
 	h.positionMutex.Unlock()
 
@@ -281,6 +282,9 @@ func (h *WebSocketHandler) updateClientPosition(w http.ResponseWriter, r *http.R
 	}
 
 	h.positionMutex.Lock()
+	if writer := h.positionClients[conn]; writer != nil {
+		writer.stop()
+	}
 	delete(h.positionClients, conn)
 	h.positionMutex.Unlock()
 }
@@ -308,35 +312,43 @@ func (h *WebSocketHandler) updateBoardUtilityValues(w http.ResponseWriter, r *ht
 func (h *WebSocketHandler) registerBoardUtilitiesClient(conn *websocket.Conn, sessionID string) error {
 	h.boardMutex.Lock()
 	defer h.boardMutex.Unlock()
-	h.boardClients[conn] = true
-	if err := writeSocketJSON(conn, map[string]any{"type": "rulerSession", "id": sessionID, "generation": h.boardGeneration}); err != nil {
+	initial := make([][]byte, 0, 2+len(h.rulers)+len(h.strokes)+len(h.fogMarks))
+	appendInitial := func(value any) error {
+		data, err := json.Marshal(value)
+		if err == nil {
+			initial = append(initial, data)
+		}
+		return err
+	}
+	if err := appendInitial(map[string]any{"type": "rulerSession", "id": sessionID, "generation": h.boardGeneration}); err != nil {
 		return err
 	}
 	if h.currentMap != nil {
-		if err := writeSocketJSON(conn, map[string]any{"type": "boardMapChanged", "map": h.currentMap}); err != nil {
+		if err := appendInitial(map[string]any{"type": "boardMapChanged", "map": h.currentMap}); err != nil {
 			return err
 		}
 	}
 	for _, ruler := range h.rulers {
-		if err := writeSocketJSON(conn, ruler); err != nil {
+		if err := appendInitial(ruler); err != nil {
 			return err
 		}
 	}
 	for _, stroke := range h.strokes {
-		if err := writeSocketJSON(conn, stroke); err != nil {
+		if err := appendInitial(stroke); err != nil {
 			return err
 		}
 	}
 	if len(h.fogMarks) > 0 {
-		if err := writeSocketJSON(conn, map[string]string{"type": "fogReset"}); err != nil {
+		if err := appendInitial(map[string]string{"type": "fogReset"}); err != nil {
 			return err
 		}
 		for _, mark := range h.fogMarks {
-			if err := writeSocketJSON(conn, mark); err != nil {
+			if err := appendInitial(mark); err != nil {
 				return err
 			}
 		}
 	}
+	h.boardClients[conn] = newSocketWriter(conn, initial, false)
 	return nil
 }
 
@@ -352,7 +364,10 @@ func (h *WebSocketHandler) readBoardUtilitiesMessages(conn *websocket.Conn, sess
 		}
 		if err := h.handleBoardUtilitiesMessage(sessionID, data, isGM); err != nil {
 			h.boardMutex.Lock()
-			writeSocketJSON(conn, map[string]string{"type": "boardLimitReached", "message": err.Error()})
+			data, _ := json.Marshal(map[string]string{"type": "boardLimitReached", "message": err.Error()})
+			if writer := h.boardClients[conn]; writer != nil {
+				writer.send(data)
+			}
 			h.boardMutex.Unlock()
 		}
 	}
@@ -383,6 +398,9 @@ func (h *WebSocketHandler) handleBoardUtilitiesMessage(sessionID string, data []
 func (h *WebSocketHandler) unregisterBoardUtilitiesClient(conn *websocket.Conn, sessionID string) {
 	h.boardMutex.Lock()
 	defer h.boardMutex.Unlock()
+	if writer := h.boardClients[conn]; writer != nil {
+		writer.stop()
+	}
 	delete(h.boardClients, conn)
 	if _, exists := h.rulers[sessionID]; exists {
 		delete(h.rulers, sessionID)

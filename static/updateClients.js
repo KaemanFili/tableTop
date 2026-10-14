@@ -25,34 +25,16 @@ document.addEventListener('htmx:beforeSwap', event => {
 const removedUnitIDs = new Set();
 const unitSizes = JSON.parse(document.getElementById('unit-sizes').textContent);
 
-const unitAnimations = new Map();
 const pendingUnitPositions = new Map();
-const unitBlendDuration = 60;
-let unitAnimationFrame = null;
 
-function stopUnitAnimation(id) {
-    unitAnimations.delete(id);
-    if (unitAnimations.size === 0) {
-        cancelAnimationFrame(unitAnimationFrame);
-        unitAnimationFrame = null;
-    }
-}
-
-function animateUnits(now) {
-    unitAnimationFrame = null;
-    for (const [id, animation] of unitAnimations) {
-        const {element, fromLeft, fromTop, left, top, started} = animation;
-        if (!element.isConnected || element.classList.contains('dragging') || removedUnitIDs.has(id)) {
-            unitAnimations.delete(id);
-            continue;
-        }
-        const progress = movementMath.progress(now, started, unitBlendDuration);
-        element.style.left = `${movementMath.interpolate(fromLeft, left, progress)}px`;
-        element.style.top = `${movementMath.interpolate(fromTop, top, progress)}px`;
-        document.dispatchEvent(new CustomEvent('unitPositionChanged', {detail: {id}}));
-        if (progress === 1) unitAnimations.delete(id);
-    }
-    if (unitAnimations.size) unitAnimationFrame = requestAnimationFrame(animateUnits);
+function freezeRemotePosition(id) {
+    const element = document.getElementById(id);
+    if (!element?.classList.contains('remote-moving')) return;
+    const style = getComputedStyle(element);
+    const left = style.left, top = style.top;
+    element.classList.remove('remote-moving');
+    element.style.left = left;
+    element.style.top = top;
 }
 
 function updateUnitPosition(element, left, top) {
@@ -60,30 +42,19 @@ function updateUnitPosition(element, left, top) {
     if (removedUnitIDs.has(id) || element.classList.contains('dragging')) return;
     const pending = pendingUnitPositions.get(id);
     if (pending) {
-        if (left === pending.left && top === pending.top) {
-            pendingUnitPositions.delete(id);
-        } else if (performance.now() < pending.expires) {
-            // Wait for the server to observe the final drop before accepting older position updates.
-            return;
-        } else {
-            pendingUnitPositions.delete(id);
-        }
+        if (left === pending.left && top === pending.top) pendingUnitPositions.delete(id);
+        else if (performance.now() < pending.expires) return;
+        else pendingUnitPositions.delete(id);
     }
-    const previous = unitAnimations.get(id);
-    // Repeated stationary position updates must let an existing animation finish.
-    if (previous?.element === element && previous.left === left && previous.top === top) return;
-    const fromLeft = parseFloat(element.style.left) || 0;
-    const fromTop = parseFloat(element.style.top) || 0;
-    if (fromLeft === left && fromTop === top) {
-        stopUnitAnimation(id);
-        return;
-    }
-    unitAnimations.set(id, {element, fromLeft, fromTop, left, top, started: performance.now()});
-    if (unitAnimationFrame === null) unitAnimationFrame = requestAnimationFrame(animateUnits);
+    if (parseFloat(element.style.left) === left && parseFloat(element.style.top) === top) return;
+    element.classList.add('remote-moving');
+    element.style.left = `${left}px`;
+    element.style.top = `${top}px`;
+    document.dispatchEvent(new CustomEvent('unitPositionChanged', {detail: {id}}));
 }
 
 document.addEventListener('unitDragStarted', event => {
-    stopUnitAnimation(event.detail.id);
+    freezeRemotePosition(event.detail.id);
     pendingUnitPositions.delete(event.detail.id);
 });
 document.addEventListener('unitDragFinished', event => {
@@ -123,7 +94,6 @@ document.addEventListener('unitRemoved', event => {
     const id = event.detail.id;
     if (typeof id !== 'string' || !id) return;
     removedUnitIDs.add(id);
-    stopUnitAnimation(id);
     pendingUnitPositions.delete(id);
     document.getElementById(id)?.remove();
 });
@@ -139,9 +109,6 @@ document.addEventListener('boardCleared', event => {
         typeof item === 'string' ? item : item.id));
     ids.forEach(id => document.dispatchEvent(new CustomEvent('unitRemoved', {detail: {id}})));
     document.getElementById('unitOverlay').replaceChildren();
-    cancelAnimationFrame(unitAnimationFrame);
-    unitAnimationFrame = null;
-    unitAnimations.clear();
     pendingUnitPositions.clear();
 });
 

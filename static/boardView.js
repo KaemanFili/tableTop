@@ -40,6 +40,7 @@
         world.style.marginTop = `calc(var(--cell-size) * ${Math.max(0, -definition.offsetY)})`;
         world.style.width = `calc(var(--cell-size) * ${Math.max(64, definition.offsetX + definition.width)})`;
         world.style.height = `calc(var(--cell-size) * ${Math.max(64, definition.offsetY + definition.height)})`;
+        document.dispatchEvent(new CustomEvent('boardBoundsChanged'));
     }
 
     document.addEventListener('boardMapChanged', event => {
@@ -60,7 +61,10 @@
 
     function initialView() {
         if (currentMap) scheduleCenter();
-        else viewport.scrollTo({left: world.offsetLeft, top: world.offsetTop, behavior: 'instant'});
+        else {
+            const bounds = world.getBoundingClientRect();
+            viewport.scrollTo({left: viewport.scrollLeft + bounds.left, top: viewport.scrollTop + bounds.top, behavior: 'instant'});
+        }
     }
 
     // Space around the board permits centering maps smaller than the viewport at (0, 0).

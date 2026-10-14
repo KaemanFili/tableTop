@@ -31,7 +31,7 @@ func safeReturn(path string) string {
 	return parsed.RequestURI()
 }
 
-var loginTemplate = template.Must(template.New("login").Parse(`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Sign in · tableTop</title><link rel="icon" href="/static/favicon.ico?v=1" sizes="16x16 32x32 48x48" type="image/x-icon"><link rel="icon" href="/static/favicon-64.png?v=1" sizes="64x64" type="image/png"><link rel="stylesheet" href="/static/style.css?v=42"></head><body class="login-page"><main><h1>tableTop</h1><p>Sign in to join the tabletop.</p>{{if .Error}}<p role="alert">{{.Error}}</p>{{end}}<a class="oauth-login" href="{{.LoginURL}}">Sign in with {{.ProviderName}}</a></main></body></html>`))
+var loginTemplate = template.Must(template.New("login").Parse(`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Sign in · tableTop</title><link rel="icon" href="/static/favicon.ico?v=1" sizes="16x16 32x32 48x48" type="image/x-icon"><link rel="icon" href="/static/favicon-64.png?v=1" sizes="64x64" type="image/png"><link rel="stylesheet" href="/static/style.css?v=67"></head><body class="login-page"><main><h1>tableTop</h1><p>Sign in to join the tabletop.</p>{{if .Error}}<p role="alert">{{.Error}}</p>{{end}}<a class="oauth-login" href="{{.LoginURL}}">Sign in with {{.ProviderName}}</a></main></body></html>`))
 
 func (m *Manager) loginPage(w http.ResponseWriter, r *http.Request) {
 	if _, user := m.authenticate(r); user != nil {

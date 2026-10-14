@@ -1,6 +1,7 @@
 package plugins
 
 import (
+	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -351,14 +352,37 @@ func (p Pack) Image(ref app.ArtworkReference) ([]byte, error) {
 	if !ok {
 		return nil, os.ErrNotExist
 	}
-	if err := p.Validate(); err != nil {
+	if err := p.ValidateMetadata(); err != nil {
 		return nil, err
 	}
 	data, err := p.read(a.path, a.limit)
 	if err != nil {
 		return nil, err
 	}
+	// Every image was decoded at load time. Check this exact file's identity
+	// without statting thousands of unrelated portraits for each thumbnail.
+	if sha256.Sum256(data) != p.reader.hashes[a.path] {
+		return nil, errors.New("plugin version changed; restore its original folder")
+	}
+	if bytes.HasPrefix(data, []byte("\x89PNG\r\n\x1a\n")) {
+		return data, nil
+	}
 	return artwork.Normalize(data)
+}
+
+// ValidateMetadata checks the binding's content indexes. Accessed artwork and
+// saved boards verify their own bytes; full Validate remains available on entry.
+func (p Pack) ValidateMetadata() error {
+	p.reader.mu.Lock()
+	defer p.reader.mu.Unlock()
+	for _, path := range []string{"plugin.json", p.Manifest.Maps, p.Manifest.Units, p.Manifest.Statuses} {
+		if expected, exists := p.reader.stamps[path]; exists {
+			if err := p.validateFile(path, expected); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }
 
 // UnitByID uses the validated default index without constructing a listing.

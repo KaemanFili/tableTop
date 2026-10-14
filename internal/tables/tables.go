@@ -74,7 +74,7 @@ var lobbyTemplate = template.Must(template.New("lobby").Parse(`<!doctype html>
   <title>Your sessions · tableTop</title>
   <link rel="icon" href="/static/favicon.ico?v=1" sizes="16x16 32x32 48x48" type="image/x-icon">
   <link rel="icon" href="/static/favicon-64.png?v=1" sizes="64x64" type="image/png">
-  <link rel="stylesheet" href="/static/style.css?v=52">
+  <link rel="stylesheet" href="/static/style.css?v=67">
 </head>
 <body class="lobby-page session-lobby">
 <p class="lobby-loading" data-lobby-loading role="status" aria-live="polite" hidden></p>
@@ -245,17 +245,23 @@ func (m *Manager) board(w http.ResponseWriter, r *http.Request) {
 
 func (m *Manager) handler(id string) (http.Handler, error) {
 	m.mu.Lock()
-	defer m.mu.Unlock()
 	table, exists := m.library.ByID(id)
 	if !exists || table.Deleting || table.Initialization != "" {
+		m.mu.Unlock()
 		return nil, app.ErrTableNotFound
 	}
 	if handler := m.boards[id]; handler != nil {
-		if err := handler.defaults.Validate(); err != nil {
+		m.mu.Unlock()
+		validate := handler.defaults.Validate
+		if metadata, ok := handler.defaults.(interface{ ValidateMetadata() error }); ok {
+			validate = metadata.ValidateMetadata
+		}
+		if err := validate(); err != nil {
 			return nil, err
 		}
 		return handler, nil
 	}
+	defer m.mu.Unlock()
 	if table.PluginBinding == nil {
 		return nil, errors.New("tabletop has no plugin binding; create a new tabletop")
 	}

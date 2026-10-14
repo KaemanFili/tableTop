@@ -13,24 +13,45 @@ boardInput.addEventListener("down", function (e) {
     // Artwork and other children should drag their containing unit.
     e.preventDefault();
 
+    document.dispatchEvent(new CustomEvent('unitDragStarted', {detail: {id: target.id}}));
     const overlay = target.parentElement;
-    const start = boardGeometry.localPoint(overlay, e);
-    const offsetX = start.x - target.offsetLeft;
-    const offsetY = start.y - target.offsetTop;
+    const initialLeft = target.offsetLeft, initialTop = target.offsetTop;
+    let geometry = null;
+    let geometryDirty = true;
+    function readGeometry() {
+        if (!geometryDirty) return;
+        const bounds = overlay.getBoundingClientRect();
+        geometry = {left: bounds.left, top: bounds.top,
+            scaleX: bounds.width / overlay.offsetWidth, scaleY: bounds.height / overlay.offsetHeight};
+        geometryDirty = false;
+    }
+    readGeometry();
+    const offsetX = (e.clientX - geometry.left) / geometry.scaleX - initialLeft;
+    const offsetY = (e.clientY - geometry.top) / geometry.scaleY - initialTop;
+    let position = {left: initialLeft, top: initialTop};
+    let pendingPoint = null;
+    let renderFrame = null;
+    let sendTimer = null;
 
-    //Add dragging class
     isDragging = true;
     target.classList.add("dragging");
     target.style.cursor = "grabbing";
-    document.dispatchEvent(new CustomEvent('unitDragStarted', {detail: {id: target.id}}));
-    let sendTimer = null;
 
-    function move(e) {
-        const point = boardGeometry.localPoint(overlay, e);
-        target.style.left = `${point.x - offsetX}px`;
-        target.style.top = `${point.y - offsetY}px`;
+    function renderMove() {
+        renderFrame = null;
+        if (!pendingPoint || !target.isConnected) return;
+        readGeometry();
+        position = {left: (pendingPoint.x - geometry.left) / geometry.scaleX - offsetX,
+            top: (pendingPoint.y - geometry.top) / geometry.scaleY - offsetY};
+        pendingPoint = null;
+        target.style.transform = `translate3d(${position.left - initialLeft}px, ${position.top - initialTop}px, 0)`;
         if (!sendTimer) sendTimer = setTimeout(updateUnitPositionOnServer, 33);
     }
+    function move(e) {
+        pendingPoint = {x: e.clientX, y: e.clientY};
+        if (renderFrame === null) renderFrame = requestAnimationFrame(renderMove);
+    }
+    function invalidateGeometry() { geometryDirty = true; }
 
     function up() {
         finish(true);
@@ -46,8 +67,21 @@ boardInput.addEventListener("down", function (e) {
         document.removeEventListener("unitRemoved", removed);
         boardInput.removeEventListener("cancel", up);
         window.removeEventListener("blur", up);
+        document.removeEventListener('scroll', invalidateGeometry, true);
+        document.removeEventListener('viewZoomChanged', invalidateGeometry);
+        window.removeEventListener('resize', invalidateGeometry);
+        if (renderFrame !== null) {
+            cancelAnimationFrame(renderFrame);
+            renderMove();
+        }
         clearTimeout(sendTimer);
         sendTimer = null;
+        // Commit compositor movement before clearing it; other clients use board pixels.
+        if (target.isConnected) {
+            target.style.left = `${Math.trunc(position.left)}px`;
+            target.style.top = `${Math.trunc(position.top)}px`;
+            target.style.removeProperty('transform');
+        }
 
         // Remove dragging class
         isDragging = false;
@@ -71,8 +105,8 @@ boardInput.addEventListener("down", function (e) {
         if (!target.isConnected) return;
         if (updateServerSocket.readyState === WebSocket.OPEN) {
             let data = {
-                Left: parseInt(target.style.left, 10),
-                Top: parseInt(target.style.top, 10),
+                Left: Math.trunc(position.left),
+                Top: Math.trunc(position.top),
                 ID: target.id
             };
             updateServerSocket.send(JSON.stringify(data));
@@ -84,6 +118,9 @@ boardInput.addEventListener("down", function (e) {
     boardInput.addEventListener("move", move);
     boardInput.addEventListener("up", up);
     boardInput.addEventListener("cancel", up);
+    document.addEventListener('scroll', invalidateGeometry, true);
+    document.addEventListener('viewZoomChanged', invalidateGeometry);
+    window.addEventListener('resize', invalidateGeometry);
     document.addEventListener("unitRemoved", removed);
     window.addEventListener("blur", up);
 });

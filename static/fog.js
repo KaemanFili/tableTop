@@ -8,6 +8,7 @@
     const confirmedContext = confirmed.getContext('2d');
     const error = document.getElementById('utility-error');
     const pending = new Map();
+    let renderFrame = null;
     let owner = null;
     let nextMark = 0;
     let drawing = false;
@@ -20,7 +21,6 @@
     const buttons = [document.getElementById('utility-fog'), document.getElementById('utility-fog-eraser')].filter(Boolean);
 
     const settingsMenu = menuUI.popover(settings, buttons);
-    const closeSettings = settingsMenu.close;
     for (const button of buttons) {
         button.addEventListener('contextmenu', event => {
             event.preventDefault();
@@ -58,6 +58,14 @@
         context.clearRect(0, 0, canvas.width, canvas.height);
         context.drawImage(confirmed, 0, 0);
         for (const mark of pending.values()) paint(context, mark);
+    }
+
+    function queueRender() {
+        if (renderFrame !== null) return;
+        renderFrame = requestAnimationFrame(() => {
+            renderFrame = null;
+            renderPending();
+        });
     }
 
     function boardPoint(event) {
@@ -119,13 +127,12 @@
         pending.clear();
         confirmedContext.clearRect(0, 0, canvas.width, canvas.height);
         renderPending();
-        closeSettings();
     });
     document.addEventListener('fogMark', event => {
         const mark = event.detail;
         paint(confirmedContext, mark);
         pending.delete(mark.id);
-        renderPending();
+        queueRender();
     });
     document.addEventListener('rulerSession', event => { owner = event.detail.id; });
     document.addEventListener('rulerDisconnected', () => {

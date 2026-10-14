@@ -83,9 +83,8 @@ func TestBrowserSync(t *testing.T) {
 		}
 		ws.positionMutex.Lock()
 		defer ws.positionMutex.Unlock()
-		for conn := range ws.positionClients {
-			if err := writeSocket(conn, data); err != nil {
-				conn.Close()
+		for conn, writer := range ws.positionClients {
+			if !writer.send(data) {
 				delete(ws.positionClients, conn)
 			}
 		}

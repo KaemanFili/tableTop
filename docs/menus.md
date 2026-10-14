@@ -12,8 +12,10 @@ button.addEventListener('click', () => {
 ```
 
 Opening positions the panel beside its button, updates `aria-expanded`, and
-focuses the supplied control. Outside mouse presses, Escape, scrolling, resizing,
-and tool changes dismiss it. Escape restores focus to the button that opened it.
+focuses the supplied control. Outside mouse presses, Escape, board scrolling,
+layout changes, and tool changes dismiss it. Scrolling inside a panel does not
+close it; phone keyboard scrolling and height changes also keep it open. Escape
+restores focus to the button that opened it.
 Multiple buttons can open the same panel, as the fog brush and eraser do.
 A missing panel is supported for controls omitted from non-GM pages.
 
@@ -26,6 +28,14 @@ there is insufficient room. The default placement is beside the anchor;
 All placements stay within the viewport margins. Pass the same options as the
 third argument to `menuUI.popover(panel, buttons, options)` to configure a toolbar
 menu, such as the dice roller.
+
+The dice panel sits directly under the document body, above the board and
+toolbar layers. On phones, a transparent backdrop catches outside taps and
+dismisses the panel after the click, keeping that touch from reaching the board.
+Closing, hiding UI, or switching panels removes the backdrop. The `onOpen` and
+`onClose` popover hooks keep it in sync. Opening dice cancels active board
+gestures, and mobile dice never automatically focuses a field. Counts and
+modifiers support both touch steppers and explicit keyboard entry.
 
 
 # Notifications
@@ -49,3 +59,9 @@ Dice results use the same rendering function in the roller and its notification.
 compatibility fixes, animation queues, and fading. Its `create(layer, status)`
 returns `load()` and `play(message)`. `static/dice.js` owns form input, shared
 requests, duplicate-event handling, privacy, and result presentation.
+The 3D engine loads on the first roll; opening the menu does not download or
+initialize it.
+Dice inputs unlock as soon as the HTTP response provides the authoritative
+result, independently of animation loading or playback. Animation has no shadows,
+is skipped for more than 20 physical dice (percentile dice count as two), and has
+at most three pending rolls. All numerical results and notifications still appear.

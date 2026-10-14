@@ -80,16 +80,16 @@ without dragging still opens a token's menu. Toolbar right-click settings remain
 available, and the brush outline hides while panning.
 
 Dragging follows your mouse immediately. Position updates are sent and broadcast
-about 30 times per second; other boards blend between positions over 60 ms.
+about 30 times per second; receiving boards use 100 ms CSS transitions.
 Releasing sends the final position immediately, and older position updates are briefly
 ignored on your board until the server confirms the drop. Unit refreshes received
 during dragging are deferred until release, including HTTP responses already in
 flight. Initial loading and subsequent refreshes share one serialized HTMX path;
 spawn responses do not append a second copy of a token.
 
-See [How movement smoothing works](docs/movement.md) for the before/after code,
-the progress calculation, and how token and ruler animations share
-`static/movement.js` while keeping their own drawing and lifecycle code.
+See [How movement smoothing works](docs/movement.md) for CSS transitions and
+multiplayer delivery, and [Performance changes](docs/performance-improvements.md)
+for the loading, artwork, animation, and concurrency improvements.
 
 Right-click a placed unit to show a small menu beside it. The ↑ and ↓ arrows
 increase or decrease its size by one existing category, stopping at Tiny and
@@ -188,9 +188,15 @@ its map definition in `data/maps.json`, with the original image in `data/maps/`
 and token artwork in `data/images/` or `static/images/`. Keep these together when
 backing up. Use Load Map to restore this content, including after a server restart.
 
-Use **Hide UI** in the top-right corner to hide Spawn unit, the utilities, and GM
-controls. The button stays visible as **Show UI** to bring them back. This affects
-only your browser and leaves your selected tool active.
+Use **Hide UI** in the top-right corner to hide all controls, menus, and dice
+notifications. The button stays visible as **Show UI** to bring them back. Hiding
+the UI also deselects the current tool so you can pan freely. This affects only
+your browser. On phones, **Tools** opens a compact tray; choosing a tool closes
+it. Menus open as scrollable sheets with a **Close** button, leaving part of the
+board visible. Brush settings are available in the Tools tray.
+On desktop, Sessions and account controls sit at the top center. Zoom controls
+stack vertically on the right, with a separate dice button. On phones, account
+controls join the Tools tray.
 
 GM users can select **Fog of war** (the fog icon) and drag to paint an 80 px brush
 over the grid and tokens. **Erase fog** removes just the brushed area with a 40 px

@@ -121,3 +121,20 @@ func BenchmarkDNDPluginLoading(b *testing.B) {
 		}
 	})
 }
+
+func BenchmarkDNDPortrait(b *testing.B) {
+	pack, err := openVersion(filepath.Join("..", "..", "plugins", "dnd-5e", "1"), "dnd-5e", "1", Bounds{1 << 20, 16 << 20})
+	if err != nil {
+		b.Fatal(err)
+	}
+	if err := pack.load(); err != nil {
+		b.Fatal(err)
+	}
+	unit, _ := pack.UnitByID(StableID("dnd-5e", "unit", "monster-5194867"))
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		if _, err := pack.Image(*unit.Artwork); err != nil {
+			b.Fatal(err)
+		}
+	}
+}

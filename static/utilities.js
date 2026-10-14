@@ -15,9 +15,7 @@
     let measuring = false;
     let lastPointer = null;
     let sendTimer = null;
-    let animationFrame = null;
     const rulerSendInterval = 33;
-    const rulerBlendDuration = 50;
 
     function sendRuler(clear = false) {
         clearTimeout(sendTimer);
@@ -45,10 +43,7 @@
     function removeRuler(id) {
         rulers.get(id)?.element?.remove();
         rulers.delete(id);
-        if (![...rulers.values()].some(measurement => measurement.transition)) {
-            cancelAnimationFrame(animationFrame);
-            animationFrame = null;
-        }
+
     }
 
     function selectTool(tool) {
@@ -80,6 +75,7 @@
         const tool = button === fogButton ? 'fog' : 'fog-eraser';
         selectTool(document.body.dataset.tool === tool ? '' : tool);
     });
+    document.addEventListener('uiVisibilityChanged', event => { if (!event.detail.visible) selectTool(''); });
     document.addEventListener('keydown', event => {
         if (event.key === 'Escape') selectTool('');
     });
@@ -104,45 +100,25 @@
                 label: element.querySelector('.ruler-distance')};
         }
         const {start, parts} = measurement;
-        const end = measurement.displayEnd || measurement.end;
+        const end = measurement.end;
         const x1 = start.x * cell.width, y1 = start.y * cell.height;
         const x2 = end.x * cell.width, y2 = end.y * cell.height;
         const {line, first, last, label} = parts;
-        line.setAttribute('x1', x1);
-        line.setAttribute('y1', y1);
-        line.setAttribute('x2', x2);
-        line.setAttribute('y2', y2);
-        first.setAttribute('cx', x1);
-        first.setAttribute('cy', y1);
-        last.setAttribute('cx', x2);
-        last.setAttribute('cy', y2);
+        measurement.element.classList.toggle('ruler-remote', Boolean(measurement.remote));
+        line.setAttribute('x1', 0);
+        line.setAttribute('y1', 0);
+        line.setAttribute('x2', 1);
+        line.setAttribute('y2', 0);
+        line.setAttribute('vector-effect', 'non-scaling-stroke');
+        const length = Math.max(0.001, Math.hypot(x2 - x1, y2 - y1));
+        const angle = Math.atan2(y2 - y1, x2 - x1) * 180 / Math.PI;
+        line.style.transform = `translate(${x1}px, ${y1}px) rotate(${angle}deg) scaleX(${length})`;
+        first.style.transform = `translate(${x1}px, ${y1}px)`;
+        last.style.transform = `translate(${x2}px, ${y2}px)`;
         const feet = Math.hypot(end.x - start.x, end.y - start.y) * 5;
         label.textContent = `${Number(feet.toFixed(1))} ft`;
         label.style.left = `${(x1 + x2) / 2}px`;
         label.style.top = `${(y1 + y2) / 2}px`;
-    }
-
-    function animateRulers(now) {
-        animationFrame = null;
-        let running = false;
-        const cell = cellSize();
-        for (const measurement of rulers.values()) {
-            const transition = measurement.transition;
-            if (!transition) continue;
-            const progress = movementMath.progress(now, transition.started, rulerBlendDuration);
-            measurement.displayEnd = {
-                x: movementMath.interpolate(transition.from.x, measurement.end.x, progress),
-                y: movementMath.interpolate(transition.from.y, measurement.end.y, progress),
-            };
-            drawMeasurement(measurement, cell);
-            if (progress === 1) {
-                measurement.displayEnd = measurement.end;
-                delete measurement.transition;
-            } else {
-                running = true;
-            }
-        }
-        if (running) animationFrame = requestAnimationFrame(animateRulers);
     }
 
     document.addEventListener('rulerSession', event => { rulerID = event.detail.id; });
@@ -156,21 +132,12 @@
         }
         const measurement = rulers.get(id) || {};
         const sameStart = measurement.start?.x === start.x && measurement.start?.y === start.y;
-        if (sameStart) {
-            measurement.transition = {from: {...(measurement.displayEnd || measurement.end)},
-                started: performance.now()};
-        } else {
-            // A new measurement should appear at its origin rather than sweep across the board.
-            measurement.displayEnd = end;
-            delete measurement.transition;
-        }
+        measurement.remote = sameStart;
         measurement.start = start;
         measurement.end = end;
         rulers.set(id, measurement);
         drawMeasurement(measurement);
-        if (measurement.transition && animationFrame === null) {
-            animationFrame = requestAnimationFrame(animateRulers);
-        }
+
     });
     document.addEventListener('rulerDisconnected', () => {
         clearTimeout(sendTimer);

@@ -5,6 +5,7 @@ const diceAnimation = Object.freeze({
         let renderer;
         let fadeTimer;
         let queue = Promise.resolve();
+        let queued = 0;
 
         async function withTimeout(promise, message) {
             let timer;
@@ -33,6 +34,7 @@ const diceAnimation = Object.freeze({
                     const {default: DiceBox} = await import('/static/vendor/dice-box-threejs-0.0.12/dice-box-threejs.es.js');
                     const box = new DiceBox(`#${layer.id}`, {
                         sounds: false,
+                        shadows: false,
                         theme_colorset: 'white',
                         theme_texture: 'none',
                         theme_material: 'plastic',
@@ -60,8 +62,16 @@ const diceAnimation = Object.freeze({
         }
 
         async function animate(message) {
+            const count = message.groups.reduce((total, group) => total + group.values.length * (group.sides === 100 ? 2 : 1), 0);
+            if (count > 20) {
+                clearTimeout(fadeTimer);
+                layer.style.opacity = '0';
+                status.textContent = '3D animation skipped for rolls over 20 dice. All results are shown.';
+                return;
+            }
             const box = await load();
             if (!box || reducedMotion.matches) return;
+            status.textContent = '';
             clearTimeout(fadeTimer);
             layer.style.opacity = '1';
             // The engine combines repeated die types; keep their fixed values in
@@ -85,6 +95,7 @@ const diceAnimation = Object.freeze({
                 await withTimeout(box.roll(`${notation}@${values}`), 'Dice animation did not finish');
             } catch (error) {
                 console.warn('Could not animate shared dice roll:', error);
+                box.clearDice();
                 layer.style.opacity = '0';
             } finally {
                 fadeTimer = setTimeout(() => { layer.style.opacity = '0'; }, 2500);
@@ -92,9 +103,13 @@ const diceAnimation = Object.freeze({
         }
 
         function play(message) {
+            // Results are already displayed. Keep rapid shared rolls from building
+            // an unbounded physics-animation backlog on every connected browser.
+            if (queued >= 3) return Promise.resolve();
+            queued++;
             queue = queue.then(() => animate(message)).catch(error => {
                 console.warn('Could not display dice animation:', error);
-            });
+            }).finally(() => { queued--; });
             return queue;
         }
         return {load, play};

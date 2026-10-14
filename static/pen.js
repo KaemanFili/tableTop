@@ -17,7 +17,6 @@
     let lastErasePoint = null;
 
     const settingsMenu = menuUI.popover(settings, [button]);
-    const closeSettings = settingsMenu.close;
     button.addEventListener('contextmenu', event => {
         event.preventDefault();
         finishStroke();
@@ -42,16 +41,36 @@
             // SVG coordinates are grid squares; 40px is the standard square size.
             path.style.strokeWidth = width / 40;
             layer.append(path);
-            stroke = {path, width, count: 0, commands: '', points: []};
+            if (style.remote) {
+                path.classList.add('pen-remote');
+                path.style.strokeDasharray = '10000 10000';
+                path.style.strokeDashoffset = '10000';
+            }
+            stroke = {path, width, count: 0, length: 0, dashLength: 10000, commands: '', points: []};
             strokes.set(id, stroke);
         }
         for (const point of points) {
+            const previous = stroke.points.at(-1);
+            if (previous) stroke.length += Math.hypot(point.x - previous.x, point.y - previous.y);
             // A zero-length first segment with a round cap also draws a single click.
             stroke.commands += stroke.count ? ` L ${point.x} ${point.y}` : `M ${point.x} ${point.y} L ${point.x} ${point.y}`;
             stroke.count++;
             stroke.points.push(point);
         }
         stroke.path.setAttribute('d', stroke.commands);
+        if (stroke.path.classList.contains('pen-remote')) {
+            if (stroke.length >= stroke.dashLength) {
+                const visible = stroke.dashLength - parseFloat(getComputedStyle(stroke.path).strokeDashoffset);
+                stroke.dashLength = Math.ceil((stroke.length + 1) / 10000) * 10000;
+                stroke.path.style.transition = 'none';
+                stroke.path.style.strokeDasharray = `${stroke.dashLength} ${stroke.dashLength}`;
+                stroke.path.style.strokeDashoffset = `${stroke.dashLength - visible}`;
+                // Preserve the visible endpoint when a very long stroke needs a larger dash.
+                getComputedStyle(stroke.path).strokeDashoffset;
+                stroke.path.style.removeProperty('transition');
+            }
+            stroke.path.style.strokeDashoffset = `${stroke.dashLength - stroke.length}`;
+        }
     }
 
     function flushStroke(finished = false) {
@@ -171,7 +190,8 @@
         // Local strokes are drawn immediately; their broadcasts must not duplicate points.
         if (stroke.owner === owner) return;
         if ((strokes.get(stroke.id)?.count || 0) !== stroke.offset) return;
-        if (stroke.points?.length) appendPoints(stroke.id, stroke.points, stroke);
+        if (stroke.points?.length) appendPoints(stroke.id, stroke.points,
+            {...stroke, remote: !(stroke.finished && stroke.offset === 0)});
     });
     document.addEventListener('penErased', event => event.detail.ids.forEach(removeStroke));
     document.addEventListener('boardCleared', () => {
@@ -183,7 +203,6 @@
         strokes.clear();
         erasedIDs.clear();
         layer.replaceChildren();
-        closeSettings();
     });
     document.addEventListener('rulerDisconnected', () => {
         clearTimeout(sendTimer);

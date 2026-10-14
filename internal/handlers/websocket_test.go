@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"fmt"
 	"net"
 	"net/http"
 	"strings"
@@ -76,11 +77,73 @@ func TestStalledBoardClientIsDisconnected(t *testing.T) {
 	case <-time.After(socketWriteTimeout + 3*time.Second):
 		t.Fatal("stalled client blocked the board")
 	}
+	deadline := time.Now().Add(socketWriteTimeout + time.Second)
+	for {
+		ws.boardMutex.Lock()
+		remaining := len(ws.boardClients)
+		ws.boardMutex.Unlock()
+		if remaining == 0 {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("stalled client was retained")
+		}
+		time.Sleep(time.Millisecond)
+	}
+}
+
+func TestSlowClientDoesNotDelayOtherPlayers(t *testing.T) {
+	ws := NewWebSocketHandler(app.NewState())
+	mux := http.NewServeMux()
+	ws.RegisterRoutes(mux)
+	server := newTestServer(t, mux)
+	connect := func() *websocket.Conn {
+		t.Helper()
+		conn, _, err := websocket.DefaultDialer.Dial("ws"+strings.TrimPrefix(server.URL, "http")+"/ws/updateUnitsForClients", nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		t.Cleanup(func() { conn.Close() })
+		readRulerSession(t, conn)
+		return conn
+	}
+	slow := connect()
+	healthy := connect()
 	ws.boardMutex.Lock()
-	remaining := len(ws.boardClients)
+	for conn := range ws.boardClients {
+		if err := conn.UnderlyingConn().(*net.TCPConn).SetWriteBuffer(1024); err != nil {
+			t.Fatal(err)
+		}
+	}
 	ws.boardMutex.Unlock()
-	if remaining != 0 {
-		t.Fatal("stalled client was retained")
+	// A blocked write is much longer than a frame, but must not hold the board lock.
+	received := make(chan error, 1)
+	go func() {
+		healthy.SetReadDeadline(time.Now().Add(time.Second))
+		_, _, err := healthy.ReadMessage()
+		if err == nil {
+			_, message, readErr := healthy.ReadMessage()
+			err = readErr
+			if err == nil && string(message) != "next drawing batch" {
+				err = fmt.Errorf("messages arrived out of order")
+			}
+		}
+		received <- err
+	}()
+	_ = slow // Deliberately leave this connection unread.
+	start := time.Now()
+	ws.broadcastUnits([]byte(strings.Repeat("x", 1<<20)))
+	ws.broadcastUnits([]byte("next drawing batch"))
+	if time.Since(start) > 100*time.Millisecond {
+		t.Fatal("network write blocked board producers")
+	}
+	select {
+	case err := <-received:
+		if err != nil {
+			t.Fatal(err)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("slow player delayed a healthy player's drawing")
 	}
 }
 

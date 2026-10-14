@@ -209,6 +209,25 @@ func TestPluginModificationInvalidatesBoundReader(t *testing.T) {
 	}
 }
 
+func TestImageServingRejectsChangedContent(t *testing.T) {
+	for _, path := range []string{"statuses.json", "forest.png"} {
+		t.Run(path, func(t *testing.T) {
+			f := newPackFixture(t)
+			pack := f.pack(t)
+			unit, _ := pack.UnitByID(StableID("forest", "unit", "scout"))
+			if _, err := pack.Image(*unit.Artwork); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(filepath.Join(f.dir, path), []byte("changed"), 0600); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := pack.Image(*unit.Artwork); err == nil {
+				t.Fatal("changed plugin content was served")
+			}
+		})
+	}
+}
+
 func validateFixture(f packFixture) error {
 	p, err := openPack(os.DirFS(f.dir), f.dir, Bounds{1 << 20, 16 << 20})
 	if err != nil {

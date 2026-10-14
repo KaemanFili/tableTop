@@ -9,10 +9,31 @@
     const groups = document.getElementById('dice-groups');
     const errorMessage = document.getElementById('dice-error');
     const shareRolls = document.getElementById('share-dice-rolls');
-    const menu = menuUI.popover(panel, [button], {placement: 'above'});
+    const backdrop = document.getElementById('dice-backdrop');
+    const mobile = menuUI.usesTouchControls;
+    const menu = menuUI.popover(panel, [button], {
+        placement: 'above', backdrop,
+        onOpen() {
+            boardInput.cancel();
+            boardZoom.cancel();
+            backdrop.hidden = !mobile();
+        },
+        onClose() {
+            backdrop.hidden = true;
+            if (panel.contains(document.activeElement)) document.activeElement.blur();
+        },
+    });
+    backdrop.addEventListener('click', event => {
+        event.stopPropagation();
+        menu.close();
+    });
     let busy = false;
     const ownRequests = new Set();
     const received = new Map();
+
+    function focusTarget(row = groups) {
+        return mobile() ? null : row.querySelector('input');
+    }
 
     function addGroup() {
         const template = document.getElementById('dice-group-template');
@@ -95,7 +116,7 @@
                 signal: AbortSignal.timeout(10000),
             });
             if (!response.ok) throw new Error((await response.text()).trim());
-            await receiveRoll(await response.json());
+            receiveRoll(await response.json());
         } catch (error) {
             errorMessage.textContent = error.message || 'Could not roll. Try again.';
             errorMessage.hidden = false;
@@ -117,22 +138,31 @@
 
     button.addEventListener('click', () => {
         if (panel.hidden) {
-            menu.open(button, groups.querySelector('input'));
-            animation.load();
+            menu.open(button, focusTarget());
         }
         else menu.close();
     });
     document.getElementById('add-dice-group').addEventListener('click', () => {
         const row = addGroup();
         menuUI.position(panel, button, {placement: 'above'});
-        row.querySelector('input').focus({preventScroll: true});
+        focusTarget(row)?.focus({preventScroll: true});
     });
     groups.addEventListener('click', event => {
+        const step = event.target.closest('[data-dice-step]');
+        if (step) {
+            const input = step.closest('.dice-stepper').querySelector('input');
+            const value = input.value === '' ? 0 : Number(input.value);
+            input.value = Math.max(Number(input.min), Math.min(Number(input.max),
+                (Number.isFinite(value) ? Math.trunc(value) : 0) + Number(step.dataset.diceStep)));
+            input.dispatchEvent(new Event('input', {bubbles: true}));
+            input.dispatchEvent(new Event('change', {bubbles: true}));
+            return;
+        }
         const remove = event.target.closest('[data-remove-dice]');
         if (!remove || groups.children.length === 1) return;
         remove.closest('.dice-group').remove();
         updateRemoveButtons();
-        groups.querySelector('input').focus({preventScroll: true});
+        focusTarget()?.focus({preventScroll: true});
     });
     form.addEventListener('submit', event => {
         event.preventDefault();

@@ -167,6 +167,7 @@
         }
         close();
     }, true);
+    document.addEventListener('uiDismissed', close);
     window.addEventListener('resize', close);
     document.addEventListener('viewZoomChanged', close);
     document.addEventListener('boardCleared', close);
@@ -201,10 +202,25 @@
         });
     }
     document.addEventListener('unitStatusChanged', () => queueMicrotask(updateControls));
+    let followFrame = null;
+    function followMovingUnit() {
+        followFrame = null;
+        if (menu.hidden) return;
+        const unit = document.getElementById(menu.dataset.unitId);
+        if (!unit) return;
+        position(unit);
+        if (unit.getAnimations().some(animation => animation.playState === 'running')) {
+            followFrame = requestAnimationFrame(followMovingUnit);
+        }
+    }
+    function queueFollow() {
+        if (!menu.hidden && followFrame === null) followFrame = requestAnimationFrame(followMovingUnit);
+    }
     document.addEventListener('unitPositionChanged', event => {
-        if (menu.hidden || menu.dataset.unitId !== event.detail.id) return;
-        const unit = document.getElementById(event.detail.id);
-        if (unit) position(unit);
+        if (menu.dataset.unitId === event.detail.id) queueFollow();
+    });
+    overlay.addEventListener('transitionrun', event => {
+        if (event.target.id === menu.dataset.unitId) queueFollow();
     });
     document.addEventListener('unitSizeChanged', event => {
         // The display listener applies the new size before this task runs.

@@ -29,12 +29,19 @@ async function connectBrowser() {
         bubbles: true, cancelable: true, button: 0, buttons: type === 'mouseup' ? 0 : 1,
         clientX: x, clientY: y,
     }));
-    function startDrag() {
+    async function startDrag() {
         const token = units()[0];
         const bounds = token.getBoundingClientRect();
+        const left = token.style.left, top = token.style.top;
         mouse(token, 'mousedown', bounds.left + 10, bounds.top + 10);
         mouse(d, 'mousemove', bounds.left + 50, bounds.top + 60);
         assert(dragging(), 'Token drag did not start');
+        await pause(40);
+        const moved = token.getBoundingClientRect();
+        assert(token.style.left === left && token.style.top === top && token.style.transform,
+            'Desktop dragging rewrites layout coordinates on every frame');
+        assert(Math.abs(moved.left - bounds.left - 40) < 1 && Math.abs(moved.top - bounds.top - 50) < 1,
+            'Desktop token did not visibly follow the pointer');
         return token;
     }
     function endDrag() {
@@ -57,8 +64,8 @@ async function connectBrowser() {
 async function testRemoteSpawnDuringDrag(browser) {
     const {units, startDrag, endDrag, remoteSpawn, expectCount} = browser;
     // A remote spawn during a real mouse drag must appear after release.
-    const dragged = startDrag();
-    const left = dragged.style.left, top = dragged.style.top;
+    const dragged = await startDrag();
+    const left = parseInt(dragged.style.left) + 40, top = parseInt(dragged.style.top) + 50;
     await remoteSpawn();
     await pause(100);
     assert(dragged.isConnected && units().length === 1, 'Refresh replaced an active drag');
@@ -67,7 +74,7 @@ async function testRemoteSpawnDuringDrag(browser) {
     await until(async () => {
         const saved = await (await fetch('/browser/state')).json();
         const token = saved.find(unit => unit.ID === dragged.id);
-        return token.Left === parseInt(left) && token.Top === parseInt(top);
+        return token.Left === left && token.Top === top;
     }, 'Final drag position did not reach the server');
 }
 
@@ -112,7 +119,7 @@ async function testUnitRefreshDuringDrag(browser) {
     await control('arm', 'refresh');
     w.htmx.trigger('#loadExistingUnits', 'loadUnits');
     await control('ready');
-    const held = startDrag();
+    const held = await startDrag();
     await control('release');
     await pause(100);
     assert(held.isConnected && held.classList.contains('dragging'), 'In-flight unit refresh replaced the dragged token');
@@ -147,7 +154,7 @@ async function testStatusMenuFollowsRemoteMovement(browser) {
         remote.send(JSON.stringify({ID: token.id, Left: left, Top: top}));
         await confirmed;
         await control('positions');
-        await until(() => token.style.left === `${left}px` && token.style.top === `${top}px`, 'Remote token movement did not finish');
+        await until(() => token.style.left === `${left}px` && token.style.top === `${top}px` && !token.getAnimations().some(animation => animation.playState === 'running'), 'Remote token movement did not finish');
         assert(!menu.hidden && !statuses.hidden && !tooltip.hidden, 'Remote movement closed the status menu');
         const destination = token.getBoundingClientRect();
         for (const {element, bounds} of anchored) {
@@ -198,6 +205,7 @@ async function testMenuDismissalAndFocus(browser) {
 
 function configureDice(d, groups) {
     const rows = d.getElementById('dice-groups');
+    while (rows.children.length > groups.length) rows.lastElementChild.querySelector('[data-remove-dice]').click();
     groups.forEach((group, index) => {
         if (!rows.children[index]) d.getElementById('add-dice-group').click();
         const row = rows.children[index];
@@ -252,7 +260,9 @@ async function testDiceRoller(browser) {
     const panel = d.getElementById('dice-menu');
     assert(button.getBoundingClientRect().top >= toggle.getBoundingClientRect().bottom, 'Dice button is not below Hide UI');
     toggle.click();
-    assert(d.getElementById('ui-overlay').hidden && button.getBoundingClientRect().height > 0, 'Dice roller unavailable with UI hidden');
+    assert(d.getElementById('ui-overlay').hidden && button.getBoundingClientRect().height === 0, 'Hide UI left the dice controls visible');
+    assert(toggle.getBoundingClientRect().height > 0 && toggle.textContent === 'Show UI', 'Show UI is unavailable');
+    toggle.click();
     assert(!w.performance.getEntriesByType('resource').some(entry => entry.name.includes('/vendor/dice-box-')), 'Dice animation loaded before opening the roller');
     button.click();
     assert(!panel.hidden && button.getAttribute('aria-expanded') === 'true', 'Dice menu did not open');
@@ -279,6 +289,9 @@ async function testDiceRoller(browser) {
     assert(panel.getAttribute('aria-busy') === 'true' && d.getElementById('dice-inputs').disabled, 'Dice controls remained active during a roll');
     await until(() => panel.getAttribute('aria-busy') === 'false', 'Dice roll did not finish');
     assertDiceResults(d, selected);
+    assert(!animated, 'Dice controls waited for the 3D animation to finish');
+    await until(() => animated || d.getElementById('dice-status').textContent.includes('unavailable') ||
+        w.matchMedia('(prefers-reduced-motion: reduce)').matches, 'Dice animation did not complete or fall back');
     if (animated) assertAnimationResults(d, animated);
     assert(d.querySelectorAll('.dice-notification').length === 1, 'Origin received duplicate notifications');
     const previousResult = d.getElementById('dice-result').textContent;
@@ -290,10 +303,14 @@ async function testDiceRoller(browser) {
     assert(!d.getElementById('dice-error').hidden && d.getElementById('dice-error').textContent.includes('100'), 'Oversized roll was not rejected');
     assert(d.getElementById('dice-result').textContent === previousResult && !d.getElementById('dice-inputs').disabled, 'Invalid roll changed the result or locked controls');
     quantity.value = '2';
+    animated = null;
     d.getElementById('roll-all-dice').click();
     await until(() => panel.getAttribute('aria-busy') === 'false', 'Second dice roll did not finish');
     assertDiceResults(d, selected);
     assert(d.getElementById('dice-error').hidden, 'Valid roll did not clear the previous error');
+    await until(() => animated || d.getElementById('dice-status').textContent.includes('unavailable') ||
+        w.matchMedia('(prefers-reduced-motion: reduce)').matches, 'Second dice animation did not finish');
+    if (animated) assertAnimationResults(d, animated);
     const canvas = d.getElementById('dice-layer').querySelector('canvas');
     const animationLoaded = w.performance.getEntriesByType('resource').some(entry => entry.name.includes('/vendor/dice-box-'));
     assert(!animationLoaded || canvas, 'Dice animation failed after loading its module');
@@ -306,9 +323,16 @@ async function testDiceRoller(browser) {
         assert(d.getElementById('dice-status').textContent.includes('unavailable') || w.matchMedia('(prefers-reduced-motion: reduce)').matches, 'Missing dice animation without an explanation');
         await progress('dice fallback verified');
     }
+    const large = [{qty: 100, sides: 6, modifier: 3}];
+    configureDice(d, large);
+    animated = null;
+    d.getElementById('roll-all-dice').click();
+    await until(() => panel.getAttribute('aria-busy') === 'false', 'Large roll kept dice controls locked');
+    assertDiceResults(d, large);
+    await until(() => d.getElementById('dice-status').textContent.includes('over 20 dice'), 'Large roll started expensive physics instead of showing results');
+    assert(!animated && d.getElementById('dice-layer').style.opacity !== '1', 'Large roll animated despite the visual budget');
     d.dispatchEvent(new w.KeyboardEvent('keydown', {key: 'Escape', bubbles: true, cancelable: true}));
     assert(panel.hidden && d.activeElement === button && button.getAttribute('aria-expanded') === 'false', 'Dice menu did not dismiss and restore focus');
-    toggle.click();
 }
 
 async function testDiceWithoutWebGL() {
@@ -386,7 +410,10 @@ async function testPrivateGMRolls(browser) {
         await until(() => d.getElementById('dice-menu').getAttribute('aria-busy') === 'false', 'Private GM roll did not finish');
         assertDiceResults(d, selected);
         assert(d.querySelector('#dice-notifications article:last-child > strong').textContent === 'Your private roll', 'GM notification was not marked private');
-        if (d.querySelector('#dice-layer canvas')) assertAnimationResults(d, animated);
+        if (d.querySelector('#dice-layer canvas')) {
+            await until(() => animated, 'Private roll animation did not finish');
+            assertAnimationResults(d, animated);
+        }
         assert(events.length === 0 && !observer.querySelector('.dice-notification'), 'Private roll leaked to another client');
         assert(!observer.querySelector('#dice-layer canvas'), 'Private roll triggered another client’s animation');
         share.checked = true;
@@ -526,6 +553,115 @@ async function testMapViewCentering(browser) {
     }
 }
 
+async function testMobileMenus(browser) {
+    const {w, d, mouse} = browser;
+    assert(!d.querySelector('#grid-container .cell') && !d.getElementById('loadGrid'), 'Board still creates thousands of grid cells');
+    const frame = document.getElementById('app');
+    frame.style.width = '390px';
+    frame.style.height = '844px';
+    await until(() => d.getElementById('board-viewport').clientWidth === 390 && d.body.dataset.mobileTools === 'closed', 'Mobile layout did not settle');
+    const tools = d.getElementById('mobile-tools-toggle');
+    const pen = d.getElementById('utility-pen');
+    assert(pen.getBoundingClientRect().height === 0 && tools.getBoundingClientRect().height >= 44, 'Mobile tray did not start collapsed');
+    tools.click();
+    assert(pen.getBoundingClientRect().height >= 44, 'Mobile tools did not open');
+    const grid = d.getElementById('grid-container');
+    const bounds = grid.getBoundingClientRect();
+    mouse(grid, 'mousemove', bounds.left + 100, bounds.top + 180);
+    pen.click();
+    assert(d.body.dataset.mobileTools === 'closed', 'Selecting a tool left the tray covering the board');
+    assert(d.getElementById('brush-cursor').hidden, 'Selecting Pen reused an old pointer position');
+    const drawing = d.getElementById('drawing-layer').getBoundingClientRect();
+    assert(Math.abs(drawing.top - bounds.top) < 0.1 && Math.abs(drawing.height - bounds.height) < 0.1, 'Drawing layer differs from grid bounds');
+    tools.click();
+    d.getElementById('mobile-brush-settings').click();
+    const settings = d.getElementById('pen-settings');
+    assert(!settings.hidden && settings.getBoundingClientRect().height <= 844 * 0.6 + 1, 'Brush settings are not a bounded mobile sheet');
+    settings.querySelector('[data-mobile-close-panel]').click();
+    assert(settings.hidden, 'Mobile sheet Close did not work');
+    tools.click();
+    d.getElementById('spawn-menu-toggle').click();
+    await until(() => !d.getElementById('spawn-menu').hidden, 'Mobile spawn menu did not open');
+    assert(d.body.dataset.mobileTools === 'closed', 'Mobile spawn menu left the tray open');
+    assert(d.getElementById('spawn-menu').getBoundingClientRect().height <= 844 * 0.6 + 1, 'Spawn sheet blocks too much of the board');
+    d.getElementById('toggle-ui-controls').click();
+    for (const id of ['ui-overlay', 'board-controls', 'mobile-tools-toggle', 'spawn-menu', 'dice-notifications', 'token-menu']) {
+        assert(d.getElementById(id).getBoundingClientRect().height === 0, `Hide UI left ${id} visible`);
+    }
+    assert(!d.body.dataset.tool, 'Hide UI left a drawing tool active');
+    d.getElementById('toggle-ui-controls').click();
+    await until(() => d.getElementById('spawn-menu').hidden, 'Spawn menu did not stay dismissed');
+    d.getElementById('roll-dice').click();
+    const dice = d.getElementById('dice-menu');
+    assert(!dice.hidden && !d.activeElement.matches('input, select'), 'Opening mobile dice focused a keyboard field');
+    assert(dice.parentElement === d.body, 'Dice panel is trapped inside the toolbar stacking context');
+    const tap = target => {
+        target.scrollIntoView({block: 'nearest'});
+        const bounds = target.getBoundingClientRect();
+        const x = bounds.left + bounds.width / 2, y = bounds.top + bounds.height / 2;
+        const hit = d.elementFromPoint(x, y);
+        assert(hit === target || target.contains(hit), `Tap passes through ${target.getAttribute('aria-label') || target.id}`);
+        for (const type of ['pointerdown', 'pointerup']) hit.dispatchEvent(new w.PointerEvent(type, {
+            pointerId: 99, pointerType: 'touch', isPrimary: true, bubbles: true, cancelable: true,
+            button: 0, buttons: type === 'pointerdown' ? 1 : 0, clientX: x, clientY: y,
+        }));
+        hit.dispatchEvent(new w.MouseEvent('click', {bubbles: true, cancelable: true, clientX: x, clientY: y}));
+    };
+    const row = d.querySelector('.dice-group');
+    const quantity = row.querySelector('[name="quantity"]');
+    const modifier = row.querySelector('[name="modifier"]');
+    quantity.value = '1';
+    modifier.value = '0';
+    tap(row.querySelector('[aria-label="Increase dice count"]'));
+    assert(quantity.value === '2', 'Mobile count increment failed');
+    tap(row.querySelector('[aria-label="Decrease dice count"]'));
+    tap(row.querySelector('[aria-label="Decrease dice count"]'));
+    assert(quantity.value === '1', 'Mobile count decrement passed the minimum');
+    tap(row.querySelector('[aria-label="Decrease dice modifier"]'));
+    assert(modifier.value === '-1', 'Mobile modifier cannot go negative');
+    tap(row.querySelector('[aria-label="Increase dice modifier"]'));
+    assert(modifier.value === '0', 'Mobile modifier increment failed');
+    const modifierBounds = modifier.getBoundingClientRect();
+    assert(d.elementFromPoint(modifierBounds.left + modifierBounds.width / 2,
+        modifierBounds.top + modifierBounds.height / 2) === modifier, 'Modifier is covered by another control');
+    w.dispatchEvent(new w.Event('resize'));
+    assert(!dice.hidden, 'Phone height change dismissed the dice editor');
+    modifier.focus({preventScroll: true});
+    d.dispatchEvent(new w.Event('scroll'));
+    assert(!dice.hidden && d.activeElement === modifier, 'Keyboard scrolling closed the editor');
+    modifier.blur();
+    const count = d.querySelectorAll('.dice-group').length;
+    d.getElementById('add-dice-group').click();
+    assert(d.querySelectorAll('.dice-group').length === count + 1 && !d.activeElement.matches('input, select'), 'Adding mobile dice focused a keyboard field');
+    d.querySelector('.dice-group:last-child [data-remove-dice]').click();
+    assert(!d.activeElement.matches('input, select'), 'Removing mobile dice focused a keyboard field');
+    tap(dice.querySelector('[data-mobile-close-panel]'));
+    assert(d.getElementById('dice-backdrop').hidden, 'Closing dice left a shield blocking the UI');
+    d.getElementById('roll-dice').click();
+    const shield = d.getElementById('dice-backdrop');
+    const shieldHit = d.elementFromPoint(100, 100);
+    assert(shieldHit === shield, 'Outside popup taps hit the board');
+    shield.dispatchEvent(new w.PointerEvent('pointerdown', {pointerId: 99, pointerType: 'touch', isPrimary: true,
+        bubbles: true, cancelable: true, button: 0, buttons: 1, clientX: 100, clientY: 100}));
+    assert(!shield.hidden && !dice.hidden, 'Dismissal removed the shield before the touch ended');
+    shield.dispatchEvent(new w.PointerEvent('pointerup', {pointerId: 99, pointerType: 'touch', isPrimary: true,
+        bubbles: true, cancelable: true, button: 0, buttons: 0, clientX: 100, clientY: 100}));
+    shield.dispatchEvent(new w.MouseEvent('click', {bubbles: true, cancelable: true, clientX: 100, clientY: 100}));
+    assert(shield.hidden && dice.hidden, 'Outside dismissal left the UI blocked');
+    d.getElementById('roll-dice').click();
+    tap(d.getElementById('toggle-ui-controls'));
+    assert(shield.hidden && dice.hidden, 'Hide UI left the popup shield active');
+    tap(d.getElementById('toggle-ui-controls'));
+    tools.click();
+    assert(pen.getBoundingClientRect().height > 0, 'Dice interaction left Tools unusable');
+    tools.click();
+    frame.style.width = '1200px';
+    frame.style.height = '800px';
+    await until(() => d.getElementById('board-viewport').clientWidth === 1200 &&
+        d.getElementById('board-space').style.getPropertyValue('--board-viewport-width') === '1200px' &&
+        pen.getBoundingClientRect().height > 0, 'Desktop layout did not restore');
+}
+
 async function testTouchBoardGestures(browser) {
     const {w, d, units} = browser;
     const pointer = (target, type, x, y, id = 7, primary = true) => target.dispatchEvent(new w.PointerEvent(type, {
@@ -545,6 +681,10 @@ async function testTouchBoardGestures(browser) {
     assert(w.getComputedStyle(token).touchAction === 'none', 'Token touch scrolling is not disabled');
     pointer(token, 'pointerdown', bounds.left + 10, bounds.top + 10);
     pointer(d, 'pointermove', bounds.left + 44, bounds.top + 32);
+    await pause(40);
+    const movedBounds = token.getBoundingClientRect();
+    assert(Math.abs(movedBounds.left - bounds.left - 34) < 1 && Math.abs(movedBounds.top - bounds.top - 22) < 1,
+        'Touch token did not visibly follow finger before release');
     pointer(d, 'pointerup', bounds.left + 44, bounds.top + 32);
     assert(!w.eval('isDragging'), 'Touch drag did not finish');
     await until(async () => {
@@ -585,6 +725,86 @@ async function testTouchBoardGestures(browser) {
     assert(w.getComputedStyle(grid).touchAction !== 'none', 'Leaving drawing mode did not restore touch scrolling');
 }
 
+async function testRemoteStreaming(browser) {
+    const {w, d, units, mouse} = browser;
+    await control('positions');
+    await until(() => w.eval('pendingUnitPositions.size === 0'), 'Local drops were not acknowledged before streaming');
+    const frame = document.createElement('iframe');
+    frame.style.cssText = 'position:fixed;top:0;left:0;width:700px;height:500px;z-index:10';
+    frame.src = '/?gm=true';
+    document.body.append(frame);
+    let remote;
+    try {
+        await until(() => frame.contentDocument?.readyState === 'complete' &&
+            frame.contentDocument.querySelector('#unitOverlay .unit'), 'Remote player did not load');
+        const observer = frame.contentWindow, view = frame.contentDocument;
+        await until(() => observer.eval('newUnitUpdateSocket.readyState === WebSocket.OPEN && posUpdateSocket.readyState === WebSocket.OPEN'), 'Remote sockets did not connect');
+        const source = units()[0], token = view.getElementById(source.id);
+        const left = parseInt(source.style.left), top = parseInt(source.style.top);
+        remote = new w.WebSocket(`ws://${w.location.host}/ws/updateServer`);
+        await until(() => remote.readyState === w.WebSocket.OPEN, 'Streaming sender did not connect');
+        const samples = [];
+        let sampleFrame;
+        const sample = () => { samples.push(token.getBoundingClientRect().left); sampleFrame = observer.requestAnimationFrame(sample); };
+        sampleFrame = observer.requestAnimationFrame(sample);
+        try {
+            for (let index = 1; index <= 12; index++) {
+                const acknowledged = new Promise(resolve => { remote.onmessage = resolve; });
+                remote.send(JSON.stringify({ID: source.id, Left: left + index * 10, Top: top}));
+                await acknowledged;
+                await control('positions');
+                await pause(33);
+                if (index === 6) assert(observer.getComputedStyle(token).transitionProperty.includes('left'),
+                    'Remote movement is not using CSS transitions');
+            }
+            await until(() => token.style.left === `${left + 120}px` && !token.getAnimations().some(animation => animation.playState === 'running'), 'Remote movement did not commit its final coordinates');
+        } finally { observer.cancelAnimationFrame(sampleFrame); }
+        assert(samples.filter((value, index) => index && Math.abs(value - samples[index - 1]) > 0.1).length >= 8,
+            'Remote movement arrived as a few jumps instead of display frames');
+        assert(samples.every((value, index) => !index || value >= samples[index - 1] - 0.5), 'Remote token moved backwards between consecutive updates');
+        const grid = d.getElementById('grid-container'), bounds = grid.getBoundingClientRect();
+        const oldPaths = new Set(view.querySelectorAll('#drawing-layer path'));
+        let penAnimated = false;
+        if (d.body.dataset.tool !== 'pen') d.getElementById('utility-pen').click();
+        mouse(grid, 'mousedown', bounds.left + 80, bounds.top + 120);
+        for (let index = 1; index <= 32; index++) {
+            mouse(d, 'mousemove', bounds.left + 80 + index * 4, bounds.top + 120);
+            await pause(4);
+            penAnimated ||= [...view.querySelectorAll('#drawing-layer path')].some(path =>
+                !oldPaths.has(path) && path.getAnimations().some(animation => animation.playState === 'running'));
+        }
+        mouse(d, 'mouseup', bounds.left + 208, bounds.top + 120);
+        await until(() => [...view.querySelectorAll('#drawing-layer path')].some(path => !oldPaths.has(path) &&
+            Math.abs(path.getPointAtLength(path.getTotalLength()).x - 5.2) < 0.001), 'Remote drawing lost or reordered streamed points');
+        const path = [...view.querySelectorAll('#drawing-layer path')].find(path => !oldPaths.has(path));
+        assert(penAnimated, 'Receiving pen strokes were not smoothly revealed with CSS');
+        await until(() => !path.getAnimations().some(animation => animation.playState === 'running'), 'Pen reveal did not finish');
+        assert(Math.abs(Number.parseFloat(observer.getComputedStyle(path).strokeDashoffset) - (10000 - path.getTotalLength())) < 0.01,
+            'Pen reveal did not finish at the full received stroke');
+        d.getElementById('utility-ruler').click();
+        mouse(grid, 'mousedown', bounds.left + 80, bounds.top + 80);
+        let rulerAnimated = false;
+        for (let index = 1; index <= 8; index++) {
+            mouse(d, 'mousemove', bounds.left + 80 + index * 10, bounds.top + 80);
+            await pause(33);
+            rulerAnimated ||= [...view.querySelectorAll('#ruler-layer circle')].some(circle =>
+                circle.getAnimations().some(animation => animation.playState === 'running'));
+        }
+        mouse(d, 'mouseup', bounds.left + 160, bounds.top + 80);
+        assert(rulerAnimated, 'Receiving rulers did not use CSS interpolation');
+        const end = view.querySelector('#ruler-layer .ruler-remote circle:last-child');
+        await until(() => end && !end.getAnimations().some(animation => animation.playState === 'running') &&
+            Math.abs(end.getBoundingClientRect().left + end.getBoundingClientRect().width / 2 -
+                (view.getElementById('grid-container').getBoundingClientRect().left + 160)) < 0.5,
+            'Remote ruler did not finish at the source endpoint');
+        d.dispatchEvent(new w.KeyboardEvent('keydown', {key: 'Escape', bubbles: true}));
+        await until(() => source.style.left === `${left + 120}px`, 'Source did not settle after remote movement');
+    } finally {
+        remote?.close();
+        frame.remove();
+    }
+}
+
 async function testBoardZoomKeepsUIFixed(browser) {
     const {w, d, units, mouse} = browser;
     const frame = document.getElementById('app');
@@ -592,16 +812,17 @@ async function testBoardZoomKeepsUIFixed(browser) {
     frame.style.height = '844px';
     await until(() => d.getElementById('board-viewport').clientWidth === 390 &&
         d.getElementById('board-space').style.getPropertyValue('--board-viewport-width') === '390px', 'Phone viewport did not settle');
+    d.getElementById('mobile-tools-toggle').click();
     assert(d.getElementById('utility-pen').getBoundingClientRect().width >= 44, 'Mobile utility touch target is too small');
     assert(d.getElementById('board-zoom-in').getBoundingClientRect().height >= 44, 'Mobile zoom touch target is too small');
     assert(parseFloat(w.getComputedStyle(d.querySelector('.dice-group input')).fontSize) >= 16, 'Mobile inputs can trigger focus zoom');
 
     const zoom = w.eval('boardZoom');
     const grid = d.getElementById('grid-container');
-    const button = d.getElementById('spawn-menu-toggle');
+    const button = d.getElementById('mobile-tools-toggle');
     const before = button.getBoundingClientRect();
     zoom.setScale(2);
-    assert(Math.abs(grid.querySelector('.cell').getBoundingClientRect().width - 80) < 0.1, 'Board did not scale to 200%');
+    assert(Math.abs(grid.getBoundingClientRect().width / 64 - 80) < 0.1, 'Board did not scale to 200%');
     const after = button.getBoundingClientRect();
     assert(before.width === after.width && before.height === after.height, 'Board zoom scaled the UI');
     const token = units()[0];
@@ -638,6 +859,26 @@ async function testBoardZoomKeepsUIFixed(browser) {
         bubbles: true, cancelable: true, button: type === 'pointermove' ? -1 : 0,
         buttons: type === 'pointerup' ? 0 : 1, clientX: x, clientY: y,
     }));
+
+    const touchBounds = token.getBoundingClientRect();
+    const touchLeft = parseInt(token.style.left), touchTop = parseInt(token.style.top);
+    touch(token, 'pointerdown', touchBounds.left + 5, touchBounds.top + 5, 20, true);
+    let styleWrites = 0;
+    const observer = new w.MutationObserver(records => { styleWrites += records.length; });
+    observer.observe(token, {attributes: true, attributeFilter: ['style']});
+    for (let i = 1; i <= 20; i++) touch(d, 'pointermove', touchBounds.left + 5 + i * 3, touchBounds.top + 5 + i * 2, 20, true);
+    await pause(40);
+    observer.disconnect();
+    const visual = token.getBoundingClientRect();
+    assert(styleWrites <= 1, 'Touch movement caused a style/layout write for every event');
+    assert(Math.abs(visual.left - touchBounds.left - 60) < 1 && Math.abs(visual.top - touchBounds.top - 40) < 1,
+        'Zoomed touch token did not track the latest finger position');
+    touch(d, 'pointerup', touchBounds.left + 65, touchBounds.top + 45, 20, true);
+    assert(!token.style.transform, 'Touch drag transform survived release');
+    await until(async () => {
+        const saved = (await (await fetch('/browser/state')).json()).find(unit => unit.ID === token.id);
+        return saved.Left === touchLeft + 30 && saved.Top === touchTop + 20;
+    }, 'Accelerated touch drag committed incorrect zoomed coordinates');
     const panLeft = w.document.getElementById('board-viewport').scrollLeft, panTop = w.document.getElementById('board-viewport').scrollTop;
     touch(grid, 'pointerdown', 200, 200, 20, true);
     touch(d, 'pointermove', 160, 165, 20, true);
@@ -665,16 +906,42 @@ async function testBoardZoomKeepsUIFixed(browser) {
     touch(grid, 'pointerdown', 250, 200, 21, false);
     const stableLeft = w.document.getElementById('board-viewport').scrollLeft, stableTop = w.document.getElementById('board-viewport').scrollTop;
     touch(d, 'pointermove', 254, 200, 21, false);
+    grid.dispatchEvent(new w.WheelEvent('wheel', {bubbles: true, cancelable: true, deltaY: -150, clientX: 200, clientY: 200}));
+    assert(zoom.scale === 2, 'Compatibility wheel events competed with touch zoom');
+    for (const type of ['gesturestart', 'gesturechange', 'gestureend']) {
+        assert(!grid.dispatchEvent(new w.Event(type, {bubbles: true, cancelable: true})), 'Native page pinch was not suppressed on board');
+    }
     await pause(40);
     assert(zoom.scale === 2 && w.document.getElementById('board-viewport').scrollLeft === stableLeft && w.document.getElementById('board-viewport').scrollTop === stableTop, 'Minor finger jitter changed the view');
+    assert(!d.body.dispatchEvent(new w.Event('gesturechange', {bubbles: true, cancelable: true})),
+        'Native gesture on a shared ancestor competed with board touch');
+    const world = d.getElementById('board-world');
+    const anchor = w.eval('boardGeometry').localPoint(world, {clientX: 200, clientY: 200});
+    for (const thumbX of [280, 220, 300, 210, 250]) {
+        touch(d, 'pointermove', thumbX, 200, 21, false);
+        await pause(40);
+        const view = world.getBoundingClientRect();
+        assert(Math.abs(view.left + anchor.x * zoom.scale - 200) <= 1 &&
+            Math.abs(view.top + anchor.y * zoom.scale - 200) <= 1, 'Pinch round-trip moved its board anchor');
+        assert(world.offsetWidth === 2560, 'Pinch round-trip changed grid layout');
+    }
+    assert(zoom.scale === 2, 'Pinch round-trip failed to return to original zoom');
+
+    touch(d, 'pointermove', 170, 220, 20, true);
+    touch(d, 'pointermove', 274, 220, 21, false);
+    await pause(40);
+    assert(zoom.scale === 2 && w.document.getElementById('board-viewport').scrollLeft === stableLeft &&
+        w.document.getElementById('board-viewport').scrollTop === stableTop, 'Thumb midpoint drift panned the map');
     touch(d, 'pointermove', 300, 200, 21, false);
     touch(d, 'pointerup', 150, 200, 20, true);
     const resumedLeft = w.document.getElementById('board-viewport').scrollLeft, resumedTop = w.document.getElementById('board-viewport').scrollTop;
     touch(d, 'pointermove', 280, 175, 21, false);
     touch(d, 'pointerup', 280, 175, 21, false);
-    assert(w.document.getElementById('board-viewport').scrollLeft === resumedLeft + 20 && w.document.getElementById('board-viewport').scrollTop === resumedTop + 25, 'Remaining finger did not resume panning after pinch');
+    assert(w.document.getElementById('board-viewport').scrollLeft === resumedLeft && w.document.getElementById('board-viewport').scrollTop === resumedTop, 'Lift-off thumb accidentally panned the board');
     assert(zoom.scale > 2 && zoom.scale < 2.5, 'Pinch did not use reduced sensitivity');
     const pinchScale = zoom.scale;
+    assert(!d.getElementById('board-world').style.zoom && d.getElementById('board-world').offsetWidth === 2560,
+        'Pinch reflowed the grid through CSS zoom');
     assert(button.getBoundingClientRect().width === before.width, 'Pinch scaled UI controls');
     // Fingers placed close together must not produce a large zoom jump.
     touch(grid, 'pointerdown', 200, 200, 20, true);
@@ -760,7 +1027,9 @@ const scenarios = [
     ['private GM rolls', testPrivateGMRolls],
     ['notification lifecycle', testNotificationLifecycle],
     ['unit and map library search', testLibrarySearch],
+    ['mobile menus and drawing bounds', testMobileMenus],
     ['touch board gestures', testTouchBoardGestures],
+    ['remote player movement and drawing streams', testRemoteStreaming],
     ['board zoom keeps UI fixed', testBoardZoomKeepsUIFixed],
     ['tools across zoom levels', testToolsAcrossZoomLevels],
     ['map view centers on load and reload', testMapViewCentering],
