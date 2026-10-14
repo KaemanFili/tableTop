@@ -24,7 +24,8 @@ async function connectBrowser() {
     await until(() => w.eval('newUnitUpdateSocket.readyState === WebSocket.OPEN && updateServerSocket.readyState === WebSocket.OPEN'), 'Sockets did not connect');
     const units = () => [...d.querySelectorAll('#unitOverlay .unit')];
     const dragging = () => w.eval('isDragging');
-    const mouse = (target, type, x, y) => target.dispatchEvent(new w.MouseEvent(type, {
+    const mouse = (target, type, x, y) => target.dispatchEvent(new w.PointerEvent(({mousedown: 'pointerdown', mousemove: 'pointermove', mouseup: 'pointerup'})[type], {
+        pointerId: 1, pointerType: 'mouse', isPrimary: true,
         bubbles: true, cancelable: true, button: 0, buttons: type === 'mouseup' ? 0 : 1,
         clientX: x, clientY: y,
     }));
@@ -482,16 +483,16 @@ async function testMapViewCentering(browser) {
             await until(() => browser.d.getElementById('map-layer').alt === name && centered(browser.w), 'Loaded map was not centered in the viewport');
         } catch (error) {
             const bounds = browser.d.getElementById('map-layer').getBoundingClientRect();
-            throw new Error(`${name}: ${error.message}; bounds=${JSON.stringify(bounds.toJSON())}; viewport=${browser.d.documentElement.clientWidth}x${browser.d.documentElement.clientHeight}; scroll=${browser.w.scrollX},${browser.w.scrollY}; world=${browser.d.getElementById('board-world').style.cssText}`);
+            throw new Error(`${name}: ${error.message}; bounds=${JSON.stringify(bounds.toJSON())}; viewport=${browser.d.documentElement.clientWidth}x${browser.d.documentElement.clientHeight}; scroll=${browser.d.getElementById('board-viewport').scrollLeft},${browser.d.getElementById('board-viewport').scrollTop}; world=${browser.d.getElementById('board-world').style.cssText}`);
         }
         return map;
     }
     const first = await load('Forest Clearing');
-    browser.w.scrollBy(100, 80);
-    const left = browser.w.scrollX, top = browser.w.scrollY;
+    browser.d.getElementById('board-viewport').scrollBy(100, 80);
+    const left = browser.d.getElementById('board-viewport').scrollLeft, top = browser.d.getElementById('board-viewport').scrollTop;
     browser.d.dispatchEvent(new browser.w.CustomEvent('boardMapChanged', {detail: {map: first}}));
     await pause(50);
-    assert(browser.w.scrollX === left && browser.w.scrollY === top, 'An update to the same map reset manual panning');
+    assert(browser.d.getElementById('board-viewport').scrollLeft === left && browser.d.getElementById('board-viewport').scrollTop === top, 'An update to the same map reset manual panning');
     await browser.remoteSpawn();
     await until(() => browser.units().length === 1, 'Token did not appear on the centered map');
     const token = browser.units()[0];
@@ -511,7 +512,7 @@ async function testMapViewCentering(browser) {
     assert(point.x === 5 && point.y === 5, 'Drawing coordinates changed after centering and panning');
     await load('Desert Oasis');
 
-    browser.w.scrollBy(85, 65);
+    browser.d.getElementById('board-viewport').scrollBy(85, 65);
     const oldDocument = frame.contentDocument;
     frame.style.width = '360px';
     frame.style.height = '640px';
@@ -521,8 +522,228 @@ async function testMapViewCentering(browser) {
     } catch (error) {
         const w = frame.contentWindow, d = w.document;
         const map = d.getElementById('map-layer');
-        throw new Error(`${error.message}; map=${map?.alt}; hidden=${map?.hidden}; bounds=${JSON.stringify(map?.getBoundingClientRect().toJSON())}; viewport=${d.documentElement.clientWidth}x${d.documentElement.clientHeight}; scroll=${w.scrollX},${w.scrollY}; ready=${d.readyState}`);
+        throw new Error(`${error.message}; map=${map?.alt}; hidden=${map?.hidden}; bounds=${JSON.stringify(map?.getBoundingClientRect().toJSON())}; viewport=${d.documentElement.clientWidth}x${d.documentElement.clientHeight}; scroll=${w.document.getElementById('board-viewport').scrollLeft},${w.document.getElementById('board-viewport').scrollTop}; ready=${d.readyState}`);
     }
+}
+
+async function testTouchBoardGestures(browser) {
+    const {w, d, units} = browser;
+    const pointer = (target, type, x, y, id = 7, primary = true) => target.dispatchEvent(new w.PointerEvent(type, {
+        pointerId: id, pointerType: 'touch', isPrimary: primary,
+        bubbles: true, cancelable: true, button: type === 'pointermove' ? -1 : 0,
+        buttons: type === 'pointerup' || type === 'pointercancel' ? 0 : 1,
+        clientX: x, clientY: y,
+    }));
+    const select = tool => {
+        if (d.body.dataset.tool !== tool) d.getElementById(`utility-${tool}`).click();
+    };
+    const gestures = async () => (await fetch('/browser/gestures')).json();
+    d.dispatchEvent(new w.KeyboardEvent('keydown', {key: 'Escape', bubbles: true}));
+    const token = units()[0];
+    const left = parseInt(token.style.left), top = parseInt(token.style.top);
+    const bounds = token.getBoundingClientRect();
+    assert(w.getComputedStyle(token).touchAction === 'none', 'Token touch scrolling is not disabled');
+    pointer(token, 'pointerdown', bounds.left + 10, bounds.top + 10);
+    pointer(d, 'pointermove', bounds.left + 44, bounds.top + 32);
+    pointer(d, 'pointerup', bounds.left + 44, bounds.top + 32);
+    assert(!w.eval('isDragging'), 'Touch drag did not finish');
+    await until(async () => {
+        const saved = (await (await fetch('/browser/state')).json()).find(unit => unit.ID === token.id);
+        return saved.Left === left + 34 && saved.Top === top + 22;
+    }, 'Touch drag did not reach server');
+    const grid = d.getElementById('grid-container');
+    const rectangle = grid.getBoundingClientRect();
+    const x = rectangle.left + 120, y = rectangle.top + 120;
+    pointer(grid, 'pointerdown', x, y);
+    pointer(d, 'pointerup', x, y);
+    select('pen');
+    assert(w.getComputedStyle(grid).touchAction === 'none', 'Drawing still allows native touch scrolling');
+    pointer(grid, 'pointerdown', x, y);
+    pointer(d, 'pointermove', x + 80, y + 40);
+    pointer(d, 'pointercancel', 0, 0);
+    await until(async () => Object.values((await gestures()).strokes).some(stroke => stroke.finished && stroke.points.length === 2), 'Cancelled touch stroke did not finish cleanly');
+    assert(d.querySelector('#drawing-layer .pen-stroke'), 'Touch drawing was not rendered');
+    select('eraser');
+    pointer(grid, 'pointerdown', x, y);
+    pointer(d, 'pointerup', x, y);
+    await until(async () => Object.keys((await gestures()).strokes).length === 0, 'Touch eraser did not remove stroke');
+    select('fog');
+    pointer(grid, 'pointerdown', x, y);
+    pointer(d, 'pointermove', x + 40, y + 20);
+    pointer(d, 'pointerup', x + 40, y + 20);
+    await until(async () => (await gestures()).fog?.some(mark => mark.mode === 'paint' && mark.points.length >= 2), 'Touch fog painting did not reach server');
+    select('fog-eraser');
+    pointer(grid, 'pointerdown', x, y);
+    pointer(d, 'pointercancel', 0, 0);
+    await until(async () => (await gestures()).fog?.some(mark => mark.mode === 'erase'), 'Touch fog eraser did not reach server');
+    select('ruler');
+    pointer(grid, 'pointerdown', x, y);
+    pointer(d, 'pointermove', x + 80, y);
+    pointer(d, 'pointerup', x + 80, y);
+    await until(async () => Object.values((await gestures()).rulers).some(ruler => ruler.end.x - ruler.start.x === 2), 'Touch ruler did not reach server');
+    d.dispatchEvent(new w.KeyboardEvent('keydown', {key: 'Escape', bubbles: true}));
+    assert(w.getComputedStyle(grid).touchAction !== 'none', 'Leaving drawing mode did not restore touch scrolling');
+}
+
+async function testBoardZoomKeepsUIFixed(browser) {
+    const {w, d, units, mouse} = browser;
+    const frame = document.getElementById('app');
+    frame.style.width = '390px';
+    frame.style.height = '844px';
+    await until(() => d.getElementById('board-viewport').clientWidth === 390 &&
+        d.getElementById('board-space').style.getPropertyValue('--board-viewport-width') === '390px', 'Phone viewport did not settle');
+    assert(d.getElementById('utility-pen').getBoundingClientRect().width >= 44, 'Mobile utility touch target is too small');
+    assert(d.getElementById('board-zoom-in').getBoundingClientRect().height >= 44, 'Mobile zoom touch target is too small');
+    assert(parseFloat(w.getComputedStyle(d.querySelector('.dice-group input')).fontSize) >= 16, 'Mobile inputs can trigger focus zoom');
+
+    const zoom = w.eval('boardZoom');
+    const grid = d.getElementById('grid-container');
+    const button = d.getElementById('spawn-menu-toggle');
+    const before = button.getBoundingClientRect();
+    zoom.setScale(2);
+    assert(Math.abs(grid.querySelector('.cell').getBoundingClientRect().width - 80) < 0.1, 'Board did not scale to 200%');
+    const after = button.getBoundingClientRect();
+    assert(before.width === after.width && before.height === after.height, 'Board zoom scaled the UI');
+    const token = units()[0];
+    const left = parseInt(token.style.left), top = parseInt(token.style.top);
+    const bounds = token.getBoundingClientRect();
+    mouse(token, 'mousedown', bounds.left + 10, bounds.top + 10);
+    mouse(d, 'mousemove', bounds.left + 90, bounds.top + 70);
+    mouse(d, 'mouseup', bounds.left + 90, bounds.top + 70);
+    await until(async () => {
+        const saved = (await (await fetch('/browser/state')).json()).find(unit => unit.ID === token.id);
+        return saved.Left === left + 40 && saved.Top === top + 30;
+    }, 'Zoomed drag changed shared coordinates');
+    const gridBounds = grid.getBoundingClientRect();
+    const point = w.eval('boardGeometry').point(grid, {clientX: gridBounds.left + 160, clientY: gridBounds.top + 240});
+    assert(point.x === 2 && point.y === 3, 'Drawing geometry did not account for board zoom');
+    d.getElementById('utility-pen').click();
+    mouse(grid, 'mousedown', gridBounds.left + 160, gridBounds.top + 240);
+    mouse(d, 'mousemove', gridBounds.left + 320, gridBounds.top + 320);
+    mouse(d, 'mouseup', gridBounds.left + 320, gridBounds.top + 320);
+    await until(async () => {
+        const strokes = Object.values((await (await fetch('/browser/gestures')).json()).strokes);
+        return strokes.some(stroke => stroke.finished && stroke.points[0].x === 2 && stroke.points[0].y === 3 && stroke.points.at(-1).x === 4 && stroke.points.at(-1).y === 4);
+    }, 'Zoomed drawing did not preserve shared grid coordinates');
+    d.getElementById('utility-ping').click();
+    let ping = null;
+    d.addEventListener('boardPing', event => { ping = event.detail; }, {once: true});
+    grid.dispatchEvent(new w.MouseEvent('click', {bubbles: true, cancelable: true, button: 0,
+        clientX: gridBounds.left + 160, clientY: gridBounds.top + 240}));
+    await until(() => ping, 'Zoomed ping did not reach browser');
+    assert(ping.x === 80 && ping.y === 120, 'Zoomed ping changed shared pixel coordinates');
+    d.dispatchEvent(new w.KeyboardEvent('keydown', {key: 'Escape', bubbles: true}));
+    const touch = (target, type, x, y, id, primary) => target.dispatchEvent(new w.PointerEvent(type, {
+        pointerId: id, pointerType: 'touch', isPrimary: primary,
+        bubbles: true, cancelable: true, button: type === 'pointermove' ? -1 : 0,
+        buttons: type === 'pointerup' ? 0 : 1, clientX: x, clientY: y,
+    }));
+    const panLeft = w.document.getElementById('board-viewport').scrollLeft, panTop = w.document.getElementById('board-viewport').scrollTop;
+    touch(grid, 'pointerdown', 200, 200, 20, true);
+    touch(d, 'pointermove', 160, 165, 20, true);
+    touch(d, 'pointerup', 160, 165, 20, true);
+    assert(w.document.getElementById('board-viewport').scrollLeft === panLeft + 40 && w.document.getElementById('board-viewport').scrollTop === panTop + 35, 'One-finger board panning failed');
+    assert(w.scrollX === 0 && w.scrollY === 0, 'Board panning scrolled the document');
+    assert(button.getBoundingClientRect().top === before.top && button.getBoundingClientRect().left === before.left, 'Board panning moved fixed UI');
+    const stillLeft = w.document.getElementById('board-viewport').scrollLeft, stillTop = w.document.getElementById('board-viewport').scrollTop;
+    touch(grid, 'pointerdown', 200, 200, 20, true);
+    touch(d, 'pointermove', 202, 201, 20, true);
+    await pause(40);
+    assert(w.document.getElementById('board-viewport').scrollLeft === stillLeft && w.document.getElementById('board-viewport').scrollTop === stillTop, 'Resting finger jitter moved the board');
+    touch(d, 'pointerup', 202, 201, 20, true);
+    w.document.getElementById('board-viewport').scrollTo({left: 0, top: 0, behavior: 'instant'});
+    touch(grid, 'pointerdown', 100, 100, 20, true);
+    touch(d, 'pointermove', 200, 200, 20, true);
+    await pause(40);
+    assert(w.document.getElementById('board-viewport').scrollLeft === 0 && w.document.getElementById('board-viewport').scrollTop === 0, 'Edge pan did not clamp');
+    touch(d, 'pointermove', 180, 170, 20, true);
+    touch(d, 'pointerup', 180, 170, 20, true);
+    assert(w.document.getElementById('board-viewport').scrollLeft === 20 && w.document.getElementById('board-viewport').scrollTop === 30, 'Reversing a pan at an edge was stuck');
+    w.document.getElementById('board-viewport').scrollTo({left: stillLeft, top: stillTop, behavior: 'instant'});
+
+    touch(grid, 'pointerdown', 150, 200, 20, true);
+    touch(grid, 'pointerdown', 250, 200, 21, false);
+    const stableLeft = w.document.getElementById('board-viewport').scrollLeft, stableTop = w.document.getElementById('board-viewport').scrollTop;
+    touch(d, 'pointermove', 254, 200, 21, false);
+    await pause(40);
+    assert(zoom.scale === 2 && w.document.getElementById('board-viewport').scrollLeft === stableLeft && w.document.getElementById('board-viewport').scrollTop === stableTop, 'Minor finger jitter changed the view');
+    touch(d, 'pointermove', 300, 200, 21, false);
+    touch(d, 'pointerup', 150, 200, 20, true);
+    const resumedLeft = w.document.getElementById('board-viewport').scrollLeft, resumedTop = w.document.getElementById('board-viewport').scrollTop;
+    touch(d, 'pointermove', 280, 175, 21, false);
+    touch(d, 'pointerup', 280, 175, 21, false);
+    assert(w.document.getElementById('board-viewport').scrollLeft === resumedLeft + 20 && w.document.getElementById('board-viewport').scrollTop === resumedTop + 25, 'Remaining finger did not resume panning after pinch');
+    assert(zoom.scale > 2 && zoom.scale < 2.5, 'Pinch did not use reduced sensitivity');
+    const pinchScale = zoom.scale;
+    assert(button.getBoundingClientRect().width === before.width, 'Pinch scaled UI controls');
+    // Fingers placed close together must not produce a large zoom jump.
+    touch(grid, 'pointerdown', 200, 200, 20, true);
+    touch(grid, 'pointerdown', 210, 200, 21, false);
+    touch(d, 'pointermove', 230, 200, 21, false);
+    touch(d, 'pointerup', 200, 200, 20, true);
+    touch(d, 'pointerup', 230, 200, 21, false);
+    assert(zoom.scale === pinchScale, 'Close fingers caused an amplified zoom jump');
+    const cancelledLeft = w.document.getElementById('board-viewport').scrollLeft, cancelledTop = w.document.getElementById('board-viewport').scrollTop;
+    touch(grid, 'pointerdown', 200, 200, 20, true);
+    touch(d, 'pointermove', 180, 175, 20, true);
+    touch(d, 'pointercancel', 0, 0, 20, true);
+    const stoppedLeft = w.document.getElementById('board-viewport').scrollLeft, stoppedTop = w.document.getElementById('board-viewport').scrollTop;
+    touch(d, 'pointermove', 80, 75, 20, true);
+    await pause(40);
+    assert(w.document.getElementById('board-viewport').scrollLeft === stoppedLeft && w.document.getElementById('board-viewport').scrollTop === stoppedTop, 'Cancelled pan kept moving');
+    assert(stoppedLeft === cancelledLeft + 20 && stoppedTop === cancelledTop + 25, 'Cancelling pan applied unrelated coordinates');
+
+
+    grid.dispatchEvent(new w.WheelEvent('wheel', {bubbles: true, cancelable: true, deltaY: 100, clientX: 200, clientY: 200}));
+    assert(zoom.scale < pinchScale, 'Wheel did not zoom board');
+    d.getElementById('board-zoom-reset').click();
+    assert(zoom.scale === 1, 'Reset zoom did not restore 100%');
+}
+
+async function testToolsAcrossZoomLevels(browser) {
+    const {w, d, mouse} = browser;
+    const zoom = w.eval('boardZoom');
+    const viewport = d.getElementById('board-viewport');
+    const grid = d.getElementById('grid-container');
+    for (const scale of [0.5, 1.25, 2.4, 0.75, 1]) {
+        zoom.setScale(scale);
+        viewport.scrollBy({left: 27, top: 19, behavior: 'instant'});
+        let bounds = grid.getBoundingClientRect();
+        const cellX = bounds.width / 64, cellY = bounds.height / 64;
+        const start = {x: bounds.left + 2 * cellX, y: bounds.top + 3 * cellY};
+        const end = {x: bounds.left + 4 * cellX, y: bounds.top + 3 * cellY};
+        if (d.body.dataset.tool !== 'ruler') d.getElementById('utility-ruler').click();
+        mouse(grid, 'mousedown', start.x, start.y);
+        mouse(d, 'mousemove', end.x, end.y);
+        mouse(d, 'mouseup', end.x, end.y);
+        const circles = [...d.querySelectorAll('#ruler-layer circle')];
+        assert(circles.length >= 2, 'Ruler was not rendered');
+        const first = circles[0].getBoundingClientRect(), last = circles[1].getBoundingClientRect();
+        assert(Math.abs(first.left + first.width / 2 - start.x) < 1 && Math.abs(first.top + first.height / 2 - start.y) < 1,
+            `Ruler start drifted from pointer at ${scale}x`);
+        assert(Math.abs(last.left + last.width / 2 - end.x) < 1 && Math.abs(last.top + last.height / 2 - end.y) < 1,
+            `Ruler end drifted from pointer at ${scale}x`);
+        assert(d.querySelector('#ruler-layer .ruler-distance').textContent === '10 ft', `Ruler distance changed at ${scale}x`);
+        d.getElementById('utility-pen').click();
+        const oldIDs = Object.keys((await (await fetch('/browser/gestures')).json()).strokes);
+        mouse(grid, 'mousedown', start.x, start.y);
+        mouse(d, 'mousemove', end.x, end.y);
+        mouse(d, 'mouseup', end.x, end.y);
+        await until(async () => {
+            const strokes = (await (await fetch('/browser/gestures')).json()).strokes;
+            return Object.entries(strokes).some(([id, stroke]) => !oldIDs.includes(id) && stroke.finished &&
+                stroke.points[0].x === 2 && stroke.points[0].y === 3 && stroke.points.at(-1).x === 4 && stroke.points.at(-1).y === 3);
+        }, `Drawing coordinates drifted at ${scale}x`);
+        const path = d.querySelector('#drawing-layer path:last-child');
+        // A horizontal round-capped stroke extends half its height past each endpoint.
+        // Use the rendered box; SVG screen matrices can omit inherited CSS zoom.
+        const drawing = path.getBoundingClientRect();
+        const radius = drawing.height / 2;
+        assert(Math.abs(drawing.left + radius - start.x) < 1 && Math.abs(drawing.right - radius - end.x) < 1 &&
+            Math.abs(drawing.top + radius - start.y) < 1,
+            `Rendered drawing missed pointer at ${scale}x: ${JSON.stringify(drawing.toJSON())}`);
+    }
+    d.dispatchEvent(new w.KeyboardEvent('keydown', {key: 'Escape', bubbles: true}));
 }
 
 // These scenarios share one board: each spawn changes the count expected by
@@ -539,6 +760,9 @@ const scenarios = [
     ['private GM rolls', testPrivateGMRolls],
     ['notification lifecycle', testNotificationLifecycle],
     ['unit and map library search', testLibrarySearch],
+    ['touch board gestures', testTouchBoardGestures],
+    ['board zoom keeps UI fixed', testBoardZoomKeepsUIFixed],
+    ['tools across zoom levels', testToolsAcrossZoomLevels],
     ['map view centers on load and reload', testMapViewCentering],
 ];
 

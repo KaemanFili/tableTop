@@ -1,5 +1,56 @@
 # How movement smoothing works
 
+## Mouse, touch, and stylus input
+
+`static/boardInput.js` routes Pointer Events to token dragging, pen/eraser,
+fog/eraser, and ruler handlers. One pointer owns a gesture; additional fingers
+cannot move the active token or add drawing points. Pointer capture keeps native
+gestures connected to the board when a finger or stylus leaves the initial target.
+Cancellation, lost capture, or leaving the page finishes the current gesture.
+
+On mobile, drag a token directly to move it. Select a drawing tool before dragging
+on the board. With no tool selected, drag empty board space to pan. Pinch with two
+fingers to zoom the board; a second finger finishes an active drawing or token drag
+before starting the zoom gesture. The board handles these gestures itself so they
+do not zoom the surrounding menus. Menus accept touch presses for outside dismissal.
+
+Use the mouse wheel over the board, pinch, or the **− / percentage / +** controls
+to zoom between 25% and 300%. Click the percentage to reset to 100%.
+`static/boardZoom.js` scales only `#board-world` and keeps the board point under the
+zoom gesture in place. Fixed UI elements remain outside that scaled container.
+Token dragging and pings convert screen coordinates back to shared board pixels;
+drawing, fog, and ruler coordinates remain in grid squares. Zoom and panning are
+local to each viewer.
+
+Pointer coordinates are normalized against the entire rendered grid, which avoids
+rounding differences between individual cells at fractional zoom levels. Ruler
+rendering uses unscaled board pixels because its SVG and label already live inside
+the zoomed world. Screen-space cell sizes are reserved for cursor previews and
+hit testing, preventing zoom from being applied twice to ruler endpoints.
+
+Pinch zoom ignores the first 10 pixels of span change and uses reduced
+sensitivity. Fingers initially less than 80 pixels apart must spread before zoom
+starts, avoiding large changes from tiny movements. Updates combine both fingers'
+latest positions once per animation frame and use a fixed board anchor to reduce
+scroll drift. Small midpoint movements also leave the view unchanged.
+
+One-finger panning ignores initial movements smaller than 6 pixels and updates
+once per animation frame. Movement uses the actual current scroll position,
+so reversing direction at an edge responds immediately. After a pinch, lifting
+one finger resumes panning from the remaining finger when no tool is selected.
+Cancelled gestures stop queued movement. The board disables browser scroll
+anchoring and overscroll so DOM updates and viewport bouncing do not compete
+with its camera.
+
+The camera scrolls a fixed `#board-viewport` container instead of the document.
+Map centering, touch panning, right-button panning, and zoom all use that same
+container. The document remains stationary, keeping mobile browser chrome and
+fixed menus separate from board movement. Viewport padding follows the actual
+container size. Mobile controls use at least 44-pixel touch targets (48 pixels for
+utility buttons), and form fields use 16-pixel text to reduce focus zoom on iPhone.
+
+## Position updates
+
 Token movement and ruler movement use the same linear interpolation formula.
 Both call the shared `movementMath` utility in `static/movement.js`. Each keeps
 its own animation loop and display behavior:

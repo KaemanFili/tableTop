@@ -72,13 +72,15 @@ var lobbyTemplate = template.Must(template.New("lobby").Parse(`<!doctype html>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Your sessions · tableTop</title>
-  <link rel="stylesheet" href="/static/style.css?v=50">
+  <link rel="icon" href="/static/favicon.ico?v=1" sizes="16x16 32x32 48x48" type="image/x-icon">
+  <link rel="icon" href="/static/favicon-64.png?v=1" sizes="64x64" type="image/png">
+  <link rel="stylesheet" href="/static/style.css?v=52">
 </head>
-<body class="lobby-page">
+<body class="lobby-page session-lobby">
 <p class="lobby-loading" data-lobby-loading role="status" aria-live="polite" hidden></p>
 <main>
   <header class="lobby-header">
-    <h1>Your sessions</h1>
+    <div><h1>Your sessions</h1><p>Create a session or join with a code.</p></div>
     <div class="lobby-account">
       <span>{{.User.Name}}</span>
       {{if .User.IsAdmin}}<a href="/admin/invites">Invite players</a>{{end}}
@@ -87,7 +89,7 @@ var lobbyTemplate = template.Must(template.New("lobby").Parse(`<!doctype html>
   </header>
   {{if .Error}}<p class="lobby-error" role="alert">{{.Error}}</p>{{end}}
   <div class="lobby-actions">
-    <section>
+    <section class="lobby-create">
       <h2>Create a session</h2>
       <p>You will be the GM.</p>
       <form action="/sessions" method="post">
@@ -96,7 +98,7 @@ var lobbyTemplate = template.Must(template.New("lobby").Parse(`<!doctype html>
         <button class="primary-button">Create session</button>
       </form>
     </section>
-    <section>
+    <section class="lobby-join">
       <h2>Join a session</h2>
       <p>Enter the code shared by your GM.</p>
       <form action="/sessions/join" method="post">
@@ -106,7 +108,7 @@ var lobbyTemplate = template.Must(template.New("lobby").Parse(`<!doctype html>
     </section>
   </div>
   <section class="lobby-tabletops">
-    <h2>Your tabletops</h2>
+    <div class="section-heading"><h2>Your tabletops</h2><span class="section-count">{{len .Tables}}</span></div>
     <div class="lobby-table-list">
       {{range .Tables}}
       <article>

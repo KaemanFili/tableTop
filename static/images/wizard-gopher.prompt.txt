@@ -1,0 +1,7 @@
+Generator: built-in image_gen, editing the user-attached Go gopher image.
+Background: transparent alpha.
+Project artwork: wizard-gopher.png
+Browser icons: ../favicon.ico (16, 32, 48 px), ../favicon-64.png (64 px).
+
+Final prompt:
+Use case: precise-object-edit / background-extraction. Edit target: the user-attached cyan Go gopher image. Create a browser tab icon asset of this same friendly gopher wearing a simple pointed wizard hat and a wizard robe. Preserve its recognizable oversized white eyes, black pupils, black oval nose, cream muzzle, two front teeth, little cream hands/feet, cyan skin, bold black outlines and flat cartoon illustration style. Hat and robe in a muted deep purple with simple contrasting trim, keep face fully visible. Full character including complete hat and feet, centered in a square canvas, close framing with a small transparent margin; clear readable silhouette suitable for a favicon. True transparent alpha background, no white background, no checkerboard baked into pixels, no shadow backdrop. No words, lettering, watermark, extra props or extra characters.

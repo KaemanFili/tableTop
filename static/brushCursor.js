@@ -26,7 +26,7 @@
             return;
         }
         const bounds = grid.getBoundingClientRect();
-        const cell = grid.querySelector('.cell')?.getBoundingClientRect();
+        const cell = boardGeometry.cellSize(grid);
         if (!cell?.width || !cell?.height || pointer.x < bounds.left || pointer.x > bounds.right ||
             pointer.y < bounds.top || pointer.y > bounds.bottom) {
             hide();
@@ -44,7 +44,8 @@
         document.body.classList.add('brush-cursor-visible');
     }
 
-    document.addEventListener('mousemove', event => {
+    document.addEventListener('pointermove', event => {
+        if (event.pointerType === 'touch') { forgetPointer(); return; }
         pointer = {x: event.clientX, y: event.clientY};
         refresh();
     });

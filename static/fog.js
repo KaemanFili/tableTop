@@ -139,7 +139,7 @@
         renderPending();
     });
     document.addEventListener('toolChanged', finish);
-    document.addEventListener('mousedown', event => {
+    boardInput.addEventListener('down', event => {
         if (document.body.dataset.gm !== 'true' || !['fog', 'fog-eraser'].includes(document.body.dataset.tool) || event.button !== 0) return;
         if (!event.target.closest('#grid-container, #unitOverlay .unit')) return;
         event.preventDefault();
@@ -154,13 +154,14 @@
         addPoint(boardPoint(event));
         flush();
     });
-    document.addEventListener('mousemove', event => {
+    boardInput.addEventListener('move', event => {
         if (drawing) addPoint(boardPoint(event));
     });
-    document.addEventListener('mouseup', event => {
+    boardInput.addEventListener('up', event => {
         if (!drawing || event.button !== 0) return;
         addPoint(boardPoint(event));
         finish();
     });
+    boardInput.addEventListener('cancel', finish);
     window.addEventListener('blur', finish);
 })();

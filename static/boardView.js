@@ -1,5 +1,6 @@
 (() => {
     const world = document.getElementById('board-world');
+    const viewport = document.getElementById('board-viewport');
     const map = document.getElementById('map-layer');
     // The board chooses its initial view instead of restoring an old scroll position.
     history.scrollRestoration = 'manual';
@@ -10,9 +11,9 @@
         pendingFrame = null;
         if (!currentMap || map.hidden) return;
         const bounds = map.getBoundingClientRect();
-        window.scrollTo({
-            left: window.scrollX + bounds.left + bounds.width / 2 - document.documentElement.clientWidth / 2,
-            top: window.scrollY + bounds.top + bounds.height / 2 - document.documentElement.clientHeight / 2,
+        viewport.scrollTo({
+            left: viewport.scrollLeft + bounds.left + bounds.width / 2 - viewport.clientWidth / 2,
+            top: viewport.scrollTop + bounds.top + bounds.height / 2 - viewport.clientHeight / 2,
             behavior: 'instant',
         });
         document.dispatchEvent(new CustomEvent('viewPanChanged'));
@@ -59,11 +60,18 @@
 
     function initialView() {
         if (currentMap) scheduleCenter();
-        else window.scrollTo({left: world.offsetLeft, top: world.offsetTop, behavior: 'instant'});
+        else viewport.scrollTo({left: world.offsetLeft, top: world.offsetTop, behavior: 'instant'});
     }
 
     // Space around the board permits centering maps smaller than the viewport at (0, 0).
     // Start an empty board at its origin, then center its first map when it arrives.
+    function sizeViewport() {
+        const space = document.getElementById('board-space');
+        space.style.setProperty('--board-viewport-width', `${viewport.clientWidth}px`);
+        space.style.setProperty('--board-viewport-height', `${viewport.clientHeight}px`);
+    }
+    sizeViewport();
+    new ResizeObserver(sizeViewport).observe(viewport);
     initialView();
     window.addEventListener('load', initialView, {once: true});
 })();

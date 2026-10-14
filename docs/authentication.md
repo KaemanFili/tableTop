@@ -31,7 +31,7 @@ go run .
 ```
 
 For a hosted app, use its HTTPS URL, such as
-`https://tabletop.example.com/auth/discord/callback`, in both Discord and
+`https://vtt.kaeman.dev/auth/discord/callback`, in both Discord and
 `OAUTH2_REDIRECT_URL`. A reverse proxy can terminate HTTPS and forward requests
 to the Go server on port 18080. Keep the client secret in its mounted file.
 Only the app operator performs this setup; players use the sign-in button.

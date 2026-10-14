@@ -18,7 +18,55 @@ type Access interface {
 	RevokeInvitation(string, string) error
 }
 
-var adminTemplate = template.Must(template.New("admin").Parse(`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Invite players · tableTop</title><link rel="stylesheet" href="/static/style.css?v=42"></head><body class="lobby-page"><main><a href="/lobby">Sessions</a><h1>Invite players</h1><p>Each link admits one player to this server and expires after seven days. Share it privately. Players still need a game’s join code.</p>{{if .Error}}<p role="alert">{{.Error}}</p>{{end}}{{if .Link}}<p role="status">Invitation created. Copy this link now; it is only shown once.</p><label>Invite link<input readonly value="{{.Link}}" onclick="this.select()"></label>{{end}}<form action="/admin/invites" method="post"><button>Create invitation</button></form><h2>Pending invitations</h2>{{range .Invites}}<article><span>Expires {{.Expires.Format "2006-01-02 15:04 UTC"}}</span><form action="/admin/invites/{{.ID}}/revoke" method="post"><button>Revoke invitation</button></form></article>{{else}}<p>No pending invitations.</p>{{end}}</main></body></html>`))
+var adminTemplate = template.Must(template.New("admin").Parse(`<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Invite players · tableTop</title>
+  <link rel="icon" href="/static/favicon.ico?v=1" sizes="16x16 32x32 48x48" type="image/x-icon">
+  <link rel="icon" href="/static/favicon-64.png?v=1" sizes="64x64" type="image/png">
+  <link rel="stylesheet" href="/static/style.css?v=52">
+</head>
+<body class="lobby-page admin-page">
+<main>
+  <header class="lobby-header">
+    <div>
+      <h1>Invite players</h1>
+      <p>Manage who can join your server.</p>
+    </div>
+    <a class="page-nav" href="/lobby">← Back to sessions</a>
+  </header>
+  {{if .Error}}<p class="lobby-error" role="alert">{{.Error}}</p>{{end}}
+  <div class="admin-layout">
+    <section class="admin-create">
+      <h2>Create an invitation</h2>
+      <p>Each link admits one player and expires after seven days. Share it privately.</p>
+      <form action="/admin/invites" method="post"><button class="primary-button">Create invitation</button></form>
+      {{if .Link}}
+      <div class="invite-created">
+        <p role="status">Invitation created. Copy this link now; it is only shown once.</p>
+        <label>Invite link<input readonly value="{{.Link}}" onclick="this.select()"></label>
+      </div>
+      {{end}}
+      <p class="admin-note">Players also need a game’s join code after accepting an invitation.</p>
+    </section>
+    <section class="admin-pending">
+      <div class="section-heading"><h2>Pending invitations</h2><span class="section-count">{{len .Invites}}</span></div>
+      <p>Unused links that can still be accepted.</p>
+      <div class="invite-list">
+        {{range .Invites}}
+        <article class="invite-row">
+          <div><p>Expires <time datetime="{{.Expires.Format "2006-01-02T15:04:05Z07:00"}}">{{.Expires.Format "2006-01-02 15:04 UTC"}}</time></p></div>
+          <form action="/admin/invites/{{.ID}}/revoke" method="post"><button class="danger-button">Revoke invitation</button></form>
+        </article>
+        {{else}}<p class="lobby-empty">No pending invitations.</p>{{end}}
+      </div>
+    </section>
+  </div>
+</main>
+</body>
+</html>`))
 
 func (m *Manager) admin(w http.ResponseWriter, r *http.Request) {
 	user := CurrentUser(r)

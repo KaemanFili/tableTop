@@ -199,7 +199,7 @@
         lastErasePoint = null;
     });
 
-    document.addEventListener('mousedown', event => {
+    boardInput.addEventListener('down', event => {
         if (document.body.dataset.tool !== 'pen' || event.button !== 0) return;
         if (!event.target.closest('#grid-container, #unitOverlay .unit')) return;
         event.preventDefault();
@@ -219,11 +219,11 @@
         error.hidden = true;
         flushStroke();
     });
-    document.addEventListener('mousemove', event => {
+    boardInput.addEventListener('move', event => {
         if (active) addPoint(event);
         if (erasing) eraseAt(boardPoint(event));
     });
-    document.addEventListener('mouseup', event => {
+    boardInput.addEventListener('up', event => {
         if (erasing && event.button === 0) {
             eraseAt(boardPoint(event));
             erasing = false;
@@ -233,7 +233,7 @@
         addPoint(event);
         finishStroke();
     });
-    document.addEventListener('mousedown', event => {
+    boardInput.addEventListener('down', event => {
         if (document.body.dataset.tool !== 'eraser' || event.button !== 0) return;
         if (!event.target.closest('#grid-container, #unitOverlay .unit')) return;
         event.preventDefault();
@@ -241,6 +241,11 @@
         lastErasePoint = null;
         error.hidden = true;
         eraseAt(boardPoint(event));
+    });
+    boardInput.addEventListener('cancel', () => {
+        finishStroke();
+        erasing = false;
+        lastErasePoint = null;
     });
     window.addEventListener('blur', () => {
         finishStroke();

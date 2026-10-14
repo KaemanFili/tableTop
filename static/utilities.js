@@ -85,7 +85,7 @@
     });
 
     function cellSize() {
-        return boardGeometry.cellSize(grid);
+        return boardGeometry.localCellSize(grid);
     }
 
     function boardPoint(event) {
@@ -193,7 +193,7 @@
         error.hidden = true;
     });
 
-    document.addEventListener('mousedown', event => {
+    boardInput.addEventListener('down', event => {
         if (document.body.dataset.tool !== 'ruler' || event.button !== 0) return;
         if (!event.target.closest('#grid-container, #unitOverlay .unit')) return;
         event.preventDefault();
@@ -212,7 +212,7 @@
         drawMeasurement(measurement);
         sendRuler();
     });
-    document.addEventListener('mousemove', event => {
+    boardInput.addEventListener('move', event => {
         if (!measuring) return;
         lastPointer = {clientX: event.clientX, clientY: event.clientY};
         const end = boardPoint(event);
@@ -222,13 +222,17 @@
         drawMeasurement(measurement);
         queueRuler();
     });
-    document.addEventListener('mouseup', event => {
+    boardInput.addEventListener('up', event => {
         if (!measuring || event.button !== 0) return;
         const measurement = rulers.get(rulerID);
         measurement.end = boardPoint(event) || measurement.end;
         drawMeasurement(measurement);
         measuring = false;
         sendRuler();
+    });
+    boardInput.addEventListener('cancel', () => {
+        if (measuring) sendRuler();
+        measuring = false;
     });
     window.addEventListener('blur', () => {
         if (measuring) sendRuler();
@@ -244,15 +248,15 @@
     }
     document.addEventListener('scroll', refreshMeasurement, true);
     window.addEventListener('resize', refreshMeasurement);
+    document.addEventListener('viewZoomChanged', refreshMeasurement);
     document.addEventListener('htmx:afterSwap', refreshMeasurement);
 
     document.addEventListener('click', async event => {
         if (document.body.dataset.tool !== 'ping' || event.button !== 0) return;
         if (!event.target.closest('#grid-container, #unitOverlay .unit')) return;
-        const bounds = grid.getBoundingClientRect();
-        const x = Math.round(event.clientX - bounds.left);
-        const y = Math.round(event.clientY - bounds.top);
-        if (x < 0 || y < 0 || x >= bounds.width || y >= bounds.height) return;
+        const point = boardGeometry.localPoint(grid, event);
+        const x = Math.round(point.x), y = Math.round(point.y);
+        if (x < 0 || y < 0 || x >= grid.offsetWidth || y >= grid.offsetHeight) return;
         try {
             if (newUnitUpdateSocket.readyState !== WebSocket.OPEN) throw new Error('Disconnected');
             const response = await fetch(boardURL('/board/ping'), {

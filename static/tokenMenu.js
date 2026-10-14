@@ -142,7 +142,7 @@
     });
 
     // Capture runs before the existing drag listener. Menu buttons are outside units.
-    document.addEventListener('mousedown', event => {
+    document.addEventListener('pointerdown', event => {
         if (!menu.contains(event.target) && !statuses.contains(event.target)) close();
     }, true);
     document.addEventListener('click', event => {
@@ -168,6 +168,7 @@
         close();
     }, true);
     window.addEventListener('resize', close);
+    document.addEventListener('viewZoomChanged', close);
     document.addEventListener('boardCleared', close);
     document.addEventListener('htmx:beforeSwap', event => {
         if (event.detail.target === overlay) close();

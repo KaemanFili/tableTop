@@ -123,3 +123,38 @@ func TestComposeDevFlagIsExplicit(t *testing.T) {
 		t.Fatal("development override was not controlled by -dev")
 	}
 }
+
+func TestComposeTunnelFlagAndDevelopmentRejection(t *testing.T) {
+	root, _, _ := scriptFixture(t)
+	for _, args := range [][]string{
+		{"compose.sh", "config"},
+		{"compose.sh", "-tunnel", "config"},
+		{"compose.sh", "-host-data", "-tunnel", "config"},
+	} {
+		if output, err := exec.Command("sh", args...).CombinedOutput(); err != nil {
+			t.Fatalf("compose wrapper: %v %s", err, output)
+		}
+	}
+	log, err := os.ReadFile(filepath.Join(root, "docker.log"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	lines := strings.Split(strings.TrimSpace(string(log)), "\n")
+	if len(lines) != 3 || strings.Contains(lines[0], "compose.tunnel.yaml") ||
+		!strings.Contains(lines[1], "compose.tunnel.yaml") ||
+		!strings.Contains(lines[2], "compose.host-data.yaml") || !strings.Contains(lines[2], "compose.tunnel.yaml") {
+		t.Fatal("tunnel or host storage overrides were not selected correctly")
+	}
+	for _, args := range [][]string{
+		{"compose.sh", "-dev", "-tunnel", "config"},
+		{"compose.sh", "-tunnel", "-dev", "config"},
+	} {
+		if output, err := exec.Command("sh", args...).CombinedOutput(); err == nil || !strings.Contains(string(output), "unauthenticated") {
+			t.Fatalf("development tunnel was not rejected: %v %s", err, output)
+		}
+	}
+	after, _ := os.ReadFile(filepath.Join(root, "docker.log"))
+	if string(after) != string(log) {
+		t.Fatal("rejected development tunnel still invoked Docker")
+	}
+}

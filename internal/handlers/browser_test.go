@@ -68,6 +68,11 @@ func TestBrowserSync(t *testing.T) {
 	})
 	mux.HandleFunc("/browser/progress", func(w http.ResponseWriter, r *http.Request) { t.Log(r.URL.Query().Get("stage")) })
 	mux.HandleFunc("/browser/state", func(w http.ResponseWriter, r *http.Request) { json.NewEncoder(w).Encode(state.Units()) })
+	mux.HandleFunc("/browser/gestures", func(w http.ResponseWriter, r *http.Request) {
+		ws.boardMutex.Lock()
+		defer ws.boardMutex.Unlock()
+		json.NewEncoder(w).Encode(map[string]any{"strokes": ws.strokes, "fog": ws.fogMarks, "rulers": ws.rulers})
+	})
 	mux.HandleFunc("/browser/maps", func(w http.ResponseWriter, r *http.Request) { json.NewEncoder(w).Encode(maps.Maps()) })
 	// Send one production-format position update without starting a permanent ticker.
 	mux.HandleFunc("/browser/positions", func(w http.ResponseWriter, r *http.Request) {

@@ -5,7 +5,7 @@ updateServerSocket.onopen = () => {
     console.log("webSocket connection established");
 };
 
-document.addEventListener("mousedown", function (e) {
+boardInput.addEventListener("down", function (e) {
     if (e.button !== 0) return;
     if (['ping', 'ruler', 'pen', 'eraser', 'fog', 'fog-eraser'].includes(document.body.dataset.tool)) return;
     const target = e.target.closest(".unit");
@@ -13,8 +13,10 @@ document.addEventListener("mousedown", function (e) {
     // Artwork and other children should drag their containing unit.
     e.preventDefault();
 
-    let offsetX = e.clientX - target.offsetLeft;
-    let offsetY = e.clientY - target.offsetTop;
+    const overlay = target.parentElement;
+    const start = boardGeometry.localPoint(overlay, e);
+    const offsetX = start.x - target.offsetLeft;
+    const offsetY = start.y - target.offsetTop;
 
     //Add dragging class
     isDragging = true;
@@ -24,8 +26,9 @@ document.addEventListener("mousedown", function (e) {
     let sendTimer = null;
 
     function move(e) {
-        target.style.left = `${e.clientX - offsetX}px`;
-        target.style.top = `${e.clientY - offsetY}px`;
+        const point = boardGeometry.localPoint(overlay, e);
+        target.style.left = `${point.x - offsetX}px`;
+        target.style.top = `${point.y - offsetY}px`;
         if (!sendTimer) sendTimer = setTimeout(updateUnitPositionOnServer, 33);
     }
 
@@ -38,9 +41,10 @@ document.addEventListener("mousedown", function (e) {
     }
 
     function finish(sendPosition) {
-        document.removeEventListener("mousemove", move);
-        document.removeEventListener("mouseup", up);
+        boardInput.removeEventListener("move", move);
+        boardInput.removeEventListener("up", up);
         document.removeEventListener("unitRemoved", removed);
+        boardInput.removeEventListener("cancel", up);
         window.removeEventListener("blur", up);
         clearTimeout(sendTimer);
         sendTimer = null;
@@ -77,8 +81,9 @@ document.addEventListener("mousedown", function (e) {
         }
     }
 
-    document.addEventListener("mousemove", move);
-    document.addEventListener("mouseup", up);
+    boardInput.addEventListener("move", move);
+    boardInput.addEventListener("up", up);
+    boardInput.addEventListener("cancel", up);
     document.addEventListener("unitRemoved", removed);
     window.addEventListener("blur", up);
 });

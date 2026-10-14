@@ -1,4 +1,5 @@
 (() => {
+    const viewport = document.getElementById('board-viewport');
     let drag = null;
     let suppressMenuUntil = 0;
     let openingUnitMenu = false;
@@ -30,7 +31,7 @@
         if (event.button !== 2 || (event.buttons & 1)) return;
         if (!event.target.closest('#grid-container, #unitOverlay .unit')) return;
         event.preventDefault();
-        drag = {x: event.clientX, y: event.clientY, left: window.scrollX, top: window.scrollY,
+        drag = {x: event.clientX, y: event.clientY, left: viewport.scrollLeft, top: viewport.scrollTop,
             unit: event.target.closest('#unitOverlay .unit'), moved: false};
     }, true);
 
@@ -48,7 +49,7 @@
             document.dispatchEvent(new CustomEvent('viewPanChanged'));
         }
         event.preventDefault();
-        window.scrollTo({left: drag.left - dx, top: drag.top - dy, behavior: 'instant'});
+        viewport.scrollTo({left: drag.left - dx, top: drag.top - dy, behavior: 'instant'});
     }, true);
 
     document.addEventListener('mouseup', event => {

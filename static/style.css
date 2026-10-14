@@ -22,8 +22,9 @@ body, html {
 
 #board-space {
   width: max-content;
-  padding: 50vh 50vw;
+  padding: calc(var(--board-viewport-height, 100dvh) / 2) calc(var(--board-viewport-width, 100vw) / 2);
   background-color: darkgray;
+  touch-action: none;
 }
 
 #board-world {
@@ -1266,6 +1267,7 @@ body.map-panning * {
 #signed-in-user a { color: #fbbf24; }
 
 .lobby-page {
+  --ui-accent: #d7dde7;
   width: auto;
   min-height: 100dvh;
   height: auto;
@@ -1300,7 +1302,7 @@ body.map-panning * {
 
 .lobby-page h1 {
   margin: 0;
-  font-size: clamp(1.5rem, 4vw, 2rem);
+  font-size: clamp(1.5rem, 4vw, 1.75rem);
   letter-spacing: -0.035em;
   overflow-wrap: anywhere;
 }
@@ -1310,7 +1312,7 @@ body.map-panning * {
 .lobby-account { justify-content: flex-start; font-size: 0.8125rem; color: var(--ui-muted); }
 .lobby-account > span { overflow-wrap: anywhere; }
 .lobby-page a { color: var(--ui-accent); text-underline-offset: 3px; }
-.lobby-page a:hover { color: #fde68a; }
+.lobby-page a:hover { color: white; }
 
 .lobby-actions {
   display: grid;
@@ -1323,9 +1325,9 @@ body.map-panning * {
   min-width: 0;
   padding: 1.5rem;
   border: 1px solid var(--ui-border);
-  border-radius: 12px;
+  border-radius: 6px;
   background: var(--ui-surface);
-  box-shadow: 0 4px 16px #0002;
+  box-shadow: none;
 }
 
 .lobby-page form { display: flex; flex-direction: column; align-items: flex-start; gap: 1rem; }
@@ -1338,25 +1340,26 @@ body.map-panning * {
   min-width: 0;
   padding: 0.65rem 0.75rem;
   border: 1px solid var(--ui-border);
-  border-radius: 8px;
+  border-radius: 5px;
   background: var(--ui-field);
   color: var(--ui-text);
   font: inherit;
+  font-weight: 400;
 }
 .lobby-page input::placeholder { color: #949eaf; opacity: 1; }
 .lobby-page input[readonly] { font-family: ui-monospace, monospace; font-weight: 400; color: var(--ui-muted); }
 .lobby-page button {
   padding: 0.6rem 0.9rem;
   border: 1px solid var(--ui-border);
-  border-radius: 8px;
+  border-radius: 5px;
   background: var(--ui-raised);
   color: var(--ui-text);
   font: 600 0.8125rem/1.4 system-ui, sans-serif;
   cursor: pointer;
 }
 .lobby-page button:hover { background: #363e4c; border-color: #697589; }
-.lobby-page .primary-button { background: var(--ui-accent); border-color: var(--ui-accent); color: #1c170c; }
-.lobby-page .primary-button:hover { background: #fcd34d; border-color: #fcd34d; }
+.lobby-page .primary-button { background: var(--ui-accent); border-color: var(--ui-accent); color: #171b22; }
+.lobby-page .primary-button:hover { background: #f1f3f7; border-color: #f1f3f7; }
 .lobby-page :is(input, select, button, a):focus-visible { outline: 2px solid var(--ui-accent); outline-offset: 3px; }
 
 .lobby-table-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; margin-top: 1rem; }
@@ -1368,13 +1371,12 @@ body.map-panning * {
   min-width: 0;
   padding: 1rem;
   border: 1px solid var(--ui-border);
-  border-radius: 9px;
-  background: var(--ui-field);
+  border-radius: 6px;
+  background: var(--ui-surface);
 }
 .lobby-table-heading { flex-wrap: nowrap; align-items: flex-start; width: 100%; gap: 0.75rem; }
 .lobby-table-name { min-width: 0; font-weight: 600; overflow-wrap: anywhere; }
-.lobby-role { flex-shrink: 0; padding: 0.15rem 0.6rem; border-radius: 20px; background: var(--ui-raised); color: var(--ui-muted); font-size: 0.75rem; }
-.lobby-role-gm { background: #43351d; color: #fde68a; }
+.lobby-role { flex-shrink: 0; color: var(--ui-muted); font-size: 0.75rem; }
 .lobby-page .lobby-delete { color: #fca5a5; font-size: 0.8125rem; margin-top: auto; }
 .lobby-page .lobby-delete:hover { color: #fecaca; }
 .lobby-page .lobby-empty { grid-column: 1 / -1; padding: 1rem; border: 1px dashed var(--ui-border); border-radius: 8px; margin: 0; }
@@ -1383,8 +1385,8 @@ body.map-panning * {
 .lobby-page .lobby-pending { margin: 0; border-color: #705a30; background: #43351d; color: #fde68a; }
 .lobby-delete-confirmation { max-width: 640px; margin: 0 auto; }
 .lobby-delete-confirmation form { flex-direction: row; align-items: center; flex-wrap: wrap; }
-.lobby-page .danger-button { border-color: #6a3535; background: #3a2222; color: #fecaca; }
-.lobby-page .danger-button:hover { background: #542929; border-color: #a65757; }
+.lobby-page .danger-button { background: transparent; color: #fca5a5; }
+.lobby-page .danger-button:hover { background: #3a2222; border-color: #6a3535; }
 
 @media (max-width: 700px) {
   .lobby-actions,
@@ -1413,3 +1415,95 @@ body.map-panning * {
 #unit-search-results.htmx-request { color: var(--ui-accent); }
 
 .library-pagination { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 0.75rem; font-size: 0.75rem; color: var(--ui-muted); }
+
+/* Lobby and administration use a restrained, shared page layout. */
+.section-heading { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
+.section-count { color: var(--ui-muted); font-size: 0.8125rem; font-variant-numeric: tabular-nums; }
+.lobby-page .lobby-tabletops { padding: 0; border: 0; background: transparent; }
+.lobby-page .page-nav { font-size: 0.8125rem; }
+.admin-layout { display: grid; grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.3fr); gap: 1.25rem; align-items: start; }
+.admin-page .admin-note { margin: 1.5rem 0 0; font-size: 0.8125rem; }
+.invite-created { margin-top: 1.25rem; padding-top: 1rem; border-top: 1px solid var(--ui-border); }
+.admin-page .invite-created p { color: var(--ui-text); font-size: 0.8125rem; }
+.invite-list { display: flex; flex-direction: column; }
+.invite-row { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.75rem; padding: 1rem 0; border-top: 1px solid var(--ui-border); }
+.admin-page .invite-row p { margin: 0; font-size: 0.8125rem; }
+.admin-page .invite-row time { white-space: nowrap; }
+.admin-page .invite-row button { font-size: 0.75rem; }
+@media (max-width: 700px) {
+  .admin-layout { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* Tokens consume touch drags; unselected board space can still scroll naturally. */
+#unitOverlay .unit {
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+body[data-tool="pen"] #grid-container,
+body[data-tool="eraser"] #grid-container,
+body[data-tool="ruler"] #grid-container,
+body[data-tool="fog"] #grid-container,
+body[data-tool="fog-eraser"] #grid-container {
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+#board-zoom-controls { display: flex; gap: 4px; }
+#board-controls #board-zoom-controls button { padding: 0.4rem 0.6rem; min-width: 32px; }
+#board-zoom-reset { font-variant-numeric: tabular-nums; }
+
+/* Board gestures own the viewport; DOM swaps must not reposition its scroll anchor. */
+.board-document { overscroll-behavior: none; overflow-anchor: none; }
+#board-space { overflow-anchor: none; }
+
+.board-document,
+.board-document body { width: 100%; height: 100%; overflow: hidden; }
+#board-viewport {
+  position: fixed;
+  inset: 0;
+  overflow: auto;
+  overscroll-behavior: none;
+  overflow-anchor: none;
+  touch-action: none;
+  background: darkgray;
+  scrollbar-width: none;
+}
+#board-viewport::-webkit-scrollbar { display: none; }
+
+@media (max-width: 700px), (pointer: coarse) {
+  #ui-overlay button,
+  #board-controls button,
+  .token-menu button,
+  .lobby-page button {
+    min-height: 44px;
+    min-width: 44px;
+    font-size: 0.9375rem;
+  }
+  #ui-overlay .utility-button,
+  #board-controls .utility-button { width: 48px; height: 48px; }
+  #board-controls #board-zoom-controls button { min-height: 44px; min-width: 44px; font-size: 0.9375rem; }
+  #spawn-menu-toggle { font-size: 1rem; }
+  .spawn-menu { font-size: 1rem; }
+  .spawn-menu p,
+  .library-search,
+  .library-unit-size,
+  .spawn-action,
+  .library-content-group > summary { font-size: 0.875rem; }
+  #ui-overlay .unit-library-list > .library-entry > button:not(.library-unit),
+  #ui-overlay .saved-map-list > .library-entry > .library-delete,
+  #ui-overlay .secondary-button { font-size: 0.875rem; }
+  .spawn-menu input:not([type="hidden"]),
+  .spawn-menu select,
+  #create-unit-form input[type="file"],
+  .dice-group input,
+  .dice-group select,
+  .lobby-page input,
+  .lobby-page select { font-size: 16px; }
+  .token-statuses { grid-template-columns: repeat(6, 44px); }
+  .status-circle { width: 44px; height: 44px; }
+  #signed-in-user { flex-wrap: wrap; max-width: calc(100vw - 11rem); }
+  #signed-in-user span { min-width: 0; max-width: 7rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+}

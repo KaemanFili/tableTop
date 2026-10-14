@@ -32,7 +32,7 @@ const menuUI = Object.freeze({
             focusTarget?.focus({preventScroll: true});
         }
         if (panel) {
-            document.addEventListener('mousedown', event => {
+            document.addEventListener('pointerdown', event => {
                 if (!panel.contains(event.target) && !buttons.some(button => button.contains(event.target))) close();
             });
             document.addEventListener('keydown', event => {

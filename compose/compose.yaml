@@ -11,7 +11,7 @@ services:
     environment:
       # Set these public settings to enable Discord sign-in.
       OAUTH2_CLIENT_ID: "${OAUTH2_CLIENT_ID}"
-      # Local callback: http://localhost:18080/auth/discord/callback
+      # Public callback: https://vtt.kaeman.dev/auth/discord/callback
       OAUTH2_REDIRECT_URL: "${OAUTH2_REDIRECT_URL}"
       OAUTH2_CLIENT_SECRET_FILE: /run/secrets/oauth2_client_secret
       TABLETOP_ADMIN_USER_IDS: "${TABLETOP_ADMIN_USER_IDS:-}"

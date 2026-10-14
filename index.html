@@ -1,11 +1,13 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="board-document">
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>VTT</title>
+        <link rel="icon" href="/static/favicon.ico?v=1" sizes="16x16 32x32 48x48" type="image/x-icon">
+        <link rel="icon" href="/static/favicon-64.png?v=1" sizes="64x64" type="image/png">
         <script src="/static/vendor/htmx-2.0.11.min.js"></script>
-        <link rel="stylesheet" href="/static/style.css?v=50">
+        <link rel="stylesheet" href="/static/style.css?v=56">
     </head>
     <body data-gm="{{ .IsGM }}" data-session-prefix="{{ boardPrefix }}">
         <div
@@ -31,6 +33,11 @@
             </div>
             {{ end }}
             <button type="button" id="toggle-ui-controls" aria-expanded="true" aria-controls="ui-overlay" title="Hide controls">Hide UI</button>
+            <div id="board-zoom-controls" role="group" aria-label="Board zoom">
+                <button type="button" id="board-zoom-out" aria-label="Zoom board out">−</button>
+                <button type="button" id="board-zoom-reset" aria-label="Reset board zoom">100%</button>
+                <button type="button" id="board-zoom-in" aria-label="Zoom board in">+</button>
+            </div>
             <button type="button" id="roll-dice" class="utility-button" title="Roll dice" aria-label="Roll dice" aria-expanded="false" aria-controls="dice-menu">
                 <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
                     <path d="m12 2 9 5v10l-9 5-9-5V7zM12 6 6 16h12zM12 2v4M3 7l9-1 9 1M3 7l3 9-3 1M21 7l-3 9 3 1M6 16l6 6 6-6"/>
@@ -123,17 +130,19 @@
             </article>
         </template>
         <div id="dice-layer" aria-hidden="true"></div>
-        <div id="board-space">
-            <div id="board-world">
-                <div class="grid-wrapper">
-                    <img id="map-layer" alt="" draggable="false" hidden>
-                    <svg id="drawing-layer" viewBox="0 0 64 64" preserveAspectRatio="none" aria-hidden="true" focusable="false"></svg>
-                    <div id = "grid-container" class="grid"></div>
-                    <div id="ping-layer" aria-hidden="true"></div>
-                    <div id="ruler-layer"></div>
-                    <canvas id="fog-layer" width="2560" height="2560" aria-hidden="true"></canvas>
+        <div id="board-viewport" aria-label="Tabletop viewport">
+            <div id="board-space">
+                <div id="board-world">
+                    <div class="grid-wrapper">
+                        <img id="map-layer" alt="" draggable="false" hidden>
+                        <svg id="drawing-layer" viewBox="0 0 64 64" preserveAspectRatio="none" aria-hidden="true" focusable="false"></svg>
+                        <div id = "grid-container" class="grid"></div>
+                        <div id="ping-layer" aria-hidden="true"></div>
+                        <div id="ruler-layer"></div>
+                        <canvas id="fog-layer" width="2560" height="2560" aria-hidden="true"></canvas>
+                    </div>
+                    <div id="unitOverlay" class="unitOverlay"></div>
                 </div>
-                <div id="unitOverlay" class="unitOverlay"></div>
             </div>
         </div>
         <div id="brush-cursor" aria-hidden="true" hidden></div>
@@ -154,17 +163,19 @@
         <div id="token-status-tooltip" class="token-status-tooltip" role="tooltip" hidden></div>
         <script type="application/json" id="unit-sizes">{{ .UnitSizes }}</script>
         <script src="/static/session.js?v=1"></script>
-        <script src="/static/pan.js?v=1"></script>
-        <script src="/static/menuUI.js?v=2"></script>
-        <script src="/static/tokenMenu.js?v=11"></script>
+        <script src="/static/pan.js?v=2"></script>
+        <script src="/static/menuUI.js?v=3"></script>
+        <script src="/static/tokenMenu.js?v=13"></script>
         <script src="/static/movement.js?v=1"></script>
-        <script src="/static/drag.js?v=12"></script>
+        <script src="/static/boardInput.js?v=2"></script>
+        <script src="/static/drag.js?v=14"></script>
         <script src="/static/updateClients.js?v=20"></script>
-        <script src="/static/boardGeometry.js?v=1"></script>
-        <script src="/static/utilities.js?v=13"></script>
-        <script src="/static/pen.js?v=6"></script>
-        <script src="/static/fog.js?v=4"></script>
-        <script src="/static/brushCursor.js?v=3"></script>
+        <script src="/static/boardGeometry.js?v=3"></script>
+        <script src="/static/boardZoom.js?v=4"></script>
+        <script src="/static/utilities.js?v=16"></script>
+        <script src="/static/pen.js?v=7"></script>
+        <script src="/static/fog.js?v=5"></script>
+        <script src="/static/brushCursor.js?v=5"></script>
         <script src="/static/ui.js?v=11"></script>
         <script src="/static/notifications.js?v=1"></script>
         <script src="/static/diceAnimation.js?v=1"></script>
@@ -172,6 +183,6 @@
         <script src="/static/mapEditor.js?v=2"></script>
         <script src="/static/imageFit.js?v=3"></script>
         <script src="/static/librarySearch.js?v=3"></script>
-        <script src="/static/boardView.js?v=2"></script>
+        <script src="/static/boardView.js?v=3"></script>
     </body>
 </html>

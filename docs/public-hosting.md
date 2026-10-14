@@ -34,6 +34,53 @@ development board through a public tunnel.
 
 ## Network and resource limits
 
+### Cloudflare tunnel (VTT)
+
+The optional `compose/compose.tunnel.yaml` runs `cloudflared` alongside the app.
+The tunnel name in Cloudflare can be **VTT**; its token identifies the tunnel,
+so the name does not need to appear in the connector command.
+
+Create the token file locally:
+
+```sh
+mkdir -p compose/secrets
+chmod 700 compose/secrets
+touch compose/secrets/cloudflare_tunnel_token
+chmod 644 compose/secrets/cloudflare_tunnel_token
+```
+
+Open that file in your editor and paste only the tunnel token, without quotes,
+`--token`, or the Docker command. This directory is excluded from Git and Docker
+builds. Its private host permissions protect the files while the file permissions
+allow the container to read its mounted secret. The connector uses Cloudflare's
+[`--token-file` option](https://developers.cloudflare.com/cloudflare-one/networks/connectors/cloudflare-tunnel/configure-tunnels/run-parameters/#token-file),
+keeping the token out of Compose YAML, container arguments, and environment variables.
+If a token was shared in chat or otherwise exposed, rotate it before using it;
+see [Cloudflare token rotation](https://developers.cloudflare.com/tunnel/reference/tunnel-tokens/).
+
+In Cloudflare's **VTT** tunnel, add a published application route for
+**vtt.kaeman.dev**, with service type **HTTP** and service URL **tabletop:18080**. Leave
+the path and HTTP Host Header override unset. The connector shares the app's
+Docker network; `localhost` inside it would refer to the connector itself.
+
+Set `OAUTH2_REDIRECT_URL` in `compose/.env` to
+`https://vtt.kaeman.dev/auth/discord/callback` and register the identical URL in
+Discord's OAuth2 settings. Keep the existing client ID, secret, and administrator
+IDs configured. Start normal authenticated hosting from the repository root:
+
+```sh
+./compose/compose.sh -tunnel up -d
+./compose/compose.sh -tunnel logs -f cloudflared
+```
+
+The tunnel stays running across container restarts. If using host-backed artwork
+storage, combine `-host-data -tunnel`. After replacing a rotated token file, run
+`./compose/compose.sh -tunnel up -d --force-recreate cloudflared`.
+Stop the connector with `./compose/compose.sh -tunnel stop cloudflared` before
+switching to development mode. The wrapper rejects combining `-dev` and `-tunnel`.
+
+### Origin network and limits
+
 Compose publishes port 18080 only on `127.0.0.1`. A proxy or `cloudflared` running
 on the host can forward to `http://localhost:18080`. Players connect through the
 public HTTPS hostname; register that exact callback URL with Discord too.
