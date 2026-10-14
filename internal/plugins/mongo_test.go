@@ -10,10 +10,12 @@ import (
 	"go.mongodb.org/mongo-driver/v2/bson"
 	"go.mongodb.org/mongo-driver/v2/mongo"
 	"go.mongodb.org/mongo-driver/v2/mongo/options"
-	"tableTop/main/internal/app"
+
+	"tableTop/main/internal/app/model"
+	"tableTop/main/internal/app/persistence"
 )
 
-func mongoFixture(t *testing.T) (*app.MongoStore, *mongo.Database, string) {
+func mongoFixture(t *testing.T) (*persistence.MongoStore, *mongo.Database, string) {
 	t.Helper()
 	uri := os.Getenv("TABLETOP_TEST_MONGODB_URI")
 	if uri == "" {
@@ -22,7 +24,7 @@ func mongoFixture(t *testing.T) (*app.MongoStore, *mongo.Database, string) {
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 	name := "tabletop_plugin_test_" + rand.Text()
-	store, err := app.NewMongoStore(ctx, uri, name)
+	store, err := persistence.NewMongoStore(ctx, uri, name)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -47,10 +49,10 @@ func TestMongoBoundInitializationDoesNotImportDefaults(t *testing.T) {
 	store, db, scope := mongoFixture(t)
 	p := newPackFixture(t).pack(t)
 	dir := t.TempDir()
-	if err := app.InitializeOwned(dir, scope, store, nil); err != nil {
+	if err := persistence.InitializeOwned(dir, scope, store, nil); err != nil {
 		t.Fatal(err)
 	}
-	units, err := app.NewUnitLibraryWithStore(dir, store.Units(scope))
+	units, err := persistence.NewUnitLibraryWithStore(dir, store.Units(scope))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -75,19 +77,19 @@ func TestMongoOwnedMapKeepsPluginArtworkReference(t *testing.T) {
 	store, _, scope := mongoFixture(t)
 	p := newPackFixture(t).pack(t)
 	dir := t.TempDir()
-	if err := app.InitializeOwned(dir, scope, store, nil); err != nil {
+	if err := persistence.InitializeOwned(dir, scope, store, nil); err != nil {
 		t.Fatal(err)
 	}
-	maps, err := app.NewMapLibraryWithStore(dir, store.Maps(scope))
+	maps, err := persistence.NewMapLibraryWithStore(dir, store.Maps(scope))
 	if err != nil {
 		t.Fatal(err)
 	}
 	maps.SetDefaults(p)
-	copy, err := maps.SaveMap(p.Maps()[0], app.SavedBoard{Units: []app.UnitData{{Name: "Owned scout", ImageID: app.NPCUnitImageID}}})
+	copy, err := maps.SaveMap(p.Maps()[0], model.SavedBoard{Units: []model.UnitData{{Name: "Owned scout", ImageID: model.NPCUnitImageID}}})
 	if err != nil {
 		t.Fatal(err)
 	}
-	reloaded, err := app.NewMapLibraryWithStore(dir, store.Maps(scope))
+	reloaded, err := persistence.NewMapLibraryWithStore(dir, store.Maps(scope))
 	if err != nil {
 		t.Fatal(err)
 	}

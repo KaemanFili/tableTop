@@ -10,7 +10,8 @@ import (
 	"strings"
 	"time"
 
-	"tableTop/main/internal/app"
+	"tableTop/main/internal/app/model"
+	"tableTop/main/internal/app/persistence"
 	"tableTop/main/internal/auth"
 	"tableTop/main/internal/handlers"
 	"tableTop/main/internal/plugins"
@@ -26,7 +27,7 @@ func main() {
 func run() error {
 	dev := flag.Bool("dev", false, "enable the unauthenticated local development board")
 	flag.Parse()
-	limits, err := app.StorageLimitsFromEnvironment("data")
+	limits, err := persistence.StorageLimitsFromEnvironment("data")
 	if err != nil {
 		return fmt.Errorf("configure storage limits: %w", err)
 	}
@@ -39,7 +40,7 @@ func run() error {
 	if err != nil {
 		return err
 	}
-	var store app.LibraryStore
+	var store persistence.LibraryStore
 	if mongoStore != nil {
 		defer mongoStore.Close(context.Background())
 		store = mongoStore
@@ -67,7 +68,7 @@ func run() error {
 	return server.ListenAndServe()
 }
 
-func connectMongoStore() (*app.MongoStore, error) {
+func connectMongoStore() (*persistence.MongoStore, error) {
 	uri := os.Getenv("TABLETOP_MONGODB_URI")
 	if uri == "" {
 		return nil, nil
@@ -78,14 +79,14 @@ func connectMongoStore() (*app.MongoStore, error) {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
-	store, err := app.NewMongoStore(ctx, uri, database)
+	store, err := persistence.NewMongoStore(ctx, uri, database)
 	if err != nil {
 		return nil, fmt.Errorf("connect MongoDB: %w", err)
 	}
 	return store, nil
 }
 
-func registerAuthenticatedRoutes(mux *http.ServeMux, authentication *auth.Manager, store app.LibraryStore, limits *app.StorageLimits) error {
+func registerAuthenticatedRoutes(mux *http.ServeMux, authentication *auth.Manager, store persistence.LibraryStore, limits *persistence.StorageLimits) error {
 	sessions, err := tables.NewWithStore("data", ".", store, limits)
 	if err != nil {
 		return fmt.Errorf("load tabletop sessions: %w", err)
@@ -95,32 +96,32 @@ func registerAuthenticatedRoutes(mux *http.ServeMux, authentication *auth.Manage
 	return nil
 }
 
-func registerDevelopmentRoutes(mux *http.ServeMux, store app.LibraryStore, limits *app.StorageLimits) error {
+func registerDevelopmentRoutes(mux *http.ServeMux, store persistence.LibraryStore, limits *persistence.StorageLimits) error {
 	defaults, err := plugins.Development("data", ".", store, limits)
 	if err != nil {
 		return fmt.Errorf("initialize development content: %w", err)
 	}
-	var unitStore app.DocumentStore[app.UnitDefinition]
-	var mapStore app.DocumentStore[app.MapDefinition]
+	var unitStore persistence.DocumentStore[model.UnitDefinition]
+	var mapStore persistence.DocumentStore[model.MapDefinition]
 	if store != nil {
 		unitStore = store.Units("dev")
 		mapStore = store.Maps("dev")
 	}
-	library, err := app.NewUnitLibraryWithStore("data", unitStore, limits)
+	library, err := persistence.NewUnitLibraryWithStore("data", unitStore, limits)
 	if err != nil {
 		return fmt.Errorf("load unit library: %w", err)
 	}
-	maps, err := app.NewMapLibraryWithStore("data", mapStore, limits)
+	maps, err := persistence.NewMapLibraryWithStore("data", mapStore, limits)
 	if err != nil {
 		return fmt.Errorf("load map library: %w", err)
 	}
 	library.SetDefaults(defaults)
 	maps.SetDefaults(defaults)
-	statuses, err := app.EffectiveStatuses("data", "dev", store, limits, defaults)
+	statuses, err := persistence.EffectiveStatuses("data", "dev", store, limits, defaults)
 	if err != nil {
 		return fmt.Errorf("load statuses: %w", err)
 	}
-	state, err := app.NewStateWithStatuses(statuses)
+	state, err := model.NewStateWithStatuses(statuses)
 	if err != nil {
 		return err
 	}
@@ -132,12 +133,12 @@ func registerDevelopmentRoutes(mux *http.ServeMux, store app.LibraryStore, limit
 	return nil
 }
 
-func configureAuthentication(dev bool, dir string, limits *app.StorageLimits) (*auth.Manager, error) {
+func configureAuthentication(dev bool, dir string, limits *persistence.StorageLimits) (*auth.Manager, error) {
 	if dev {
 		return nil, nil
 	}
 	admins := strings.FieldsFunc(os.Getenv("TABLETOP_ADMIN_USER_IDS"), func(r rune) bool { return r == ',' || r == ' ' || r == '\n' })
-	access, err := app.NewAccessLibrary(dir, admins, limits)
+	access, err := persistence.NewAccessLibrary(dir, admins, limits)
 	if err != nil {
 		return nil, err
 	}

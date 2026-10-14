@@ -8,13 +8,14 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
-	"tableTop/main/internal/app"
+
+	"tableTop/main/internal/app/model"
 )
 
 func TestClearBoardSharedStateAndDelayedUpdates(t *testing.T) {
-	state := app.NewState()
-	firstToken := state.AddRandomUnit(app.DefaultUnitImageID)
-	secondToken := state.AddRandomUnit(app.PCUnitImageID)
+	state := model.NewState()
+	firstToken := state.AddRandomUnit(model.DefaultUnitImageID)
+	secondToken := state.AddRandomUnit(model.PCUnitImageID)
 	ws := NewWebSocketHandler(state)
 	library := newTestLibrary(t)
 	handler := newTestEndpointHandler(t, state, ws, library)
@@ -93,7 +94,7 @@ func TestClearBoardSharedStateAndDelayedUpdates(t *testing.T) {
 	if _, exists := library.UnitByID("knight"); !exists {
 		t.Fatal("clear removed library units")
 	}
-	newToken := state.AddRandomUnit(app.PCUnitImageID)
+	newToken := state.AddRandomUnit(model.PCUnitImageID)
 	if newToken.ID == firstToken.ID || newToken.ID == secondToken.ID {
 		t.Fatal("clear reused token IDs")
 	}

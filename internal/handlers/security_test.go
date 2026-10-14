@@ -11,11 +11,12 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
-	"tableTop/main/internal/app"
+
+	"tableTop/main/internal/app/model"
 )
 
 func TestWebSocketMessageAndConnectionLimits(t *testing.T) {
-	ws := NewWebSocketHandler(app.NewState())
+	ws := NewWebSocketHandler(model.NewState())
 	ws.socketSlots = make(chan struct{}, 1)
 	mux := http.NewServeMux()
 	ws.RegisterRoutes(mux)
@@ -54,25 +55,25 @@ func TestWebSocketMessageAndConnectionLimits(t *testing.T) {
 }
 
 func TestLiveBoardCapsAndReclamation(t *testing.T) {
-	state := app.NewState()
+	state := model.NewState()
 	ws := NewWebSocketHandler(state)
-	for range app.MaxBoardUnits {
-		state.AddRandomUnit(app.PCUnitImageID)
+	for range model.MaxBoardUnits {
+		state.AddRandomUnit(model.PCUnitImageID)
 	}
 	mux := http.NewServeMux()
 	newTestEndpointHandler(t, state, ws, newTestLibrary(t)).RegisterRoutes(mux)
 	result := httptest.NewRecorder()
 	mux.ServeHTTP(result, httptest.NewRequest("POST", "/unit?unitID=knight", nil))
-	if result.Code != 409 || state.UnitCount() != app.MaxBoardUnits {
+	if result.Code != 409 || state.UnitCount() != model.MaxBoardUnits {
 		t.Fatal("token count limit was bypassed")
 	}
-	ws.drawingPoints = app.MaxBoardPoints
+	ws.drawingPoints = model.MaxBoardPoints
 	stroke, _ := json.Marshal(penStroke{Type: "penStroke", ID: "1", Points: []rulerPoint{{X: 1, Y: 1}}})
-	if err := ws.updatePen("player", stroke); !errors.Is(err, app.ErrCapacity) || len(ws.strokes) != 0 {
+	if err := ws.updatePen("player", stroke); !errors.Is(err, model.ErrCapacity) || len(ws.strokes) != 0 {
 		t.Fatal("drawing point limit was bypassed")
 	}
 	fog, _ := json.Marshal(fogMark{Type: "fogMark", ID: "1", Mode: "paint", Width: 1, Points: []rulerPoint{{X: 1, Y: 1}}})
-	if err := ws.updateFog("gm", fog); !errors.Is(err, app.ErrCapacity) || len(ws.fogMarks) != 0 {
+	if err := ws.updateFog("gm", fog); !errors.Is(err, model.ErrCapacity) || len(ws.fogMarks) != 0 {
 		t.Fatal("fog point limit was bypassed")
 	}
 	ws.boardMutex.Lock()

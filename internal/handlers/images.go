@@ -6,15 +6,15 @@ import (
 	"os"
 	"path/filepath"
 
-	"tableTop/main/internal/app"
+	"tableTop/main/internal/app/model"
 )
 
 // Image IDs belong to artwork, so multiple units can share the same file.
 // Resolve IDs here rather than accepting filesystem paths from clients.
 var unitImages = map[string]string{
-	app.DefaultUnitImageID: "static/images/default-unit.svg",
-	app.NPCUnitImageID:     "static/images/goblin.png",
-	app.PCUnitImageID:      "static/images/knight.png",
+	model.DefaultUnitImageID: "static/images/default-unit.svg",
+	model.NPCUnitImageID:     "static/images/goblin.png",
+	model.PCUnitImageID:      "static/images/knight.png",
 }
 
 func (h *EndpointHandler) unitImage(w http.ResponseWriter, r *http.Request) {

@@ -7,17 +7,18 @@ import (
 	"strings"
 	"testing"
 
-	"tableTop/main/internal/app"
+	"tableTop/main/internal/app/model"
+	"tableTop/main/internal/app/persistence"
 	"tableTop/main/internal/plugins"
 )
 
-func defaultUnitHandler(t *testing.T) (*http.ServeMux, *app.UnitLibrary, app.UnitDefinition) {
+func defaultUnitHandler(t *testing.T) (*http.ServeMux, *persistence.UnitLibrary, model.UnitDefinition) {
 	t.Helper()
 	dir := t.TempDir()
-	if err := app.InitializeOwned(dir, "test", nil, nil); err != nil {
+	if err := persistence.InitializeOwned(dir, "test", nil, nil); err != nil {
 		t.Fatal(err)
 	}
-	library, err := app.NewUnitLibrary(dir)
+	library, err := persistence.NewUnitLibrary(dir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -38,7 +39,7 @@ func defaultUnitHandler(t *testing.T) (*http.ServeMux, *app.UnitLibrary, app.Uni
 	if !ok {
 		t.Fatal("default knight missing")
 	}
-	state := app.NewState()
+	state := model.NewState()
 	mux := http.NewServeMux()
 	newTestEndpointHandler(t, state, NewWebSocketHandler(state), library).RegisterRoutes(mux)
 	return mux, library, source
@@ -62,7 +63,7 @@ func TestUnitCopyFormKeepsChosenMetadataAndOriginalImage(t *testing.T) {
 			continue
 		}
 		if unit.Name == "Owned knight" {
-			if unit.ReadOnly || unit.Source == nil || unit.ImageID != source.ImageID || unit.UnitType != "npc" || unit.Size != app.SizeLarge {
+			if unit.ReadOnly || unit.Source == nil || unit.ImageID != source.ImageID || unit.UnitType != "npc" || unit.Size != model.SizeLarge {
 				t.Fatal("copy lost ownership, image, or chosen metadata")
 			}
 			return

@@ -11,7 +11,8 @@ import (
 	"sort"
 	"sync"
 
-	"tableTop/main/internal/app"
+	"tableTop/main/internal/app/model"
+	"tableTop/main/internal/app/persistence"
 	"tableTop/main/internal/artwork"
 )
 
@@ -19,12 +20,12 @@ type mapEntry struct {
 	Key       string `json:"key"`
 	Image     string `json:"image"`
 	BoardFile string `json:"boardFile,omitempty"`
-	app.MapDefinition
+	model.MapDefinition
 }
 type unitEntry struct {
 	Key   string `json:"key"`
 	Image string `json:"image"`
-	app.UnitDefinition
+	model.UnitDefinition
 }
 type asset struct {
 	path  string
@@ -33,11 +34,11 @@ type asset struct {
 type reader struct {
 	mu          sync.Mutex
 	maps        map[string]mapEntry
-	units       map[string]app.UnitDefinition
-	byKey       map[string]app.UnitDefinition
+	units       map[string]model.UnitDefinition
+	byKey       map[string]model.UnitDefinition
 	images      map[string]asset
-	statuses    []app.UnitStatusOption
-	statusNames map[app.UnitStatus]bool
+	statuses    []model.UnitStatusOption
+	statusNames map[model.UnitStatus]bool
 	files       map[string]int64
 	stamps      map[string]string
 	hashes      map[string][32]byte
@@ -48,8 +49,8 @@ func StableID(plugin, kind, key string) string {
 	sum := sha256.Sum256([]byte(plugin + "\x00" + kind + "\x00" + key))
 	return hex.EncodeToString(sum[:16])
 }
-func (p Pack) Binding() app.PluginBinding {
-	return app.PluginBinding{PluginID: p.ID, Version: p.Version, Fingerprint: p.reader.fingerprint}
+func (p Pack) Binding() model.PluginBinding {
+	return model.PluginBinding{PluginID: p.ID, Version: p.Version, Fingerprint: p.reader.fingerprint}
 }
 func (p *Pack) load() error {
 	p.reader = newReader(p.Manifest, p.bounds)
@@ -66,8 +67,8 @@ func (p *Pack) load() error {
 }
 func newReader(manifest Manifest, bounds Bounds) *reader {
 	return &reader{
-		maps: map[string]mapEntry{}, units: map[string]app.UnitDefinition{}, byKey: map[string]app.UnitDefinition{}, images: map[string]asset{},
-		statusNames: map[app.UnitStatus]bool{}, files: map[string]int64{"plugin.json": bounds.Metadata, manifest.Maps: bounds.Content, manifest.Units: bounds.Content, manifest.Statuses: bounds.Content},
+		maps: map[string]mapEntry{}, units: map[string]model.UnitDefinition{}, byKey: map[string]model.UnitDefinition{}, images: map[string]asset{},
+		statusNames: map[model.UnitStatus]bool{}, files: map[string]int64{"plugin.json": bounds.Metadata, manifest.Maps: bounds.Content, manifest.Units: bounds.Content, manifest.Statuses: bounds.Content},
 		stamps: map[string]string{}, hashes: map[string][32]byte{},
 	}
 }
@@ -138,15 +139,15 @@ func (p Pack) validateFile(path, expected string) error {
 	p.reader.stamps[path] = stamp
 	return nil
 }
-func (p Pack) source(key string) *app.ContentSource {
-	return &app.ContentSource{PluginID: p.ID, Version: p.Version, Key: key}
+func (p Pack) source(key string) *model.ContentSource {
+	return &model.ContentSource{PluginID: p.ID, Version: p.Version, Key: key}
 }
-func (p Pack) reference(kind, id string) *app.ArtworkReference {
-	return &app.ArtworkReference{PluginID: p.ID, Version: p.Version, Kind: kind, ImageID: id}
+func (p Pack) reference(kind, id string) *model.ArtworkReference {
+	return &model.ArtworkReference{PluginID: p.ID, Version: p.Version, Kind: kind, ImageID: id}
 }
 func (p Pack) readStatuses() error {
 	if err := p.list(p.Manifest.Statuses, func(raw json.RawMessage) error {
-		var value app.UnitStatusOption
+		var value model.UnitStatusOption
 		if err := json.Unmarshal(raw, &value); err != nil {
 			return err
 		}
@@ -159,7 +160,7 @@ func (p Pack) readStatuses() error {
 	}); err != nil {
 		return err
 	}
-	return app.ValidateUnitStatuses(p.reader.statuses)
+	return model.ValidateUnitStatuses(p.reader.statuses)
 }
 func (p Pack) readUnits() error {
 	return p.list(p.Manifest.Units, func(raw json.RawMessage) error {
@@ -179,26 +180,26 @@ func (p Pack) readUnits() error {
 		return nil
 	})
 }
-func (p Pack) defaultUnit(entry unitEntry) (app.UnitDefinition, error) {
+func (p Pack) defaultUnit(entry unitEntry) (model.UnitDefinition, error) {
 	unit := entry.UnitDefinition
 	unit.ID = StableID(p.ID, "unit", entry.Key)
 	unit.Source = p.source(entry.Key)
 	unit.ReadOnly = true
 	if unit.Size == "" {
-		unit.Size = app.SizeMedium
+		unit.Size = model.SizeMedium
 	}
-	if unit.ImageFit == (app.ImageFit{}) {
-		unit.ImageFit = app.DefaultImageFit()
+	if unit.ImageFit == (model.ImageFit{}) {
+		unit.ImageFit = model.DefaultImageFit()
 	}
-	if err := app.ValidateUnitDefinition(unit.Name, unit.UnitType, unit.Size); err != nil {
+	if err := persistence.ValidateUnitDefinition(unit.Name, unit.UnitType, unit.Size); err != nil {
 		return unit, err
 	}
 	if err := unit.ImageFit.Validate(); err != nil {
 		return unit, err
 	}
-	unit.ImageID = app.NPCUnitImageID
+	unit.ImageID = model.NPCUnitImageID
 	if unit.UnitType == "pc" {
-		unit.ImageID = app.PCUnitImageID
+		unit.ImageID = model.PCUnitImageID
 	}
 	unit.Artwork = nil
 	if entry.Image == "" {
@@ -263,12 +264,12 @@ func (p Pack) validateBoardFile(path string) error {
 	_, err := p.board(path)
 	return err
 }
-func (p Pack) board(path string) (*app.SavedBoard, error) {
+func (p Pack) board(path string) (*model.SavedBoard, error) {
 	data, err := p.read(path, p.bounds.Content)
 	if err != nil {
 		return nil, err
 	}
-	var b app.SavedBoard
+	var b model.SavedBoard
 	if err := json.Unmarshal(data, &b); err != nil {
 		return nil, err
 	}
@@ -279,7 +280,7 @@ func (p Pack) board(path string) (*app.SavedBoard, error) {
 	}
 	return &b, b.Validate()
 }
-func (p Pack) resolveUnit(unit *app.UnitData) error {
+func (p Pack) resolveUnit(unit *model.UnitData) error {
 	id, reference, err := p.unitImage(unit.ImageID)
 	if err != nil {
 		return err
@@ -289,19 +290,19 @@ func (p Pack) resolveUnit(unit *app.UnitData) error {
 		return errors.New("unknown saved token status")
 	}
 	if unit.Size == "" {
-		unit.Size = app.SizeMedium
+		unit.Size = model.SizeMedium
 	}
-	if unit.ImageFit == (app.ImageFit{}) {
-		unit.ImageFit = app.DefaultImageFit()
+	if unit.ImageFit == (model.ImageFit{}) {
+		unit.ImageFit = model.DefaultImageFit()
 	}
 	return nil
 }
-func (p Pack) unitImage(id string) (string, *app.ArtworkReference, error) {
+func (p Pack) unitImage(id string) (string, *model.ArtworkReference, error) {
 	if unit, exists := p.reader.byKey[id]; exists {
 		return unit.ImageID, unit.Artwork, nil
 	}
 	switch id {
-	case app.PCUnitImageID, app.NPCUnitImageID, app.DefaultUnitImageID:
+	case model.PCUnitImageID, model.NPCUnitImageID, model.DefaultUnitImageID:
 		return id, nil, nil
 	}
 	if unit, exists := p.reader.units[id]; exists && unit.ImageID == id {
@@ -309,42 +310,42 @@ func (p Pack) unitImage(id string) (string, *app.ArtworkReference, error) {
 	}
 	return "", nil, errors.New("unknown saved token image")
 }
-func (p Pack) Maps() []app.MapDefinition {
-	result := []app.MapDefinition{}
+func (p Pack) Maps() []model.MapDefinition {
+	result := []model.MapDefinition{}
 	for _, e := range p.reader.maps {
 		result = append(result, e.MapDefinition)
 	}
 	return result
 }
-func (p Pack) Units() []app.UnitDefinition {
-	result := []app.UnitDefinition{}
+func (p Pack) Units() []model.UnitDefinition {
+	result := []model.UnitDefinition{}
 	for _, u := range p.reader.units {
 		result = append(result, u)
 	}
 	return result
 }
-func (p Pack) Statuses() []app.UnitStatusOption {
-	return append([]app.UnitStatusOption(nil), p.reader.statuses...)
+func (p Pack) Statuses() []model.UnitStatusOption {
+	return append([]model.UnitStatusOption(nil), p.reader.statuses...)
 }
-func (p Pack) LoadMap(id string) (app.MapDefinition, error) {
+func (p Pack) LoadMap(id string) (model.MapDefinition, error) {
 	if err := p.Validate(); err != nil {
-		return app.MapDefinition{}, err
+		return model.MapDefinition{}, err
 	}
 	e, ok := p.reader.maps[id]
 	if !ok {
-		return app.MapDefinition{}, os.ErrNotExist
+		return model.MapDefinition{}, os.ErrNotExist
 	}
 	m := e.MapDefinition
 	if e.BoardFile != "" {
 		var err error
 		m.Board, err = p.board(e.BoardFile)
 		if err != nil {
-			return app.MapDefinition{}, err
+			return model.MapDefinition{}, err
 		}
 	}
 	return m, nil
 }
-func (p Pack) Image(ref app.ArtworkReference) ([]byte, error) {
+func (p Pack) Image(ref model.ArtworkReference) ([]byte, error) {
 	if ref.PluginID != p.ID || ref.Version != p.Version {
 		return nil, errors.New("artwork belongs to another plugin version")
 	}
@@ -386,12 +387,12 @@ func (p Pack) ValidateMetadata() error {
 }
 
 // UnitByID uses the validated default index without constructing a listing.
-func (p Pack) UnitByID(id string) (app.UnitDefinition, bool) {
+func (p Pack) UnitByID(id string) (model.UnitDefinition, bool) {
 	unit, exists := p.reader.units[id]
 	return unit, exists
 }
 
-func (p Pack) MetadataByID(id string) (app.MapDefinition, bool) {
+func (p Pack) MetadataByID(id string) (model.MapDefinition, bool) {
 	entry, exists := p.reader.maps[id]
 	return entry.MapDefinition, exists
 }

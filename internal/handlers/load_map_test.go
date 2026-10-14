@@ -10,37 +10,39 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
-	"tableTop/main/internal/app"
+
+	"tableTop/main/internal/app/model"
+	"tableTop/main/internal/app/persistence"
 )
 
 func TestLoadSavedMapRestoresSharedBoard(t *testing.T) {
 	dir := t.TempDir()
-	maps, err := app.NewMapLibrary(dir)
+	maps, err := persistence.NewMapLibrary(dir)
 	if err != nil {
 		t.Fatal(err)
 	}
-	definition, err := maps.Create(app.MapDefinition{Name: "Forest <ruins>", Width: 17.5, Height: 10, OffsetX: 1.5}, testPNG(t, 4, 2))
+	definition, err := maps.Create(model.MapDefinition{Name: "Forest <ruins>", Width: 17.5, Height: 10, OffsetX: 1.5}, testPNG(t, 4, 2))
 	if err != nil {
 		t.Fatal(err)
 	}
-	board := app.SavedBoard{
-		Units:   []app.UnitData{{ID: "old-token", Name: "Mage", UnitType: "pc", ImageID: app.PCUnitImageID, Left: 240, Top: 360, Size: app.SizeLarge, Status: "Poisoned", ImageFit: app.ImageFit{Zoom: 2, OffsetX: 12, OffsetY: -8}}},
-		Strokes: []app.PenStroke{{Type: "penStroke", ID: "old/1", Owner: "old", Width: 5, Color: "#123456", Points: []app.BoardPoint{{X: 1, Y: 2}, {X: 3, Y: 4}}, Finished: true}},
-		Fog: []app.FogMark{
-			{Type: "fogMark", ID: "old/1", Owner: "old", Mode: "paint", Width: 2, Points: []app.BoardPoint{{X: 2, Y: 3}}},
-			{Type: "fogMark", ID: "old/2", Owner: "old", Mode: "erase", Width: 1, Points: []app.BoardPoint{{X: 2, Y: 3}}},
+	board := model.SavedBoard{
+		Units:   []model.UnitData{{ID: "old-token", Name: "Mage", UnitType: "pc", ImageID: model.PCUnitImageID, Left: 240, Top: 360, Size: model.SizeLarge, Status: "Poisoned", ImageFit: model.ImageFit{Zoom: 2, OffsetX: 12, OffsetY: -8}}},
+		Strokes: []model.PenStroke{{Type: "penStroke", ID: "old/1", Owner: "old", Width: 5, Color: "#123456", Points: []model.BoardPoint{{X: 1, Y: 2}, {X: 3, Y: 4}}, Finished: true}},
+		Fog: []model.FogMark{
+			{Type: "fogMark", ID: "old/1", Owner: "old", Mode: "paint", Width: 2, Points: []model.BoardPoint{{X: 2, Y: 3}}},
+			{Type: "fogMark", ID: "old/2", Owner: "old", Mode: "erase", Width: 1, Points: []model.BoardPoint{{X: 2, Y: 3}}},
 		},
-		Rulers: []app.BoardRuler{{Type: "rulerChanged", ID: "old", Start: &app.BoardPoint{X: 1, Y: 1}, End: &app.BoardPoint{X: 4, Y: 5}}},
+		Rulers: []model.BoardRuler{{Type: "rulerChanged", ID: "old", Start: &model.BoardPoint{X: 1, Y: 1}, End: &model.BoardPoint{X: 4, Y: 5}}},
 	}
 	if err := maps.SaveBoard(definition, board); err != nil {
 		t.Fatal(err)
 	}
-	maps, err = app.NewMapLibrary(dir) // Loading must work after restart.
+	maps, err = persistence.NewMapLibrary(dir) // Loading must work after restart.
 	if err != nil {
 		t.Fatal(err)
 	}
-	state := app.NewState()
-	oldToken := state.AddRandomUnit(app.DefaultUnitImageID)
+	state := model.NewState()
+	oldToken := state.AddRandomUnit(model.DefaultUnitImageID)
 	ws := NewWebSocketHandler(state)
 	handler := newTestEndpointHandler(t, state, ws, newTestLibrary(t), maps)
 	mux := http.NewServeMux()
@@ -98,7 +100,7 @@ func TestLoadSavedMapRestoresSharedBoard(t *testing.T) {
 		}
 		var mapEvent struct {
 			Type string
-			Map  app.MapDefinition
+			Map  model.MapDefinition
 		}
 		read(conn, &mapEvent)
 		if mapEvent.Type != "boardMapChanged" || mapEvent.Map != definition || mapEvent.Map.Board != nil {
@@ -147,7 +149,7 @@ func TestLoadSavedMapRestoresSharedBoard(t *testing.T) {
 	joined := connect()
 	var initial struct {
 		Type string
-		Map  app.MapDefinition
+		Map  model.MapDefinition
 	}
 	read(joined, &initial)
 	if initial.Type != "boardMapChanged" || initial.Map.ID != definition.ID {
@@ -162,7 +164,7 @@ func TestLoadSavedMapRestoresSharedBoard(t *testing.T) {
 	ws.boardMutex.Unlock()
 	// The original saved document remains reusable and gets overwritten by Save Map.
 	request(http.MethodPost, "/board/save?gm=true", http.StatusNoContent)
-	reloaded, err := app.NewMapLibrary(dir)
+	reloaded, err := persistence.NewMapLibrary(dir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -173,16 +175,16 @@ func TestLoadSavedMapRestoresSharedBoard(t *testing.T) {
 }
 
 func TestLoadImageOnlyMapAndUnavailableArtwork(t *testing.T) {
-	maps, err := app.NewMapLibrary(t.TempDir())
+	maps, err := persistence.NewMapLibrary(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
 	}
-	definition, err := maps.Create(app.MapDefinition{Name: "Old map", Width: 20, Height: 10}, testPNG(t, 4, 2))
+	definition, err := maps.Create(model.MapDefinition{Name: "Old map", Width: 20, Height: 10}, testPNG(t, 4, 2))
 	if err != nil {
 		t.Fatal(err)
 	}
-	state := app.NewState()
-	state.AddRandomUnit(app.DefaultUnitImageID)
+	state := model.NewState()
+	state.AddRandomUnit(model.DefaultUnitImageID)
 	ws := NewWebSocketHandler(state)
 	handler := newTestEndpointHandler(t, state, ws, newTestLibrary(t), maps)
 	mux := http.NewServeMux()
@@ -192,7 +194,7 @@ func TestLoadImageOnlyMapAndUnavailableArtwork(t *testing.T) {
 	if response.Code != 200 || state.UnitCount() != 0 || ws.currentMap == nil || ws.currentMap.ID != definition.ID {
 		t.Fatal("image-only map not loaded onto empty board")
 	}
-	state.AddRandomUnit(app.PCUnitImageID)
+	state.AddRandomUnit(model.PCUnitImageID)
 	path, _ := maps.ImagePath(definition.ID)
 	if err := os.Rename(path, path+".missing"); err != nil {
 		t.Fatal(err)
@@ -206,20 +208,20 @@ func TestLoadImageOnlyMapAndUnavailableArtwork(t *testing.T) {
 
 func TestOversizedSavedMapCanBeDeletedWithoutLoading(t *testing.T) {
 	dir := t.TempDir()
-	maps, err := app.NewMapLibrary(dir)
+	maps, err := persistence.NewMapLibrary(dir)
 	if err != nil {
 		t.Fatal(err)
 	}
-	definition, err := maps.Create(app.MapDefinition{Name: "Legacy map", Width: 20, Height: 20, Board: &app.SavedBoard{Units: make([]app.UnitData, app.MaxBoardUnits+1)}}, testPNG(t, 2, 2))
+	definition, err := maps.Create(model.MapDefinition{Name: "Legacy map", Width: 20, Height: 20, Board: &model.SavedBoard{Units: make([]model.UnitData, model.MaxBoardUnits+1)}}, testPNG(t, 2, 2))
 	if err != nil {
 		t.Fatal(err)
 	}
-	maps, err = app.NewMapLibrary(dir)
+	maps, err = persistence.NewMapLibrary(dir)
 	if err != nil {
 		t.Fatal(err)
 	}
-	state := app.NewState()
-	state.AddRandomUnit(app.PCUnitImageID)
+	state := model.NewState()
+	state.AddRandomUnit(model.PCUnitImageID)
 	ws := NewWebSocketHandler(state)
 	handler := newTestEndpointHandler(t, state, ws, newTestLibrary(t), maps)
 	request := httptest.NewRequest(http.MethodPost, "/map-library/"+definition.ID+"/load?gm=true", nil)

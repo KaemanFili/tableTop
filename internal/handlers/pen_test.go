@@ -8,12 +8,13 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
-	"tableTop/main/internal/app"
+
+	"tableTop/main/internal/app/model"
 )
 
 func TestPenLiveStrokesInitialStateAndDisconnect(t *testing.T) {
-	state := app.NewState()
-	token := state.AddRandomUnit(app.DefaultUnitImageID)
+	state := model.NewState()
+	token := state.AddRandomUnit(model.DefaultUnitImageID)
 	ws := NewWebSocketHandler(state)
 	mux := http.NewServeMux()
 	ws.RegisterRoutes(mux)
@@ -100,8 +101,8 @@ func TestPenLiveStrokesInitialStateAndDisconnect(t *testing.T) {
 }
 
 func TestEraserSyncsRemovalAndPreventsLateStrokeResurrection(t *testing.T) {
-	state := app.NewState()
-	token := state.AddRandomUnit(app.DefaultUnitImageID)
+	state := model.NewState()
+	token := state.AddRandomUnit(model.DefaultUnitImageID)
 	ws := NewWebSocketHandler(state)
 	mux := http.NewServeMux()
 	ws.RegisterRoutes(mux)

@@ -4,22 +4,24 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
-	"tableTop/main/internal/app"
 	"testing"
+
+	"tableTop/main/internal/app/model"
+	"tableTop/main/internal/app/persistence"
 )
 
 func TestPermanentLibraryDeletion(t *testing.T) {
 	library := newTestLibrary(t)
-	maps, err := app.NewMapLibrary(t.TempDir())
+	maps, err := persistence.NewMapLibrary(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
 	}
-	definition, err := maps.Create(app.MapDefinition{Name: "Forest", Width: 20, Height: 20}, testPNG(t, 4, 2))
+	definition, err := maps.Create(model.MapDefinition{Name: "Forest", Width: 20, Height: 20}, testPNG(t, 4, 2))
 	if err != nil {
 		t.Fatal(err)
 	}
-	state := app.NewState()
-	token := state.AddRandomUnit(app.PCUnitImageID)
+	state := model.NewState()
+	token := state.AddRandomUnit(model.PCUnitImageID)
 	ws := NewWebSocketHandler(state)
 	ws.currentMap = &definition
 	handler := newTestEndpointHandler(t, state, ws, library, maps)

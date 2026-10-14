@@ -8,15 +8,17 @@ import (
 	"net/http/httptest"
 	"os/exec"
 	"strings"
-	"tableTop/main/internal/app"
-	"tableTop/main/internal/plugins"
 	"testing"
 	"time"
+
+	"tableTop/main/internal/app/model"
+	"tableTop/main/internal/app/persistence"
+	"tableTop/main/internal/plugins"
 )
 
 func largeCatalogHandler(t *testing.T) *EndpointHandler {
 	t.Helper()
-	library, err := app.NewUnitLibrary(t.TempDir())
+	library, err := persistence.NewUnitLibrary(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -25,7 +27,7 @@ func largeCatalogHandler(t *testing.T) *EndpointHandler {
 			library.SetDefaults(pack)
 		}
 	}
-	state := app.NewState()
+	state := model.NewState()
 	return newTestEndpointHandler(t, state, NewWebSocketHandler(state), library)
 }
 
@@ -90,7 +92,7 @@ func TestBrowserLargeCatalogSearch(t *testing.T) {
 		w.Header().Set("Content-Type", "text/html")
 		io.WriteString(w, `<!doctype html><script src="/static/vendor/htmx-2.0.11.min.js"></script><body>`)
 		h.renderSpawnMenu(w, h.menuData(true))
-		io.WriteString(w, `<script src="/static/librarySearch.js"></script><script>
+		io.WriteString(w, `<script src="/static/js/library/librarySearch.js"></script><script>
 (async()=>{
  const wait=async(test)=>{for(let i=0;i<200;i++){if(test())return;await new Promise(r=>setTimeout(r,25));}throw new Error('Timed out: '+document.body.innerText);};
  try {

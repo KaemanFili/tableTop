@@ -5,14 +5,15 @@ import (
 	"math"
 	"regexp"
 	"strconv"
-	"tableTop/main/internal/app"
+
+	"tableTop/main/internal/app/model"
 )
 
 const maxStrokePoints = 8192
 
 var penColorPattern = regexp.MustCompile(`^#[0-9a-fA-F]{6}$`)
 
-type penStroke = app.PenStroke
+type penStroke = model.PenStroke
 
 func (h *WebSocketHandler) updatePen(owner string, data []byte) error {
 	var update penStroke
@@ -41,8 +42,8 @@ func (h *WebSocketHandler) updatePen(owner string, data []byte) error {
 		return nil
 	}
 	stroke, exists := h.strokes[update.ID]
-	if (!exists && len(h.strokes) >= app.MaxBoardStrokes) || len(update.Points) > app.MaxBoardPoints-h.drawingPoints {
-		return app.ErrCapacity
+	if (!exists && len(h.strokes) >= model.MaxBoardStrokes) || len(update.Points) > model.MaxBoardPoints-h.drawingPoints {
+		return model.ErrCapacity
 	}
 	if !exists {
 		if update.Offset != 0 || len(update.Points) == 0 {
@@ -83,8 +84,8 @@ func (h *WebSocketHandler) erasePen(data []byte) error {
 	}
 	h.boardMutex.Lock()
 	defer h.boardMutex.Unlock()
-	if len(request.IDs) > app.MaxErasedStrokes-len(h.erasedStrokes) {
-		return app.ErrCapacity
+	if len(request.IDs) > model.MaxErasedStrokes-len(h.erasedStrokes) {
+		return model.ErrCapacity
 	}
 	ids := make([]string, 0, len(request.IDs))
 	seen := make(map[string]bool)

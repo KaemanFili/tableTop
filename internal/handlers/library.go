@@ -3,7 +3,6 @@ package handlers
 import (
 	"bytes"
 	"errors"
-	"golang.org/x/text/unicode/norm"
 	"io"
 	"log"
 	"net/http"
@@ -11,7 +10,10 @@ import (
 	"strings"
 	"unicode"
 
-	"tableTop/main/internal/app"
+	"golang.org/x/text/unicode/norm"
+
+	"tableTop/main/internal/app/model"
+	"tableTop/main/internal/app/persistence"
 	"tableTop/main/internal/artwork"
 )
 
@@ -34,14 +36,14 @@ func (group libraryGroup[T]) Total() int { return group.OwnedTotal() + group.Def
 type spawnMenuData struct {
 	Open         bool
 	Creating     bool
-	PCs          libraryGroup[app.UnitDefinition]
-	NPCs         libraryGroup[app.UnitDefinition]
+	PCs          libraryGroup[model.UnitDefinition]
+	NPCs         libraryGroup[model.UnitDefinition]
 	CopyID       string
 	Name         string
 	UnitType     string
-	Size         app.UnitSize
-	Sizes        []app.UnitSizeOption
-	ImageFit     app.ImageFit
+	Size         model.UnitSize
+	Sizes        []model.UnitSizeOption
+	ImageFit     model.ImageFit
 	Error        string
 	Notice       string
 	ServerSearch bool
@@ -124,12 +126,12 @@ func normalizeLibrarySearch(value string) string {
 }
 
 func (h *EndpointHandler) renderSpawnMenu(w http.ResponseWriter, data spawnMenuData) {
-	data.Sizes = app.UnitSizes()
+	data.Sizes = model.UnitSizes()
 	w.Header().Set("Cache-Control", "no-store")
 	var rendered bytes.Buffer
 	if err := h.indexTemplate.ExecuteTemplate(&rendered, "spawn-controls", data); err != nil {
 		log.Println("Render unit menu:", err)
-		http.Error(w, "The unit menu could not be rendered. Restart the server after updating the app.", http.StatusInternalServerError)
+		http.Error(w, "The unit menu could not be rendered. Restart the server after updating the persistence.", http.StatusInternalServerError)
 		return
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
@@ -137,7 +139,7 @@ func (h *EndpointHandler) renderSpawnMenu(w http.ResponseWriter, data spawnMenuD
 }
 
 func (h *EndpointHandler) newUnitForm(w http.ResponseWriter, r *http.Request) {
-	data := spawnMenuData{Open: true, Creating: true, UnitType: "pc", Size: app.SizeMedium, ImageFit: app.DefaultImageFit()}
+	data := spawnMenuData{Open: true, Creating: true, UnitType: "pc", Size: model.SizeMedium, ImageFit: model.DefaultImageFit()}
 	if id := r.URL.Query().Get("copy"); id != "" {
 		u, ok := h.library.UnitByID(id)
 		if !ok || !u.ReadOnly {
@@ -154,7 +156,7 @@ func (h *EndpointHandler) newUnitForm(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *EndpointHandler) createUnit(w http.ResponseWriter, r *http.Request) {
-	data := spawnMenuData{Open: true, Creating: true, UnitType: "pc", Size: app.SizeMedium, ImageFit: app.DefaultImageFit(), CopyID: r.PathValue("id")}
+	data := spawnMenuData{Open: true, Creating: true, UnitType: "pc", Size: model.SizeMedium, ImageFit: model.DefaultImageFit(), CopyID: r.PathValue("id")}
 	// Return a rendered form on validation failures so HTMX displays the error.
 	fail := func(message string) {
 		data.Error = message
@@ -181,7 +183,7 @@ func (h *EndpointHandler) createUnit(w http.ResponseWriter, r *http.Request) {
 	unit, err := h.saveLibraryUnit(data, pngImage)
 	if err != nil {
 		log.Println("Save unit:", err)
-		if errors.Is(err, app.ErrStorageLimit) {
+		if errors.Is(err, persistence.ErrStorageLimit) {
 			fail(err.Error())
 			return
 		}
@@ -197,13 +199,13 @@ func (h *EndpointHandler) createUnit(w http.ResponseWriter, r *http.Request) {
 func parseUnitForm(r *http.Request, data *spawnMenuData) error {
 	data.Name = strings.TrimSpace(r.FormValue("name"))
 	data.UnitType = r.FormValue("unitType")
-	data.Size = app.UnitSize(r.FormValue("size"))
+	data.Size = model.UnitSize(r.FormValue("size"))
 	var err error
 	data.ImageFit, err = parseImageFit(r)
 	if err != nil {
 		return err
 	}
-	return app.ValidateUnitDefinition(data.Name, data.UnitType, data.Size)
+	return persistence.ValidateUnitDefinition(data.Name, data.UnitType, data.Size)
 }
 
 func readUnitImage(r *http.Request) ([]byte, error) {
@@ -225,28 +227,28 @@ func readUnitImage(r *http.Request) ([]byte, error) {
 	return normalizeUnitImage(upload)
 }
 
-func (h *EndpointHandler) saveLibraryUnit(data spawnMenuData, pngImage []byte) (app.UnitDefinition, error) {
+func (h *EndpointHandler) saveLibraryUnit(data spawnMenuData, pngImage []byte) (model.UnitDefinition, error) {
 	if data.CopyID != "" {
 		return h.library.CreateCopy(data.CopyID, data.Name, data.UnitType, data.Size, data.ImageFit, pngImage)
 	}
 	return h.library.Create(data.Name, data.UnitType, data.Size, data.ImageFit, pngImage)
 }
 
-func parseImageFit(r *http.Request) (app.ImageFit, error) {
-	fit := app.DefaultImageFit()
+func parseImageFit(r *http.Request) (model.ImageFit, error) {
+	fit := model.DefaultImageFit()
 	for name, value := range map[string]*float64{
 		"imageZoom": &fit.Zoom, "imageOffsetX": &fit.OffsetX, "imageOffsetY": &fit.OffsetY,
 	} {
 		if input := r.FormValue(name); input != "" {
 			parsed, err := strconv.ParseFloat(input, 64)
 			if err != nil {
-				return app.DefaultImageFit(), errors.New("The image framing is invalid. Adjust the preview and try again.")
+				return model.DefaultImageFit(), errors.New("The image framing is invalid. Adjust the preview and try again.")
 			}
 			*value = parsed
 		}
 	}
 	if err := fit.Validate(); err != nil {
-		return app.DefaultImageFit(), err
+		return model.DefaultImageFit(), err
 	}
 	return fit, nil
 }
@@ -256,7 +258,7 @@ func normalizeUnitImage(upload []byte) ([]byte, error) { return artwork.Normaliz
 func (h *EndpointHandler) deleteLibraryUnit(w http.ResponseWriter, r *http.Request) {
 	menu := h.menuData(true)
 	if err := h.library.Delete(r.PathValue("id")); err != nil {
-		if errors.Is(err, app.ErrReadOnly) {
+		if errors.Is(err, persistence.ErrReadOnly) {
 			http.Error(w, err.Error(), http.StatusConflict)
 			return
 		}

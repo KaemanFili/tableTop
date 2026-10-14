@@ -10,24 +10,25 @@ import (
 	"strings"
 	"testing"
 
-	"tableTop/main/internal/app"
+	"tableTop/main/internal/app/model"
+	"tableTop/main/internal/app/persistence"
 )
 
 func TestUploadFormsExplainStorageLimits(t *testing.T) {
 	root := t.TempDir()
-	limits, err := app.NewStorageLimits(root, 1024, 64)
+	limits, err := persistence.NewStorageLimits(root, 1024, 64)
 	if err != nil {
 		t.Fatal(err)
 	}
-	units, err := app.NewUnitLibrary(root, limits)
+	units, err := persistence.NewUnitLibrary(root, limits)
 	if err != nil {
 		t.Fatal(err)
 	}
-	maps, err := app.NewMapLibrary(root, limits)
+	maps, err := persistence.NewMapLibrary(root, limits)
 	if err != nil {
 		t.Fatal(err)
 	}
-	state := app.NewState()
+	state := model.NewState()
 	handler := newTestEndpointHandler(t, state, NewWebSocketHandler(state), units, maps)
 	mux := http.NewServeMux()
 	handler.RegisterRoutes(mux)
@@ -47,31 +48,31 @@ func TestUploadFormsExplainStorageLimits(t *testing.T) {
 
 func TestSavedBoardStorageFailurePreservesPreviousSave(t *testing.T) {
 	root := t.TempDir()
-	maps, err := app.NewMapLibrary(root)
+	maps, err := persistence.NewMapLibrary(root)
 	if err != nil {
 		t.Fatal(err)
 	}
-	definition, err := maps.Create(app.MapDefinition{Name: "Forest", Width: 20, Height: 20}, testPNG(t, 2, 2))
+	definition, err := maps.Create(model.MapDefinition{Name: "Forest", Width: 20, Height: 20}, testPNG(t, 2, 2))
 	if err != nil {
 		t.Fatal(err)
 	}
 	before, _ := os.ReadFile(filepath.Join(root, "maps.json"))
 	image, _ := os.ReadFile(filepath.Join(root, "maps", definition.ID+".png"))
 	used := int64(len(before) + len(image))
-	limits, err := app.NewStorageLimits(root, used, used)
+	limits, err := persistence.NewStorageLimits(root, used, used)
 	if err != nil {
 		t.Fatal(err)
 	}
-	maps, err = app.NewMapLibrary(root, limits)
+	maps, err = persistence.NewMapLibrary(root, limits)
 	if err != nil {
 		t.Fatal(err)
 	}
-	units, err := app.NewUnitLibrary(root, limits)
+	units, err := persistence.NewUnitLibrary(root, limits)
 	if err != nil {
 		t.Fatal(err)
 	}
-	state := app.NewState()
-	state.AddRandomUnit(app.PCUnitImageID)
+	state := model.NewState()
+	state.AddRandomUnit(model.PCUnitImageID)
 	ws := NewWebSocketHandler(state)
 	ws.currentMap = &definition
 	handler := newTestEndpointHandler(t, state, ws, units, maps)

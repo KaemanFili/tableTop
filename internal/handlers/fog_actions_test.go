@@ -4,12 +4,12 @@ import (
 	"encoding/json"
 	"testing"
 
-	"tableTop/main/internal/app"
+	"tableTop/main/internal/app/model"
 )
 
 func TestWholeBoardFogPermissionsStateAndValidation(t *testing.T) {
-	state := app.NewState()
-	token := state.AddRandomUnit(app.DefaultUnitImageID)
+	state := model.NewState()
+	token := state.AddRandomUnit(model.DefaultUnitImageID)
 	h := NewWebSocketHandler(state)
 	mark := []byte(`{"type":"fogMark","id":"1","mode":"paint","width":6,"points":[{"x":1,"y":1},{"x":2,"y":2}]}`)
 	if err := h.updateFog("gm", mark); err != nil {
@@ -33,12 +33,12 @@ func TestWholeBoardFogPermissionsStateAndValidation(t *testing.T) {
 		t.Fatal("cover did not replace fog history and release capacity")
 	}
 	// Validate the serialized content used by saved maps, including the wider pen.
-	saved := app.SavedBoard{Fog: h.fogMarks, Strokes: []app.PenStroke{h.strokes["gm/1"]}}
+	saved := model.SavedBoard{Fog: h.fogMarks, Strokes: []model.PenStroke{h.strokes["gm/1"]}}
 	encoded, err := json.Marshal(saved)
 	if err != nil {
 		t.Fatal(err)
 	}
-	var restored app.SavedBoard
+	var restored model.SavedBoard
 	if err := json.Unmarshal(encoded, &restored); err != nil {
 		t.Fatal(err)
 	}

@@ -10,17 +10,19 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
-	"tableTop/main/internal/app"
+
+	"tableTop/main/internal/app/model"
+	"tableTop/main/internal/app/persistence"
 )
 
 func TestMapCreatePersistShareAndClear(t *testing.T) {
 	dir := t.TempDir()
-	maps, err := app.NewMapLibrary(dir)
+	maps, err := persistence.NewMapLibrary(dir)
 	if err != nil {
 		t.Fatal(err)
 	}
-	state := app.NewState()
-	token := state.AddRandomUnit(app.PCUnitImageID)
+	state := model.NewState()
+	token := state.AddRandomUnit(model.PCUnitImageID)
 	ws := NewWebSocketHandler(state)
 	handler := newTestEndpointHandler(t, state, ws, newTestLibrary(t), maps)
 	mux := http.NewServeMux()
@@ -37,12 +39,12 @@ func TestMapCreatePersistShareAndClear(t *testing.T) {
 		readRulerSession(t, conn)
 		return conn
 	}
-	readMap := func(conn *websocket.Conn) app.MapDefinition {
+	readMap := func(conn *websocket.Conn) model.MapDefinition {
 		t.Helper()
 		conn.SetReadDeadline(time.Now().Add(3 * time.Second))
 		var message struct {
 			Type string
-			Map  app.MapDefinition
+			Map  model.MapDefinition
 		}
 		if err := conn.ReadJSON(&message); err != nil || message.Type != "boardMapChanged" {
 			t.Fatalf("map update = %+v, error %v", message, err)
@@ -104,7 +106,7 @@ func TestMapCreatePersistShareAndClear(t *testing.T) {
 	if initial := readMap(joined); initial != definition {
 		t.Fatal("joining board did not receive map")
 	}
-	reloaded, err := app.NewMapLibrary(dir)
+	reloaded, err := persistence.NewMapLibrary(dir)
 	if err != nil {
 		t.Fatal(err)
 	}

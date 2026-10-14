@@ -8,12 +8,13 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
-	"tableTop/main/internal/app"
+
+	"tableTop/main/internal/app/model"
 )
 
 func TestPingBroadcastsToAllBoardsWithoutChangingTokens(t *testing.T) {
-	state := app.NewState()
-	token := state.AddRandomUnit(app.DefaultUnitImageID)
+	state := model.NewState()
+	token := state.AddRandomUnit(model.DefaultUnitImageID)
 	ws := NewWebSocketHandler(state)
 	handler := newTestEndpointHandler(t, state, ws, newTestLibrary(t))
 	mux := http.NewServeMux()

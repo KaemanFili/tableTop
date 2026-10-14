@@ -5,14 +5,14 @@ import (
 	"net/http"
 	"sync"
 
-	"tableTop/main/internal/app"
+	"tableTop/main/internal/app/persistence"
 	"tableTop/main/internal/handlers"
 )
 
 // Admission and draining prevent an in-flight upload or socket message from
 // writing session data after deletion cleanup has completed.
 type managedBoard struct {
-	defaults app.PluginDefaults
+	defaults persistence.PluginDefaults
 	handler  http.Handler
 	sockets  *handlers.WebSocketHandler
 	mu       sync.Mutex

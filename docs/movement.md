@@ -2,7 +2,7 @@
 
 ## Mouse, touch, and stylus input
 
-`static/boardInput.js` routes Pointer Events to token dragging, pen/eraser,
+`static/js/board/boardInput.js` routes Pointer Events to token dragging, pen/eraser,
 fog/eraser, and ruler handlers. One pointer owns a gesture; additional fingers
 cannot move the active token or add drawing points. Pointer capture keeps native
 gestures connected to the board when a finger or stylus leaves the initial target.
@@ -16,7 +16,7 @@ do not zoom the surrounding menus. Menus accept touch presses for outside dismis
 
 Use the mouse wheel over the board, pinch, or the **− / percentage / +** controls
 to zoom between 25% and 300%. Click the percentage to reset to 100%.
-`static/boardZoom.js` transforms only `#board-world` and keeps the board point under the
+`static/js/board/boardZoom.js` transforms only `#board-world` and keeps the board point under the
 zoom gesture in place. Fixed UI elements remain outside that scaled container.
 Token dragging and pings convert screen coordinates back to shared board pixels;
 drawing, fog, and ruler coordinates remain in grid squares. Zoom and panning are

@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"path/filepath"
 
-	"tableTop/main/internal/app"
+	"tableTop/main/internal/app/persistence"
 	"tableTop/main/internal/auth"
 	"tableTop/main/internal/plugins"
 )
@@ -15,7 +15,7 @@ import (
 func (m *Manager) initialize(id string) error {
 	table, ok := m.library.ByID(id)
 	if !ok || table.Deleting || table.PluginBinding == nil {
-		return app.ErrTableNotFound
+		return persistence.ErrTableNotFound
 	}
 	if _, err := plugins.Resolve(m.pluginDirs, m.pluginBounds, *table.PluginBinding); err != nil {
 		return err
@@ -26,7 +26,7 @@ func (m *Manager) initialize(id string) error {
 	if table.Initialization != "owned" {
 		return errors.New("unsupported initialization state")
 	}
-	if err := app.InitializeOwned(filepath.Join(m.dir, "sessions", id), id, m.store, m.limits); err != nil {
+	if err := persistence.InitializeOwned(filepath.Join(m.dir, "sessions", id), id, m.store, m.limits); err != nil {
 		return err
 	}
 	return m.library.FinishInitialization(id)

@@ -6,10 +6,11 @@ import (
 	"os"
 	"path/filepath"
 
-	"tableTop/main/internal/app"
+	"tableTop/main/internal/app/model"
+	"tableTop/main/internal/app/persistence"
 )
 
-func Development(dir, assets string, store app.LibraryStore, limits *app.StorageLimits) (*Pack, error) {
+func Development(dir, assets string, store persistence.LibraryStore, limits *persistence.StorageLimits) (*Pack, error) {
 	bounds, err := BoundsFromEnvironment()
 	if err != nil {
 		return nil, err
@@ -23,22 +24,22 @@ func Development(dir, assets string, store app.LibraryStore, limits *app.Storage
 	if err != nil {
 		return nil, err
 	}
-	if err := app.InitializeOwned(dir, "dev", store, limits); err != nil {
+	if err := persistence.InitializeOwned(dir, "dev", store, limits); err != nil {
 		return nil, err
 	}
 	return defaults, nil
 }
 
-func developmentBinding(dir string, dirs []string, bounds Bounds, limits *app.StorageLimits) (app.PluginBinding, error) {
+func developmentBinding(dir string, dirs []string, bounds Bounds, limits *persistence.StorageLimits) (model.PluginBinding, error) {
 	path := filepath.Join(dir, "plugin-binding.json")
 	data, err := os.ReadFile(path)
 	if err == nil {
-		var binding app.PluginBinding
+		var binding model.PluginBinding
 		err := json.Unmarshal(data, &binding)
 		return binding, err
 	}
 	if !errors.Is(err, os.ErrNotExist) {
-		return app.PluginBinding{}, err
+		return model.PluginBinding{}, err
 	}
 	binding, err := builtinBinding(dirs, bounds)
 	if err != nil {
@@ -47,13 +48,13 @@ func developmentBinding(dir string, dirs []string, bounds Bounds, limits *app.St
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		return binding, err
 	}
-	return binding, app.WriteContentJSON(path, binding, limits)
+	return binding, persistence.WriteContentJSON(path, binding, limits)
 }
-func builtinBinding(dirs []string, bounds Bounds) (app.PluginBinding, error) {
+func builtinBinding(dirs []string, bounds Bounds) (model.PluginBinding, error) {
 	for _, pack := range Discover(dirs, bounds) {
 		if pack.ID == "builtin" && pack.Version == 1 {
 			return pack.Binding(), nil
 		}
 	}
-	return app.PluginBinding{}, errors.New("built-in plugin unavailable")
+	return model.PluginBinding{}, errors.New("built-in plugin unavailable")
 }

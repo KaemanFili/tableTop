@@ -9,7 +9,8 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
-	"tableTop/main/internal/app"
+
+	"tableTop/main/internal/app/model"
 )
 
 func TestSpawnUnitImageChoice(t *testing.T) {
@@ -17,11 +18,11 @@ func TestSpawnUnitImageChoice(t *testing.T) {
 		unitType string
 		imageID  string
 	}{
-		{unitType: "npc", imageID: app.NPCUnitImageID},
-		{unitType: "pc", imageID: app.PCUnitImageID},
+		{unitType: "npc", imageID: model.NPCUnitImageID},
+		{unitType: "pc", imageID: model.PCUnitImageID},
 	} {
 		t.Run(test.unitType, func(t *testing.T) {
-			state := app.NewState()
+			state := model.NewState()
 			h := newTestEndpointHandler(t, state, NewWebSocketHandler(state), newTestLibrary(t))
 			mux := http.NewServeMux()
 			h.RegisterRoutes(mux)
@@ -60,7 +61,7 @@ func TestSpawnUnitImageChoice(t *testing.T) {
 }
 
 func TestUnitImageLifecycle(t *testing.T) {
-	state := app.NewState()
+	state := model.NewState()
 	ws := NewWebSocketHandler(state)
 	h := newTestEndpointHandler(t, state, ws, newTestLibrary(t))
 	mux := http.NewServeMux()
@@ -105,7 +106,7 @@ func TestUnitImageLifecycle(t *testing.T) {
 		t.Fatal(err)
 	}
 	unit, _ := state.UnitByID(units[0].ID)
-	if unit.Left != 250 || unit.Top != 300 || unit.ImageID != app.DefaultUnitImageID {
+	if unit.Left != 250 || unit.Top != 300 || unit.ImageID != model.DefaultUnitImageID {
 		t.Fatalf("unit after websocket movement = %+v", unit)
 	}
 

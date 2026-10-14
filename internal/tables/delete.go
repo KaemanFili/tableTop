@@ -8,7 +8,7 @@ import (
 	"net/http"
 	"time"
 
-	"tableTop/main/internal/app"
+	"tableTop/main/internal/app/persistence"
 	"tableTop/main/internal/auth"
 )
 
@@ -21,7 +21,7 @@ func (m *Manager) confirmDelete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if table.OwnerID != auth.CurrentUser(r).ID {
-		http.Error(w, app.ErrTableNotOwner.Error(), http.StatusForbidden)
+		http.Error(w, persistence.ErrTableNotOwner.Error(), http.StatusForbidden)
 		return
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
@@ -42,9 +42,9 @@ func (m *Manager) delete(w http.ResponseWriter, r *http.Request) {
 	id, owner := r.PathValue("table"), auth.CurrentUser(r).ID
 	if err := m.library.BeginDelete(id, owner); err != nil {
 		switch {
-		case errors.Is(err, app.ErrTableNotFound):
+		case errors.Is(err, persistence.ErrTableNotFound):
 			http.NotFound(w, r)
-		case errors.Is(err, app.ErrTableNotOwner):
+		case errors.Is(err, persistence.ErrTableNotOwner):
 			http.Error(w, err.Error(), http.StatusForbidden)
 		default:
 			log.Println("Begin tabletop deletion:", err)
@@ -65,7 +65,7 @@ func (m *Manager) delete(w http.ResponseWriter, r *http.Request) {
 		err = m.store.DeleteScope(id)
 	}
 	if err == nil {
-		err = app.RemoveTableFiles(m.dir, id, m.limits)
+		err = persistence.RemoveTableFiles(m.dir, id, m.limits)
 	}
 	if err == nil {
 		err = m.library.FinishDelete(id, owner)

@@ -10,7 +10,8 @@ import (
 	"strings"
 	"testing"
 
-	"tableTop/main/internal/app"
+	"tableTop/main/internal/app/model"
+	"tableTop/main/internal/app/persistence"
 	"tableTop/main/internal/plugins"
 )
 
@@ -32,8 +33,8 @@ func (f tableTestFixture) installPlugin(t *testing.T) string {
 		"plugin.json":   map[string]any{"schemaVersion": 2, "id": "forest", "version": 1, "name": "Forest", "maps": "maps.json", "units": "units.json", "statuses": "statuses.json"},
 		"units.json":    []map[string]any{{"key": "scout", "name": "Scout", "unitType": "npc", "image": "art.png"}},
 		"maps.json":     []map[string]any{{"key": "clearing", "name": "Clearing", "width": 20, "height": 20, "image": "art.png", "boardFile": "board.json"}},
-		"statuses.json": []app.UnitStatusOption{{Value: "Marked", Color: "#123456"}},
-		"board.json":    app.SavedBoard{Units: []app.UnitData{{Name: "Scout", UnitType: "npc", ImageID: "scout", Status: "Marked", Left: 100, Top: 150}}},
+		"statuses.json": []model.UnitStatusOption{{Value: "Marked", Color: "#123456"}},
+		"board.json":    model.SavedBoard{Units: []model.UnitData{{Name: "Scout", UnitType: "npc", ImageID: "scout", Status: "Marked", Left: 100, Top: 150}}},
 	}
 	for name, value := range content {
 		data, err := json.Marshal(value)
@@ -144,7 +145,7 @@ func TestDeletingTabletopDoesNotRemoveInstalledVersion(t *testing.T) {
 func TestOwnedInitializationFailureIsPrivateAndRetryable(t *testing.T) {
 	f := newTableTestFixture(t)
 	owner, player := f.login("owner"), f.login("player")
-	limits, err := app.NewStorageLimits(f.dir, 4096, 10)
+	limits, err := persistence.NewStorageLimits(f.dir, 4096, 10)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -162,7 +163,7 @@ func TestOwnedInitializationFailureIsPrivateAndRetryable(t *testing.T) {
 		t.Fatal("pending session visible to non-owner")
 	}
 	f.request(owner, "GET", "/sessions/"+id+"/", "", http.StatusNotFound)
-	f.manager.limits, err = app.NewStorageLimits(f.dir, 4096, 1024)
+	f.manager.limits, err = persistence.NewStorageLimits(f.dir, 4096, 1024)
 	if err != nil {
 		t.Fatal(err)
 	}

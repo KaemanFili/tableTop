@@ -9,11 +9,12 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
-	"tableTop/main/internal/app"
+
+	"tableTop/main/internal/app/model"
 )
 
 func TestStatusUpdatesConnectedBoardAndReload(t *testing.T) {
-	state := app.NewState()
+	state := model.NewState()
 	library := newTestLibrary(t)
 	ws := NewWebSocketHandler(state)
 	handler := newTestEndpointHandler(t, state, ws, library)
@@ -57,14 +58,14 @@ func TestStatusUpdatesConnectedBoardAndReload(t *testing.T) {
 		return change
 	}
 	change := request(token.ID, "status=Poisoned", 204)
-	if change.ID != token.ID || change.Status != "Poisoned" || change.Color != app.UnitStatus("Poisoned").Color() {
+	if change.ID != token.ID || change.Status != "Poisoned" || change.Color != model.UnitStatus("Poisoned").Color() {
 		t.Fatalf("wrong status: %+v", change)
 	}
 	state.UpdateUnitPosition(token.ID, 200, 250)
 	state.ResizeUnit(token.ID, "up")
 	board := httptest.NewRecorder()
 	mux.ServeHTTP(board, httptest.NewRequest("GET", "/loadExistingUnits", nil))
-	for _, expected := range []string{`data-status="Poisoned"`, `--unit-status-color: ` + app.UnitStatus("Poisoned").Color(), `Goblin&#10;Size: Medium&#10;Status: Poisoned`} {
+	for _, expected := range []string{`data-status="Poisoned"`, `--unit-status-color: ` + model.UnitStatus("Poisoned").Color(), `Goblin&#10;Size: Medium&#10;Status: Poisoned`} {
 		if !strings.Contains(board.Body.String(), expected) {
 			t.Fatalf("reload missing %q: %s", expected, board.Body.String())
 		}
@@ -74,7 +75,7 @@ func TestStatusUpdatesConnectedBoardAndReload(t *testing.T) {
 	request(token.ID, "", 400)
 	request("missing", "status=Dead", 404)
 	got, _ := state.UnitByID(token.ID)
-	if got.Status != "Dead" || got.Left != 200 || got.Size != app.SizeMedium || got.ImageFit != token.ImageFit {
+	if got.Status != "Dead" || got.Left != 200 || got.Size != model.SizeMedium || got.ImageFit != token.ImageFit {
 		t.Fatalf("lost token data: %+v", got)
 	}
 	change = request(token.ID, "status=", 204)

@@ -15,8 +15,8 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"tableTop/main/internal/app"
 
+	"tableTop/main/internal/app/model"
 	bundled "tableTop/main/plugins"
 )
 
@@ -212,7 +212,7 @@ func packLess(a, b Pack) bool {
 	return a.Name < b.Name
 }
 func (p Pack) Selection() string { return p.ID + "/" + strconv.Itoa(p.Version) }
-func Resolve(dirs []string, bounds Bounds, binding app.PluginBinding) (*Pack, error) {
+func Resolve(dirs []string, bounds Bounds, binding model.PluginBinding) (*Pack, error) {
 	for _, p := range Discover(dirs, bounds) {
 		if p.ID != binding.PluginID || p.Version != binding.Version {
 			continue

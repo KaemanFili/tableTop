@@ -1,8 +1,9 @@
 package handlers
 
 import (
-	"github.com/gorilla/websocket"
 	"sync"
+
+	"github.com/gorilla/websocket"
 )
 
 // One writer owns each socket. Board producers never wait for network I/O.

@@ -10,7 +10,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"tableTop/main/internal/app"
+	"tableTop/main/internal/app/model"
 )
 
 type packFixture struct {
@@ -35,10 +35,10 @@ func newPackFixture(t *testing.T) packFixture {
 	manifest := Manifest{SchemaVersion: 2, ID: "forest", Version: 1, Name: "Forest", Maps: "maps.json", Units: "units.json", Statuses: "statuses.json"}
 	f := packFixture{root, dir, manifest}
 	f.write(t, "plugin.json", manifest)
-	f.write(t, "statuses.json", []app.UnitStatusOption{{Value: "Marked", Color: "#123456"}})
-	f.write(t, "units.json", []unitEntry{{Key: "scout", Image: "forest.png", UnitDefinition: app.UnitDefinition{Name: "Scout", UnitType: "npc"}}})
-	f.write(t, "maps.json", []mapEntry{{Key: "clearing", Image: "forest.png", BoardFile: "board.json", MapDefinition: app.MapDefinition{Name: "Clearing", Width: 20, Height: 20}}})
-	f.write(t, "board.json", app.SavedBoard{Units: []app.UnitData{{Name: "Scout", UnitType: "npc", ImageID: "scout", Status: "Marked"}}})
+	f.write(t, "statuses.json", []model.UnitStatusOption{{Value: "Marked", Color: "#123456"}})
+	f.write(t, "units.json", []unitEntry{{Key: "scout", Image: "forest.png", UnitDefinition: model.UnitDefinition{Name: "Scout", UnitType: "npc"}}})
+	f.write(t, "maps.json", []mapEntry{{Key: "clearing", Image: "forest.png", BoardFile: "board.json", MapDefinition: model.MapDefinition{Name: "Clearing", Width: 20, Height: 20}}})
+	f.write(t, "board.json", model.SavedBoard{Units: []model.UnitData{{Name: "Scout", UnitType: "npc", ImageID: "scout", Status: "Marked"}}})
 	return f
 }
 func (f packFixture) write(t *testing.T, name string, value any) {
@@ -176,10 +176,10 @@ func TestPluginHasNoMapOrUnitCountCaps(t *testing.T) {
 	units := []unitEntry{}
 	maps := []mapEntry{}
 	for i := range 600 {
-		units = append(units, unitEntry{Key: fmt.Sprintf("unit-%d", i), UnitDefinition: app.UnitDefinition{Name: "Scout", UnitType: "npc"}})
+		units = append(units, unitEntry{Key: fmt.Sprintf("unit-%d", i), UnitDefinition: model.UnitDefinition{Name: "Scout", UnitType: "npc"}})
 	}
 	for i := range 140 {
-		maps = append(maps, mapEntry{Key: fmt.Sprintf("map-%d", i), Image: "forest.png", MapDefinition: app.MapDefinition{Name: "Map", Width: 20, Height: 20}})
+		maps = append(maps, mapEntry{Key: fmt.Sprintf("map-%d", i), Image: "forest.png", MapDefinition: model.MapDefinition{Name: "Map", Width: 20, Height: 20}})
 	}
 	f.write(t, "units.json", units)
 	f.write(t, "maps.json", maps)
@@ -189,7 +189,7 @@ func TestPluginHasNoMapOrUnitCountCaps(t *testing.T) {
 }
 func TestDefaultBoardLimitEnforced(t *testing.T) {
 	f := newPackFixture(t)
-	f.write(t, "board.json", app.SavedBoard{Units: make([]app.UnitData, app.MaxBoardUnits+1)})
+	f.write(t, "board.json", model.SavedBoard{Units: make([]model.UnitData, model.MaxBoardUnits+1)})
 	if err := validateFixture(f); err == nil {
 		t.Fatal("oversized board accepted")
 	}
@@ -203,7 +203,7 @@ func TestPluginIDsRemainStableAcrossVersions(t *testing.T) {
 func TestPluginModificationInvalidatesBoundReader(t *testing.T) {
 	f := newPackFixture(t)
 	p := f.pack(t)
-	f.write(t, "statuses.json", []app.UnitStatusOption{{Value: "Changed", Color: "#ABCDEF"}})
+	f.write(t, "statuses.json", []model.UnitStatusOption{{Value: "Changed", Color: "#ABCDEF"}})
 	if err := p.Validate(); err == nil {
 		t.Fatal("modified folder accepted")
 	}
@@ -244,7 +244,7 @@ func TestRestoringPluginFilesRecoversCachedReader(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	f.write(t, "statuses.json", []app.UnitStatusOption{{Value: "Changed", Color: "#ABCDEF"}})
+	f.write(t, "statuses.json", []model.UnitStatusOption{{Value: "Changed", Color: "#ABCDEF"}})
 	if err := p.Validate(); err == nil {
 		t.Fatal("changed file accepted")
 	}
@@ -275,7 +275,7 @@ func TestCachedDiscoveryReusesUnchangedContent(t *testing.T) {
 	if original == nil || original != reused {
 		t.Fatal("unchanged content was reloaded")
 	}
-	f.write(t, "units.json", []unitEntry{{Key: "scout", Image: "forest.png", UnitDefinition: app.UnitDefinition{Name: "Updated scout", UnitType: "npc"}}})
+	f.write(t, "units.json", []unitEntry{{Key: "scout", Image: "forest.png", UnitDefinition: model.UnitDefinition{Name: "Updated scout", UnitType: "npc"}}})
 	changed := Discover([]string{f.root}, bounds)
 	for _, p := range changed {
 		if p.ID == "forest" {

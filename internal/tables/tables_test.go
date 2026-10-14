@@ -16,7 +16,9 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
-	"tableTop/main/internal/app"
+
+	"tableTop/main/internal/app/model"
+	"tableTop/main/internal/app/persistence"
 	"tableTop/main/internal/auth"
 	"tableTop/main/internal/plugins"
 )
@@ -26,8 +28,8 @@ type cleanupFailureStore struct {
 	scopes []string
 }
 
-func (*cleanupFailureStore) Maps(string) app.DocumentStore[app.MapDefinition]   { return nil }
-func (*cleanupFailureStore) Units(string) app.DocumentStore[app.UnitDefinition] { return nil }
+func (*cleanupFailureStore) Maps(string) persistence.DocumentStore[model.MapDefinition]   { return nil }
+func (*cleanupFailureStore) Units(string) persistence.DocumentStore[model.UnitDefinition] { return nil }
 func (s *cleanupFailureStore) DeleteScope(scope string) error {
 	s.scopes = append(s.scopes, scope)
 	return s.err

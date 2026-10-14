@@ -7,11 +7,12 @@ import (
 	"strings"
 	"testing"
 
-	"tableTop/main/internal/app"
+	"tableTop/main/internal/app/model"
+	"tableTop/main/internal/app/persistence"
 )
 
 func TestIndexRendersSpawnControls(t *testing.T) {
-	state := app.NewState()
+	state := model.NewState()
 	handler := newTestEndpointHandler(t, state, NewWebSocketHandler(state), newTestLibrary(t))
 	mux := http.NewServeMux()
 	handler.RegisterRoutes(mux)
@@ -33,7 +34,7 @@ func TestIndexRendersSpawnControls(t *testing.T) {
 }
 
 func TestGMButtonVisibilityIsPerRequest(t *testing.T) {
-	state := app.NewState()
+	state := model.NewState()
 	handler := newTestEndpointHandler(t, state, NewWebSocketHandler(state), newTestLibrary(t))
 	mux := http.NewServeMux()
 	handler.RegisterRoutes(mux)
@@ -65,9 +66,9 @@ func TestGMButtonVisibilityIsPerRequest(t *testing.T) {
 	}
 }
 
-func newTestLibrary(t *testing.T) *app.UnitLibrary {
+func newTestLibrary(t *testing.T) *persistence.UnitLibrary {
 	t.Helper()
-	library, err := app.NewUnitLibrary(t.TempDir())
+	library, err := persistence.NewUnitLibrary(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -92,7 +93,7 @@ func TestMenuRenderFailureDoesNotReturnPartialForm(t *testing.T) {
 }
 
 func TestUnitSpawningRequiresPost(t *testing.T) {
-	state := app.NewState()
+	state := model.NewState()
 	mux := http.NewServeMux()
 	newTestEndpointHandler(t, state, NewWebSocketHandler(state), newTestLibrary(t)).RegisterRoutes(mux)
 	for _, method := range []string{http.MethodGet, http.MethodHead, http.MethodPut} {

@@ -13,7 +13,8 @@ import (
 	"testing"
 	"time"
 
-	"tableTop/main/internal/app"
+	"tableTop/main/internal/app/model"
+	"tableTop/main/internal/app/persistence"
 	"tableTop/main/internal/plugins"
 )
 
@@ -29,7 +30,7 @@ func TestBrowserSync(t *testing.T) {
 	if err != nil {
 		t.Skip("Firefox is required for browser regression tests")
 	}
-	state := app.NewState()
+	state := model.NewState()
 	library := newTestLibrary(t)
 	for _, pack := range plugins.Discover(plugins.Directories(testAssetRoot(t)), plugins.Bounds{Metadata: 1 << 20, Content: 16 << 20}) {
 		if pack.ID == "builtin" {
@@ -40,11 +41,11 @@ func TestBrowserSync(t *testing.T) {
 	knight, _ := library.UnitByID("knight")
 	state.AddUnit(knight)
 	ws := NewWebSocketHandler(state)
-	maps, err := app.NewMapLibrary(t.TempDir())
+	maps, err := persistence.NewMapLibrary(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, definition := range []app.MapDefinition{
+	for _, definition := range []model.MapDefinition{
 		{Name: "Forest Clearing", Width: 20, Height: 20, OffsetX: -8, OffsetY: -4},
 		{Name: "Desert Oasis", Width: 20, Height: 20, OffsetX: 64, OffsetY: 64},
 	} {

@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"net/url"
 
-	"tableTop/main/internal/app"
+	"tableTop/main/internal/app/persistence"
 )
 
 // Access separates server enrollment from each tabletop's membership.
@@ -14,7 +14,7 @@ type Access interface {
 	IsAdmin(string) bool
 	Admit(string, string) error
 	CreateInvitation(string) (string, error)
-	Invitations(string) []app.Invitation
+	Invitations(string) []persistence.Invitation
 	RevokeInvitation(string, string) error
 }
 
@@ -27,7 +27,7 @@ var adminTemplate = template.Must(template.New("admin").Parse(`<!doctype html>
   <link rel="icon" href="/static/favicon.ico?v=1" sizes="16x16 32x32 48x48" type="image/x-icon">
   <link rel="icon" href="/static/favicon-64.png?v=1" sizes="64x64" type="image/png">
   <link rel="stylesheet" href="/static/style.css?v=72">
-  <script defer src="/static/invitations.js?v=1"></script>
+  <script defer src="/static/js/account/invitations.js?v=1"></script>
 </head>
 <body class="lobby-page admin-page">
 <main>
@@ -99,6 +99,6 @@ func (m *Manager) admin(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	adminTemplate.Execute(w, struct {
 		Link, Error string
-		Invites     []app.Invitation
+		Invites     []persistence.Invitation
 	}{link, message, m.config.Access.Invitations(user.ID)})
 }

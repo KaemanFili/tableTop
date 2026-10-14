@@ -9,11 +9,12 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
-	"tableTop/main/internal/app"
+
+	"tableTop/main/internal/app/model"
 )
 
 func TestResizeHTTPAndConnectedBoardsPreserveLibrary(t *testing.T) {
-	state := app.NewState()
+	state := model.NewState()
 	library := newTestLibrary(t)
 	ws := NewWebSocketHandler(state)
 	handler := newTestEndpointHandler(t, state, ws, library)
@@ -50,7 +51,7 @@ func TestResizeHTTPAndConnectedBoardsPreserveLibrary(t *testing.T) {
 		t.Fatal(err)
 	}
 	change := trigger["unitSizeChanged"]
-	if change.ID != token.ID || change.Size != app.SizeMedium || change.Label != "Medium" || change.Squares != 1 || res.Body.Len() != 0 || res.Header().Get("Cache-Control") != "no-store" {
+	if change.ID != token.ID || change.Size != model.SizeMedium || change.Label != "Medium" || change.Squares != 1 || res.Body.Len() != 0 || res.Header().Get("Cache-Control") != "no-store" {
 		t.Fatalf("wrong initiating-client response: %+v", change)
 	}
 	for _, conn := range connections {
@@ -65,7 +66,7 @@ func TestResizeHTTPAndConnectedBoardsPreserveLibrary(t *testing.T) {
 	}
 	request(token.ID, "direction=up", 204)
 	got, _ := state.UnitByID(token.ID)
-	if got.Size != app.SizeLarge || got.ImageFit != token.ImageFit || got.Left != token.Left || got.Top != token.Top {
+	if got.Size != model.SizeLarge || got.ImageFit != token.ImageFit || got.Left != token.Left || got.Top != token.Top {
 		t.Fatalf("resize lost token data: %+v", got)
 	}
 	request(token.ID, "direction=sideways", 400)
@@ -76,14 +77,14 @@ func TestResizeHTTPAndConnectedBoardsPreserveLibrary(t *testing.T) {
 		request(token.ID, "direction=up", 204)
 	}
 	got, _ = state.UnitByID(token.ID)
-	if got.Size != app.SizeGargantuan {
+	if got.Size != model.SizeGargantuan {
 		t.Fatal("upper limit did not hold")
 	}
 	for range 8 {
 		request(token.ID, "direction=down", 204)
 	}
 	got, _ = state.UnitByID(token.ID)
-	if got.Size != app.SizeTiny {
+	if got.Size != model.SizeTiny {
 		t.Fatal("lower limit did not hold")
 	}
 	if gotOther, _ := state.UnitByID(other.ID); gotOther != other {

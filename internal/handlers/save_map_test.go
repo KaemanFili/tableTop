@@ -8,22 +8,23 @@ import (
 	"reflect"
 	"testing"
 
-	"tableTop/main/internal/app"
+	"tableTop/main/internal/app/model"
+	"tableTop/main/internal/app/persistence"
 )
 
 func TestSaveMapPreservesBoardAndArtwork(t *testing.T) {
 	dir := t.TempDir()
-	maps, err := app.NewMapLibrary(dir)
+	maps, err := persistence.NewMapLibrary(dir)
 	if err != nil {
 		t.Fatal(err)
 	}
 	image := testPNG(t, 4, 2)
-	definition, err := maps.Create(app.MapDefinition{Name: "Forest", Width: 20, Height: 10}, image)
+	definition, err := maps.Create(model.MapDefinition{Name: "Forest", Width: 20, Height: 10}, image)
 	if err != nil {
 		t.Fatal(err)
 	}
-	state := app.NewState()
-	token := state.AddRandomUnit(app.PCUnitImageID)
+	state := model.NewState()
+	token := state.AddRandomUnit(model.PCUnitImageID)
 	state.UpdateUnitPosition(token.ID, 240, 320)
 	ws := NewWebSocketHandler(state)
 	handler := newTestEndpointHandler(t, state, ws, newTestLibrary(t), maps)
@@ -50,7 +51,7 @@ func TestSaveMapPreservesBoardAndArtwork(t *testing.T) {
 	ruler := boardRuler{Type: "rulerChanged", ID: "author", Start: &rulerPoint{X: 1, Y: 1}, End: &rulerPoint{X: 4, Y: 5}}
 	ws.rulers[ruler.ID] = ruler
 	request("/board/save?gm=true", http.StatusNoContent)
-	reloaded, err := app.NewMapLibrary(dir)
+	reloaded, err := persistence.NewMapLibrary(dir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -59,7 +60,7 @@ func TestSaveMapPreservesBoardAndArtwork(t *testing.T) {
 		t.Fatal("board was not persisted")
 	}
 	stroke.Finished = true
-	want := app.SavedBoard{Units: state.Units(), Strokes: []app.PenStroke{stroke}, Fog: ws.fogMarks, Rulers: []app.BoardRuler{ruler}}
+	want := model.SavedBoard{Units: state.Units(), Strokes: []model.PenStroke{stroke}, Fog: ws.fogMarks, Rulers: []model.BoardRuler{ruler}}
 	if !reflect.DeepEqual(*saved.Board, want) {
 		t.Fatalf("saved board = %+v, want %+v", *saved.Board, want)
 	}
@@ -86,7 +87,7 @@ func TestSaveMapPreservesBoardAndArtwork(t *testing.T) {
 	ws.fogMarks = nil
 	state.ClearUnits()
 	request("/board/save?gm=true", http.StatusNoContent)
-	reloaded, err = app.NewMapLibrary(dir)
+	reloaded, err = persistence.NewMapLibrary(dir)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"tableTop/main/internal/app"
+	"tableTop/main/internal/app/model"
 )
 
 func TestDND5ePluginMatchesCatalog(t *testing.T) {
@@ -68,11 +68,11 @@ func TestDND5ePluginMatchesCatalog(t *testing.T) {
 		if size == "medium or small" {
 			size = "medium"
 		}
-		if unit.Size != app.UnitSize(size) {
+		if unit.Size != model.UnitSize(size) {
 			t.Fatalf("incorrect monster size: %s", entry.Key)
 		}
 		if entry.Image == "" {
-			if unit.Artwork != nil || unit.ImageID != app.NPCUnitImageID {
+			if unit.Artwork != nil || unit.ImageID != model.NPCUnitImageID {
 				t.Fatalf("missing-artwork fallback changed: %s", entry.Key)
 			}
 			continue

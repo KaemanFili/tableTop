@@ -6,17 +6,17 @@ import (
 	"log"
 	"net/http"
 
-	"tableTop/main/internal/app"
+	"tableTop/main/internal/app/model"
 )
 
 type unitSizeChange struct {
-	ID      string       `json:"id"`
-	Size    app.UnitSize `json:"size"`
-	Squares float64      `json:"squares"`
-	Label   string       `json:"label"`
+	ID      string         `json:"id"`
+	Size    model.UnitSize `json:"size"`
+	Squares float64        `json:"squares"`
+	Label   string         `json:"label"`
 }
 
-func sizeChange(unit app.UnitData) unitSizeChange {
+func sizeChange(unit model.UnitData) unitSizeChange {
 	return unitSizeChange{ID: unit.ID, Size: unit.Size, Squares: unit.Size.Squares(), Label: unit.Size.Label()}
 }
 
@@ -30,9 +30,9 @@ func (h *EndpointHandler) resizeUnit(w http.ResponseWriter, r *http.Request) {
 	unit, changed, err := h.state.ResizeUnit(r.PathValue("id"), r.PostFormValue("direction"))
 	if err != nil {
 		switch {
-		case errors.Is(err, app.ErrInvalidSizeDirection):
+		case errors.Is(err, model.ErrInvalidSizeDirection):
 			http.Error(w, "Choose up or down.", http.StatusBadRequest)
-		case errors.Is(err, app.ErrUnitNotFound):
+		case errors.Is(err, model.ErrUnitNotFound):
 			http.Error(w, "This unit is no longer on the board.", http.StatusNotFound)
 		default:
 			log.Println("Resize unit:", err)
@@ -48,7 +48,7 @@ func (h *EndpointHandler) resizeUnit(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-func (h *WebSocketHandler) BroadcastUnitSizeChanged(unit app.UnitData) {
+func (h *WebSocketHandler) BroadcastUnitSizeChanged(unit model.UnitData) {
 	data, _ := json.Marshal(struct {
 		Type string `json:"type"`
 		unitSizeChange

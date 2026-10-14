@@ -8,12 +8,13 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
-	"tableTop/main/internal/app"
+
+	"tableTop/main/internal/app/model"
 )
 
 func TestFogGMEditsSharedOrderAndInitialState(t *testing.T) {
-	state := app.NewState()
-	token := state.AddRandomUnit(app.DefaultUnitImageID)
+	state := model.NewState()
+	token := state.AddRandomUnit(model.DefaultUnitImageID)
 	handler := NewWebSocketHandler(state)
 	mux := http.NewServeMux()
 	handler.RegisterRoutes(mux)

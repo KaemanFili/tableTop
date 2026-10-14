@@ -11,11 +11,12 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
-	"tableTop/main/internal/app"
+
+	"tableTop/main/internal/app/model"
 )
 
 func TestDiceRollSharedResultsAndValidation(t *testing.T) {
-	state := app.NewState()
+	state := model.NewState()
 	ws := NewWebSocketHandler(state)
 	mux := http.NewServeMux()
 	newTestEndpointHandler(t, state, ws, newTestLibrary(t)).RegisterRoutes(mux)

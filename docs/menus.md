@@ -1,6 +1,6 @@
 # Floating menus
 
-`static/menuUI.js` shares positioning and toolbar-menu behavior. Load it before
+`static/js/shared/menuUI.js` shares positioning and toolbar-menu behavior. Load it before
 scripts that use it. Menu actions remain in their owning scripts.
 
 ```js
@@ -49,7 +49,7 @@ the account controls visible.
 
 # Notifications
 
-`static/notifications.js` manages popup dismissal, expiry, and the visible limit.
+`static/js/shared/notifications.js` manages popup dismissal, expiry, and the visible limit.
 It cancels an expiry timer when a popup is dismissed or evicted. The markup lives
 in `#notification-template` in `index.html`, with title, content, and dismiss
 slots identified by `data-notification-title`, `data-notification-content`, and
@@ -64,9 +64,9 @@ The optional third argument sets `limit` (default 5) and `duration` in milliseco
 (default 30000). Callers supply DOM content; titles are inserted as plain text.
 Dice results use the same rendering function in the roller and its notification.
 
-`static/diceAnimation.js` owns engine loading, fixed-result notation, engine
+`static/js/dice/diceAnimation.js` owns engine loading, fixed-result notation, engine
 compatibility fixes, animation queues, and fading. Its `create(layer, status)`
-returns `load()` and `play(message)`. `static/dice.js` owns form input, shared
+returns `load()` and `play(message)`. `static/js/dice/dice.js` owns form input, shared
 requests, duplicate-event handling, privacy, and result presentation.
 The 3D engine loads on the first roll; opening the menu does not download or
 initialize it.

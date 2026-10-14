@@ -10,34 +10,35 @@ import (
 	"strings"
 	"sync"
 
-	"tableTop/main/internal/app"
+	"tableTop/main/internal/app/model"
+	"tableTop/main/internal/app/persistence"
 	"tableTop/main/internal/auth"
 	"tableTop/main/internal/handlers"
 	"tableTop/main/internal/plugins"
 )
 
 type Manager struct {
-	library      *app.TableLibrary
+	library      *persistence.TableLibrary
 	dir, assets  string
 	mu           sync.Mutex
 	boards       map[string]*managedBoard
 	deleteMu     sync.Mutex
-	limits       *app.StorageLimits
-	store        app.LibraryStore
+	limits       *persistence.StorageLimits
+	store        persistence.LibraryStore
 	pluginDirs   []string
 	pluginBounds plugins.Bounds
 }
 
-func New(dir, assets string, limits ...*app.StorageLimits) (*Manager, error) {
+func New(dir, assets string, limits ...*persistence.StorageLimits) (*Manager, error) {
 	return NewWithStore(dir, assets, nil, limits...)
 }
 
-func NewWithStore(dir, assets string, store app.LibraryStore, limits ...*app.StorageLimits) (*Manager, error) {
-	var storage *app.StorageLimits
+func NewWithStore(dir, assets string, store persistence.LibraryStore, limits ...*persistence.StorageLimits) (*Manager, error) {
+	var storage *persistence.StorageLimits
 	if len(limits) > 0 {
 		storage = limits[0]
 	}
-	library, err := app.NewTableLibrary(dir, storage)
+	library, err := persistence.NewTableLibrary(dir, storage)
 	if err != nil {
 		return nil, err
 	}
@@ -127,7 +128,7 @@ var lobbyTemplate = template.Must(template.New("lobby").Parse(`<!doctype html>
     </div>
   </section>
 </main>
-<script src="/static/lobby.js?v=1" defer></script>
+<script src="/static/js/account/lobby.js?v=1" defer></script>
 </body>
 </html>`))
 
@@ -137,7 +138,7 @@ func (m *Manager) renderLobby(w http.ResponseWriter, r *http.Request, message st
 	w.WriteHeader(status)
 	lobbyTemplate.Execute(w, struct {
 		User          *auth.User
-		Tables        []app.TableDefinition
+		Tables        []persistence.TableDefinition
 		Plugins       []plugins.Pack
 		Error, Invite string
 	}{user, m.library.ForUser(user.ID), plugins.Discover(m.pluginDirs, m.pluginBounds), message, r.URL.Query().Get("invite")})
@@ -169,11 +170,11 @@ func (m *Manager) create(w http.ResponseWriter, r *http.Request) {
 	}
 	table, err := m.library.CreateBound(r.Form.Get("name"), auth.CurrentUser(r).ID, selected.Binding())
 	if err != nil {
-		if errors.Is(err, app.ErrCapacity) {
+		if errors.Is(err, model.ErrCapacity) {
 			m.renderLobby(w, r, err.Error(), http.StatusConflict)
 			return
 		}
-		if errors.Is(err, app.ErrStorageLimit) {
+		if errors.Is(err, persistence.ErrStorageLimit) {
 			m.renderLobby(w, r, err.Error(), http.StatusInsufficientStorage)
 			return
 		}
@@ -196,11 +197,11 @@ func (m *Manager) join(w http.ResponseWriter, r *http.Request) {
 	}
 	table, err := m.library.Join(strings.TrimSpace(r.Form.Get("code")), auth.CurrentUser(r).ID)
 	if err != nil {
-		if errors.Is(err, app.ErrCapacity) {
+		if errors.Is(err, model.ErrCapacity) {
 			m.renderLobby(w, r, err.Error(), http.StatusConflict)
 			return
 		}
-		if errors.Is(err, app.ErrStorageLimit) {
+		if errors.Is(err, persistence.ErrStorageLimit) {
 			m.renderLobby(w, r, err.Error(), http.StatusInsufficientStorage)
 			return
 		}
@@ -227,7 +228,7 @@ func (m *Manager) board(w http.ResponseWriter, r *http.Request) {
 	}
 	handler, err := m.handler(table.ID)
 	if err != nil {
-		if errors.Is(err, app.ErrTableNotFound) {
+		if errors.Is(err, persistence.ErrTableNotFound) {
 			http.NotFound(w, r)
 			return
 		}
@@ -248,7 +249,7 @@ func (m *Manager) handler(id string) (http.Handler, error) {
 	table, exists := m.library.ByID(id)
 	if !exists || table.Deleting || table.Initialization != "" {
 		m.mu.Unlock()
-		return nil, app.ErrTableNotFound
+		return nil, persistence.ErrTableNotFound
 	}
 	if handler := m.boards[id]; handler != nil {
 		m.mu.Unlock()
@@ -270,27 +271,27 @@ func (m *Manager) handler(id string) (http.Handler, error) {
 		return nil, err
 	}
 	dir := filepath.Join(m.dir, "sessions", id)
-	var unitStore app.DocumentStore[app.UnitDefinition]
-	var mapStore app.DocumentStore[app.MapDefinition]
+	var unitStore persistence.DocumentStore[model.UnitDefinition]
+	var mapStore persistence.DocumentStore[model.MapDefinition]
 	if m.store != nil {
 		unitStore = m.store.Units(id)
 		mapStore = m.store.Maps(id)
 	}
-	units, err := app.NewUnitLibraryWithStore(dir, unitStore, m.limits)
+	units, err := persistence.NewUnitLibraryWithStore(dir, unitStore, m.limits)
 	if err != nil {
 		return nil, err
 	}
-	maps, err := app.NewMapLibraryWithStore(dir, mapStore, m.limits)
+	maps, err := persistence.NewMapLibraryWithStore(dir, mapStore, m.limits)
 	if err != nil {
 		return nil, err
 	}
 	units.SetDefaults(defaults)
 	maps.SetDefaults(defaults)
-	statuses, err := app.EffectiveStatuses(dir, id, m.store, m.limits, defaults)
+	statuses, err := persistence.EffectiveStatuses(dir, id, m.store, m.limits, defaults)
 	if err != nil {
 		return nil, err
 	}
-	state, err := app.NewStateWithStatuses(statuses)
+	state, err := model.NewStateWithStatuses(statuses)
 	if err != nil {
 		return nil, err
 	}

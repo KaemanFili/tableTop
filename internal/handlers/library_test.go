@@ -10,7 +10,8 @@ import (
 	"strings"
 	"testing"
 
-	"tableTop/main/internal/app"
+	"tableTop/main/internal/app/model"
+	"tableTop/main/internal/app/persistence"
 )
 
 func libraryRequest(t *testing.T, name, unitType, size string, upload []byte, extraFields ...map[string]string) *http.Request {
@@ -57,11 +58,11 @@ func testPNG(t *testing.T, width, height int) []byte {
 
 func TestUnitLibraryCreateRestartAndSpawn(t *testing.T) {
 	dir := t.TempDir()
-	library, err := app.NewUnitLibrary(dir)
+	library, err := persistence.NewUnitLibrary(dir)
 	if err != nil {
 		t.Fatal(err)
 	}
-	state := app.NewState()
+	state := model.NewState()
 	mux := http.NewServeMux()
 	newTestEndpointHandler(t, state, NewWebSocketHandler(state), library).RegisterRoutes(mux)
 	for _, unitType := range []string{"pc", "npc"} {
@@ -79,7 +80,7 @@ func TestUnitLibraryCreateRestartAndSpawn(t *testing.T) {
 	}
 
 	// Reopen storage and use new handlers, as on a server restart.
-	library, err = app.NewUnitLibrary(dir)
+	library, err = persistence.NewUnitLibrary(dir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -92,7 +93,7 @@ func TestUnitLibraryCreateRestartAndSpawn(t *testing.T) {
 		if unit.ID == "knight" || unit.ID == "goblin" {
 			continue
 		}
-		if unit.Name != "Scout <script>" || unit.Size != app.SizeLarge || unit.ImageFit != (app.ImageFit{Zoom: 2, OffsetX: 10, OffsetY: -20}) {
+		if unit.Name != "Scout <script>" || unit.Size != model.SizeLarge || unit.ImageFit != (model.ImageFit{Zoom: 2, OffsetX: 10, OffsetY: -20}) {
 			t.Fatalf("unexpected saved name %q", unit.Name)
 		}
 		artwork := httptest.NewRecorder()
@@ -115,7 +116,7 @@ func TestUnitLibraryCreateRestartAndSpawn(t *testing.T) {
 		t.Fatal("library entries should spawn independent copies")
 	}
 	for _, unit := range state.Units() {
-		if unit.ImageFit != (app.ImageFit{Zoom: 2, OffsetX: 10, OffsetY: -20}) || unit.Size != app.SizeLarge || unit.Name != "Scout <script>" || (unit.UnitType != "pc" && unit.UnitType != "npc") {
+		if unit.ImageFit != (model.ImageFit{Zoom: 2, OffsetX: 10, OffsetY: -20}) || unit.Size != model.SizeLarge || unit.Name != "Scout <script>" || (unit.UnitType != "pc" && unit.UnitType != "npc") {
 			t.Fatalf("spawn lost identity: %+v", unit)
 		}
 	}
@@ -140,7 +141,7 @@ func TestCreateUnitValidation(t *testing.T) {
 	} {
 		t.Run(test.label, func(t *testing.T) {
 			library := newTestLibrary(t)
-			state := app.NewState()
+			state := model.NewState()
 			mux := http.NewServeMux()
 			newTestEndpointHandler(t, state, NewWebSocketHandler(state), library).RegisterRoutes(mux)
 			response := httptest.NewRecorder()
@@ -161,7 +162,7 @@ func TestCreateUnitValidation(t *testing.T) {
 
 func TestUnitMenusAndDefaultArtwork(t *testing.T) {
 	library := newTestLibrary(t)
-	state := app.NewState()
+	state := model.NewState()
 	mux := http.NewServeMux()
 	newTestEndpointHandler(t, state, NewWebSocketHandler(state), library).RegisterRoutes(mux)
 	for _, test := range []struct {
@@ -190,9 +191,9 @@ func TestUnitMenusAndDefaultArtwork(t *testing.T) {
 		}
 	}
 	for _, unit := range library.Units() {
-		want := app.NPCUnitImageID
+		want := model.NPCUnitImageID
 		if unit.UnitType == "pc" {
-			want = app.PCUnitImageID
+			want = model.PCUnitImageID
 		}
 		if unit.ImageID != want {
 			t.Fatalf("wrong default artwork: %+v", unit)
@@ -202,7 +203,7 @@ func TestUnitMenusAndDefaultArtwork(t *testing.T) {
 
 func TestSizeControlsSpawnAndReloadFootprint(t *testing.T) {
 	library := newTestLibrary(t)
-	state := app.NewState()
+	state := model.NewState()
 	mux := http.NewServeMux()
 	newTestEndpointHandler(t, state, NewWebSocketHandler(state), library).RegisterRoutes(mux)
 	for _, test := range []struct{ size, squares string }{
@@ -215,7 +216,7 @@ func TestSizeControlsSpawnAndReloadFootprint(t *testing.T) {
 			if !strings.Contains(created.Body.String(), "saved. Select it below") {
 				t.Fatalf("creation failed: %s", created.Body.String())
 			}
-			var definition app.UnitDefinition
+			var definition model.UnitDefinition
 			for _, unit := range library.Units() {
 				if unit.Name == "Size "+test.size {
 					definition = unit
@@ -250,7 +251,7 @@ func TestSizeControlsSpawnAndReloadFootprint(t *testing.T) {
 
 func TestRejectInvalidUnitSizes(t *testing.T) {
 	library := newTestLibrary(t)
-	state := app.NewState()
+	state := model.NewState()
 	mux := http.NewServeMux()
 	newTestEndpointHandler(t, state, NewWebSocketHandler(state), library).RegisterRoutes(mux)
 	for _, size := range []string{"", "gigantic", "2", "large; color:red"} {
@@ -259,7 +260,7 @@ func TestRejectInvalidUnitSizes(t *testing.T) {
 		if !strings.Contains(response.Body.String(), "Choose a size from Tiny to Gargantuan") || len(library.Units()) != 2 {
 			t.Fatalf("invalid size %q was not rejected", size)
 		}
-		if _, err := library.Create("Scout", "npc", app.UnitSize(size), app.DefaultImageFit(), nil); err == nil {
+		if _, err := library.Create("Scout", "npc", model.UnitSize(size), model.DefaultImageFit(), nil); err == nil {
 			t.Fatalf("library accepted invalid size %q", size)
 		}
 	}
@@ -267,7 +268,7 @@ func TestRejectInvalidUnitSizes(t *testing.T) {
 
 func TestRejectInvalidImageFraming(t *testing.T) {
 	library := newTestLibrary(t)
-	state := app.NewState()
+	state := model.NewState()
 	mux := http.NewServeMux()
 	newTestEndpointHandler(t, state, NewWebSocketHandler(state), library).RegisterRoutes(mux)
 	for _, fields := range []map[string]string{
@@ -284,7 +285,7 @@ func TestRejectInvalidImageFraming(t *testing.T) {
 }
 
 func TestFormErrorsPreserveImageFraming(t *testing.T) {
-	state := app.NewState()
+	state := model.NewState()
 	mux := http.NewServeMux()
 	newTestEndpointHandler(t, state, NewWebSocketHandler(state), newTestLibrary(t)).RegisterRoutes(mux)
 	response := httptest.NewRecorder()

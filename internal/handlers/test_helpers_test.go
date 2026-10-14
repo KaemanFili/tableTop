@@ -7,7 +7,8 @@ import (
 	"runtime"
 	"testing"
 
-	"tableTop/main/internal/app"
+	"tableTop/main/internal/app/model"
+	"tableTop/main/internal/app/persistence"
 )
 
 func testAssetRoot(t *testing.T) string {
@@ -19,7 +20,7 @@ func testAssetRoot(t *testing.T) string {
 	return filepath.Clean(filepath.Join(filepath.Dir(file), "../.."))
 }
 
-func newTestEndpointHandler(t *testing.T, state *app.AppState, ws *WebSocketHandler, library *app.UnitLibrary, maps ...*app.MapLibrary) *EndpointHandler {
+func newTestEndpointHandler(t *testing.T, state *model.AppState, ws *WebSocketHandler, library *persistence.UnitLibrary, maps ...*persistence.MapLibrary) *EndpointHandler {
 	t.Helper()
 	return newEndpointHandler(state, ws, library, testAssetRoot(t), maps...)
 }

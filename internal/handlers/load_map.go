@@ -9,7 +9,9 @@ import (
 	"net/http"
 	"os"
 	"strconv"
-	"tableTop/main/internal/app"
+
+	"tableTop/main/internal/app/model"
+	"tableTop/main/internal/app/persistence"
 )
 
 func (h *EndpointHandler) mapPicker(w http.ResponseWriter, r *http.Request) {
@@ -21,7 +23,7 @@ func (h *EndpointHandler) mapPicker(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var rendered bytes.Buffer
-	data := libraryGroup[app.MapDefinition]{}
+	data := libraryGroup[model.MapDefinition]{}
 	for _, m := range h.mapLibrary.Maps() {
 		if m.ReadOnly {
 			data.Defaults = append(data.Defaults, m)
@@ -63,7 +65,7 @@ func (h *EndpointHandler) loadMap(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte(`<p role="status" data-map-saved>Map loaded.</p>`))
 }
 
-func (h *EndpointHandler) validateMapForLoad(w http.ResponseWriter, definition app.MapDefinition) bool {
+func (h *EndpointHandler) validateMapForLoad(w http.ResponseWriter, definition model.MapDefinition) bool {
 	if err := definition.Validate(); err != nil {
 		http.Error(w, "Invalid saved map.", http.StatusConflict)
 		return false
@@ -81,7 +83,7 @@ func (h *EndpointHandler) validateMapForLoad(w http.ResponseWriter, definition a
 }
 
 // The caller holds boardMutex; validation must succeed before replacing live state.
-func (h *EndpointHandler) restoreMapLocked(definition app.MapDefinition) {
+func (h *EndpointHandler) restoreMapLocked(definition model.MapDefinition) {
 	ws := h.webSocketHandler
 	board := definition.Board
 	// Send only the image and fit in boardMapChanged; utilities have their own messages.
@@ -100,7 +102,7 @@ func (h *EndpointHandler) restoreMapLocked(definition app.MapDefinition) {
 	ws.broadcastValueLocked("unit created")
 }
 
-func (ws *WebSocketHandler) restoreStrokesLocked(values []app.PenStroke, owner string) {
+func (ws *WebSocketHandler) restoreStrokesLocked(values []model.PenStroke, owner string) {
 	for index, stroke := range values {
 		ws.drawingPoints += len(stroke.Points)
 		stroke.ID, stroke.Owner = owner+"/"+strconv.Itoa(index+1), owner
@@ -110,7 +112,7 @@ func (ws *WebSocketHandler) restoreStrokesLocked(values []app.PenStroke, owner s
 	}
 }
 
-func (ws *WebSocketHandler) restoreFogLocked(values []app.FogMark, owner string) {
+func (ws *WebSocketHandler) restoreFogLocked(values []model.FogMark, owner string) {
 	for index, mark := range values {
 		ws.drawingPoints += len(mark.Points)
 		mark.ID, mark.Owner, mark.Generation = owner+"/"+strconv.Itoa(index+1), owner, ws.boardGeneration
@@ -119,7 +121,7 @@ func (ws *WebSocketHandler) restoreFogLocked(values []app.FogMark, owner string)
 	}
 }
 
-func (ws *WebSocketHandler) restoreRulersLocked(values []app.BoardRuler, owner string) {
+func (ws *WebSocketHandler) restoreRulersLocked(values []model.BoardRuler, owner string) {
 	for index, ruler := range values {
 		ruler.ID, ruler.Generation = owner+"/"+strconv.Itoa(index+1), ws.boardGeneration
 		ws.rulers[ruler.ID] = ruler
@@ -141,7 +143,7 @@ func (h *EndpointHandler) deleteMap(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
 	if err := h.mapLibrary.Delete(id); err != nil {
 		ws.boardMutex.Unlock()
-		if errors.Is(err, app.ErrReadOnly) {
+		if errors.Is(err, persistence.ErrReadOnly) {
 			http.Error(w, err.Error(), http.StatusConflict)
 			return
 		}

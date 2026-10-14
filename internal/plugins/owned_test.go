@@ -6,22 +6,23 @@ import (
 	"path/filepath"
 	"testing"
 
-	"tableTop/main/internal/app"
+	"tableTop/main/internal/app/model"
+	"tableTop/main/internal/app/persistence"
 )
 
-func boundLibraries(t *testing.T) (packFixture, Pack, *app.MapLibrary, *app.UnitLibrary, string) {
+func boundLibraries(t *testing.T) (packFixture, Pack, *persistence.MapLibrary, *persistence.UnitLibrary, string) {
 	t.Helper()
 	f := newPackFixture(t)
 	p := f.pack(t)
 	dir := t.TempDir()
-	if err := app.InitializeOwned(dir, "test", nil, nil); err != nil {
+	if err := persistence.InitializeOwned(dir, "test", nil, nil); err != nil {
 		t.Fatal(err)
 	}
-	maps, err := app.NewMapLibrary(dir)
+	maps, err := persistence.NewMapLibrary(dir)
 	if err != nil {
 		t.Fatal(err)
 	}
-	units, err := app.NewUnitLibrary(dir)
+	units, err := persistence.NewUnitLibrary(dir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -51,17 +52,17 @@ func TestOwnedInitializationWritesNoDefaultContent(t *testing.T) {
 }
 func TestDefaultDeletionIsRejected(t *testing.T) {
 	_, p, maps, units, _ := boundLibraries(t)
-	if err := maps.Delete(p.Maps()[0].ID); !errors.Is(err, app.ErrReadOnly) {
+	if err := maps.Delete(p.Maps()[0].ID); !errors.Is(err, persistence.ErrReadOnly) {
 		t.Fatalf("map delete: %v", err)
 	}
-	if err := units.Delete(p.Units()[0].ID); !errors.Is(err, app.ErrReadOnly) {
+	if err := units.Delete(p.Units()[0].ID); !errors.Is(err, persistence.ErrReadOnly) {
 		t.Fatalf("unit delete: %v", err)
 	}
 }
 func TestSaveDefaultCreatesOwnedMapAndReusesArtwork(t *testing.T) {
 	_, p, maps, _, dir := boundLibraries(t)
 	original := p.Maps()[0]
-	board := app.SavedBoard{Units: []app.UnitData{{Name: "Changed", ImageID: app.PCUnitImageID}}}
+	board := model.SavedBoard{Units: []model.UnitData{{Name: "Changed", ImageID: model.PCUnitImageID}}}
 	copy, err := maps.SaveMap(original, board)
 	if err != nil {
 		t.Fatal(err)
@@ -98,14 +99,14 @@ func TestSaveDefaultCreatesOwnedMapAndReusesArtwork(t *testing.T) {
 func TestCopiedUnitRetainsSharedArtworkAcrossRestart(t *testing.T) {
 	_, p, _, units, dir := boundLibraries(t)
 	u := p.Units()[0]
-	copy, err := units.CreateCopy(u.ID, "Owned scout", "npc", app.SizeLarge, app.DefaultImageFit(), nil)
+	copy, err := units.CreateCopy(u.ID, "Owned scout", "npc", model.SizeLarge, model.DefaultImageFit(), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if copy.ReadOnly || copy.ID == u.ID || copy.Artwork == nil || copy.ImageID != u.ImageID {
 		t.Fatal("invalid copy ownership/artwork")
 	}
-	reloaded, err := app.NewUnitLibrary(dir)
+	reloaded, err := persistence.NewUnitLibrary(dir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -126,20 +127,20 @@ func TestCopiedUnitRetainsSharedArtworkAcrossRestart(t *testing.T) {
 }
 func TestEffectiveStatusesUseDefaultsAndOwnedAdditions(t *testing.T) {
 	_, p, _, _, dir := boundLibraries(t)
-	if err := app.WriteContentJSON(filepath.Join(dir, "statuses.json"), map[string]any{"schemaVersion": 2, "options": []app.UnitStatusOption{{Value: "Owned", Color: "#ABCDEF"}}}, nil); err != nil {
+	if err := persistence.WriteContentJSON(filepath.Join(dir, "statuses.json"), map[string]any{"schemaVersion": 2, "options": []model.UnitStatusOption{{Value: "Owned", Color: "#ABCDEF"}}}, nil); err != nil {
 		t.Fatal(err)
 	}
-	values, err := app.EffectiveStatuses(dir, "test", nil, nil, p)
+	values, err := persistence.EffectiveStatuses(dir, "test", nil, nil, p)
 	if err != nil || len(values) != 2 || values[0].Value != "Marked" || values[1].Value != "Owned" {
 		t.Fatalf("effective statuses: %v", err)
 	}
 }
 func TestOwnedStatusCannotReplaceDefault(t *testing.T) {
 	_, p, _, _, dir := boundLibraries(t)
-	if err := app.WriteContentJSON(filepath.Join(dir, "statuses.json"), map[string]any{"schemaVersion": 2, "options": []app.UnitStatusOption{{Value: "Marked", Color: "#ABCDEF"}}}, nil); err != nil {
+	if err := persistence.WriteContentJSON(filepath.Join(dir, "statuses.json"), map[string]any{"schemaVersion": 2, "options": []model.UnitStatusOption{{Value: "Marked", Color: "#ABCDEF"}}}, nil); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := app.EffectiveStatuses(dir, "test", nil, nil, p); err == nil {
+	if _, err := persistence.EffectiveStatuses(dir, "test", nil, nil, p); err == nil {
 		t.Fatal("default status replaced")
 	}
 }
@@ -148,7 +149,7 @@ func TestFailedDefaultSaveDoesNotCreateCopy(t *testing.T) {
 	if err := os.Remove(filepath.Join(f.dir, "forest.png")); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := maps.SaveMap(p.Maps()[0], app.SavedBoard{}); err == nil {
+	if _, err := maps.SaveMap(p.Maps()[0], model.SavedBoard{}); err == nil {
 		t.Fatal("missing art allowed save")
 	}
 	if len(maps.Maps()) != 1 {

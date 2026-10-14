@@ -10,15 +10,16 @@ import (
 	"os"
 	"strconv"
 	"strings"
-	"tableTop/main/internal/auth"
 
-	"tableTop/main/internal/app"
+	"tableTop/main/internal/app/model"
+	"tableTop/main/internal/app/persistence"
+	"tableTop/main/internal/auth"
 )
 
 const maxMapImageBytes = 10 << 20
 
 type mapEditorData struct {
-	app.MapDefinition
+	model.MapDefinition
 	Error string
 	Saved bool
 }
@@ -51,14 +52,14 @@ func (h *EndpointHandler) newMapForm(w http.ResponseWriter, r *http.Request) {
 	if !h.requireMapGM(w, r) {
 		return
 	}
-	h.renderMapEditor(w, mapEditorData{MapDefinition: app.MapDefinition{Width: 20, Height: 20}})
+	h.renderMapEditor(w, mapEditorData{MapDefinition: model.MapDefinition{Width: 20, Height: 20}})
 }
 
 func (h *EndpointHandler) createMap(w http.ResponseWriter, r *http.Request) {
 	if !h.requireMapGM(w, r) {
 		return
 	}
-	data := mapEditorData{MapDefinition: app.MapDefinition{Width: 20, Height: 20}}
+	data := mapEditorData{MapDefinition: model.MapDefinition{Width: 20, Height: 20}}
 	fail := func(message string) {
 		data.Error = message
 		h.renderMapEditor(w, data)
@@ -87,7 +88,7 @@ func (h *EndpointHandler) createMap(w http.ResponseWriter, r *http.Request) {
 	definition, err := h.mapLibrary.Create(data.MapDefinition, image)
 	if err != nil {
 		log.Println("Save map:", err)
-		if errors.Is(err, app.ErrStorageLimit) {
+		if errors.Is(err, persistence.ErrStorageLimit) {
 			fail(err.Error())
 			return
 		}
@@ -96,8 +97,8 @@ func (h *EndpointHandler) createMap(w http.ResponseWriter, r *http.Request) {
 	}
 	ws.currentMap = &definition
 	message, _ := json.Marshal(struct {
-		Type string            `json:"type"`
-		Map  app.MapDefinition `json:"map"`
+		Type string              `json:"type"`
+		Map  model.MapDefinition `json:"map"`
 	}{"boardMapChanged", definition})
 	ws.broadcastUnitsLocked(message)
 	w.Header().Set("HX-Trigger", "mapSaved")
@@ -105,7 +106,7 @@ func (h *EndpointHandler) createMap(w http.ResponseWriter, r *http.Request) {
 }
 
 // Update the definition before validation so errors preserve submitted values.
-func parseMapForm(r *http.Request, definition *app.MapDefinition) error {
+func parseMapForm(r *http.Request, definition *model.MapDefinition) error {
 	definition.Name = strings.TrimSpace(r.FormValue("name"))
 	for name, value := range map[string]*float64{
 		"width": &definition.Width, "height": &definition.Height,
@@ -168,7 +169,7 @@ func (h *EndpointHandler) saveBoard(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Create or load a map before saving.", http.StatusConflict)
 		return
 	}
-	board := app.SavedBoard{Units: h.state.Units(), Fog: ws.fogMarks}
+	board := model.SavedBoard{Units: h.state.Units(), Fog: ws.fogMarks}
 	for _, stroke := range ws.strokes {
 		// A saved stroke is complete even if its author is still drawing live.
 		stroke.Finished = true
@@ -180,11 +181,11 @@ func (h *EndpointHandler) saveBoard(w http.ResponseWriter, r *http.Request) {
 	saved, err := h.mapLibrary.SaveMap(*ws.currentMap, board)
 	if err != nil {
 		log.Println("Save board:", err)
-		if errors.Is(err, app.ErrCapacity) {
+		if errors.Is(err, model.ErrCapacity) {
 			http.Error(w, err.Error(), http.StatusConflict)
 			return
 		}
-		if errors.Is(err, app.ErrStorageLimit) {
+		if errors.Is(err, persistence.ErrStorageLimit) {
 			http.Error(w, err.Error(), http.StatusInsufficientStorage)
 			return
 		}

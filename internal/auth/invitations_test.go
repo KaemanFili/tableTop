@@ -8,12 +8,12 @@ import (
 	"strings"
 	"testing"
 
-	"tableTop/main/internal/app"
+	"tableTop/main/internal/app/persistence"
 )
 
 func TestInvitationOAuthFlowAndAdminAuthorization(t *testing.T) {
 	manager, mux := testManager(t)
-	access, _ := app.NewAccessLibrary(t.TempDir(), []string{"admin"}, nil)
+	access, _ := persistence.NewAccessLibrary(t.TempDir(), []string{"admin"}, nil)
 	manager.config.Access = access
 	provider := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")

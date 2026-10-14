@@ -9,11 +9,12 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
-	"tableTop/main/internal/app"
+
+	"tableTop/main/internal/app/model"
 )
 
 func TestRemoveUnitUpdatesStateAndConnectedClients(t *testing.T) {
-	state := app.NewState()
+	state := model.NewState()
 	ws := NewWebSocketHandler(state)
 	library := newTestLibrary(t)
 	handler := newTestEndpointHandler(t, state, ws, library)

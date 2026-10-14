@@ -58,15 +58,23 @@ mode enables the local development board.
 ## Structure
 
 - `main.go`: application entrypoint and route wiring.
-- `internal/app`: shared application state and data types.
-- `internal/handlers`: HTTP endpoint handlers and websocket handlers.
-- `static`: browser JavaScript and CSS; `boardGeometry.js` shares drawing coordinate calculations.
-- [docs/menus.md](docs/menus.md): shared floating-menu positioning, dismissal, and focus handling.
-- `internal/app/storage.go`: atomic JSON library replacement shared by both libraries.
-- `templates`: reusable HTML templates served by handlers.
-- `docs/movement.md`: movement smoothing, progress calculations, and worked examples.
-- [docs/erasers.md](docs/erasers.md): pen stroke deletion versus partial fog erasure,
-  with code examples and shared-state behavior.
+- `internal/app/model`: board state, token/map definitions, validation, and board limits.
+- `internal/app/persistence`: file and MongoDB storage, libraries, invitations, and membership.
+- `internal/auth`: provider-independent sign-in, Discord profiles, and login sessions.
+- `internal/handlers`: board HTTP endpoints and WebSocket handling.
+- `internal/tables`: tabletop lifecycle, membership checks, and request scoping.
+- `internal/plugins`: plugin discovery, validation, and content loading.
+- `static/js`: browser code grouped into board, realtime, dice, library, account, and shared features.
+- `static/style.css`: application styles; `static/vendor`: third-party browser dependencies.
+- `templates`: reusable HTML templates served by handlers; `index.html`: board page.
+- `docs`: architecture, feature behavior, deployment, and storage documentation.
+
+See [repository architecture](docs/architecture.md) for package responsibilities,
+dependency direction, browser script ordering, and where to add new code.
+[Go architecture diagrams](docs/architecture-diagrams.md) show package imports,
+main structs/interfaces, and file ownership.
+[Menus](docs/menus.md), [movement](docs/movement.md), and [erasers](docs/erasers.md)
+explain the corresponding browser behavior.
 
 ## UI approach
 

@@ -5,13 +5,13 @@ import (
 	"errors"
 	"net/http"
 
-	"tableTop/main/internal/app"
+	"tableTop/main/internal/app/model"
 )
 
 type unitStatusChange struct {
-	ID     string         `json:"id"`
-	Status app.UnitStatus `json:"status"`
-	Color  string         `json:"color"`
+	ID     string           `json:"id"`
+	Status model.UnitStatus `json:"status"`
+	Color  string           `json:"color"`
 }
 
 func (h *EndpointHandler) setUnitStatus(w http.ResponseWriter, r *http.Request) {
@@ -21,10 +21,10 @@ func (h *EndpointHandler) setUnitStatus(w http.ResponseWriter, r *http.Request) 
 		http.Error(w, "Choose a status.", http.StatusBadRequest)
 		return
 	}
-	unit, err := h.state.SetUnitStatus(r.PathValue("id"), app.UnitStatus(r.PostFormValue("status")))
+	unit, err := h.state.SetUnitStatus(r.PathValue("id"), model.UnitStatus(r.PostFormValue("status")))
 	if err != nil {
 		code := http.StatusBadRequest
-		if errors.Is(err, app.ErrUnitNotFound) {
+		if errors.Is(err, model.ErrUnitNotFound) {
 			code = http.StatusNotFound
 		}
 		http.Error(w, err.Error(), code)

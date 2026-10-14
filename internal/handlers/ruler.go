@@ -3,13 +3,14 @@ package handlers
 import (
 	"encoding/json"
 	"math"
-	"tableTop/main/internal/app"
+
+	"tableTop/main/internal/app/model"
 )
 
 // Coordinates are grid squares so every board uses the same distance and location.
-type rulerPoint = app.BoardPoint
+type rulerPoint = model.BoardPoint
 
-type boardRuler = app.BoardRuler
+type boardRuler = model.BoardRuler
 
 func validRulerPoint(point *rulerPoint) bool {
 	return point != nil && !math.IsNaN(point.X) && !math.IsNaN(point.Y) &&
@@ -34,8 +35,8 @@ func (h *WebSocketHandler) updateRuler(id string, data []byte) error {
 	if ruler.Generation != h.boardGeneration {
 		return nil
 	}
-	if _, exists := h.rulers[id]; !exists && !ruler.Clear && len(h.rulers) >= app.MaxTabletopMembers {
-		return app.ErrCapacity
+	if _, exists := h.rulers[id]; !exists && !ruler.Clear && len(h.rulers) >= model.MaxTabletopMembers {
+		return model.ErrCapacity
 	}
 	if ruler.Clear {
 		delete(h.rulers, id)

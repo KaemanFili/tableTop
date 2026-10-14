@@ -16,7 +16,7 @@ mouse input and WebSocket delivery, but use different rendering and storage.
 
 ## Pen: find touched strokes and delete them
 
-In [static/pen.js](../static/pen.js), `appendPoints()` creates an SVG path for each
+In [static/js/board/pen.js](../static/js/board/pen.js), `appendPoints()` creates an SVG path for each
 stroke. The client keeps that path, its width, and its points in the `strokes` map.
 This means a stroke remains an identifiable object after it is drawn.
 
@@ -75,7 +75,7 @@ an erased stroke. Repeated deletion is supported; unknown IDs are ignored.
 
 ## Fog: draw an eraser path into the canvas
 
-In [static/fog.js](../static/fog.js), `paint()` draws both fog and erasure into a
+In [static/js/board/fog.js](../static/js/board/fog.js), `paint()` draws both fog and erasure into a
 canvas. The operation changes according to the mark's mode:
 
 ```js
@@ -155,7 +155,7 @@ pending marks. This keeps local input responsive while reconciling edits from
 other GMs with the server's ordering.
 
 For a new or refreshed client, `registerBoardUtilitiesClient()` in
-[internal/handlers/websocket.go](../internal/handlers/websocket.go) sends
+[internal/handlers/socket_board.go](../internal/handlers/socket_board.go) sends
 `fogReset` followed by the stored marks in order, when fog history exists.
 Replaying them rebuilds both the fog and its partially erased areas. Pen
 restoration instead sends only the strokes still present in `h.strokes`.

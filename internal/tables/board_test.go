@@ -7,12 +7,13 @@ import (
 	"testing"
 	"time"
 
-	"tableTop/main/internal/app"
+	"tableTop/main/internal/app/model"
+	"tableTop/main/internal/app/persistence"
 	"tableTop/main/internal/handlers"
 )
 
 type validationDefaults struct {
-	app.PluginDefaults
+	persistence.PluginDefaults
 	validate func() error
 }
 
@@ -20,7 +21,7 @@ func (defaults validationDefaults) Validate() error         { return defaults.va
 func (defaults validationDefaults) ValidateMetadata() error { return defaults.validate() }
 
 func TestCachedValidationDoesNotBlockOtherSessions(t *testing.T) {
-	library, err := app.NewTableLibrary(t.TempDir())
+	library, err := persistence.NewTableLibrary(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -54,7 +55,7 @@ func TestCachedValidationDoesNotBlockOtherSessions(t *testing.T) {
 
 func TestBoardDeletionDrainsRequestsBeforeCleanup(t *testing.T) {
 	started, release, finished := make(chan struct{}), make(chan struct{}), make(chan struct{})
-	board := &managedBoard{sockets: handlers.NewWebSocketHandler(app.NewState()), handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	board := &managedBoard{sockets: handlers.NewWebSocketHandler(model.NewState()), handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/upload" {
 			close(started)
 			<-release

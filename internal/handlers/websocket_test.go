@@ -9,11 +9,12 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
-	"tableTop/main/internal/app"
+
+	"tableTop/main/internal/app/model"
 )
 
 func TestPositionBroadcastStopsAndRestarts(t *testing.T) {
-	ws := NewWebSocketHandler(app.NewState())
+	ws := NewWebSocketHandler(model.NewState())
 	ws.StartPositionBroadcast()
 	mux := http.NewServeMux()
 	ws.RegisterRoutes(mux)
@@ -42,7 +43,7 @@ func TestPositionBroadcastStopsAndRestarts(t *testing.T) {
 		}
 		t.Cleanup(func() { client.Close() })
 		client.SetReadDeadline(time.Now().Add(time.Second))
-		var units []app.UnitData
+		var units []model.UnitData
 		if err := client.ReadJSON(&units); err != nil {
 			t.Fatalf("connected client received no broadcast: %v", err)
 		}
@@ -52,7 +53,7 @@ func TestPositionBroadcastStopsAndRestarts(t *testing.T) {
 }
 
 func TestStalledBoardClientIsDisconnected(t *testing.T) {
-	ws := NewWebSocketHandler(app.NewState())
+	ws := NewWebSocketHandler(model.NewState())
 	mux := http.NewServeMux()
 	ws.RegisterRoutes(mux)
 	server := newTestServer(t, mux)
@@ -93,7 +94,7 @@ func TestStalledBoardClientIsDisconnected(t *testing.T) {
 }
 
 func TestSlowClientDoesNotDelayOtherPlayers(t *testing.T) {
-	ws := NewWebSocketHandler(app.NewState())
+	ws := NewWebSocketHandler(model.NewState())
 	mux := http.NewServeMux()
 	ws.RegisterRoutes(mux)
 	server := newTestServer(t, mux)
@@ -148,7 +149,7 @@ func TestSlowClientDoesNotDelayOtherPlayers(t *testing.T) {
 }
 
 func TestWebSocketOrigins(t *testing.T) {
-	ws := NewWebSocketHandler(app.NewState())
+	ws := NewWebSocketHandler(model.NewState())
 	mux := http.NewServeMux()
 	ws.RegisterRoutes(mux)
 	server := newTestServer(t, mux)

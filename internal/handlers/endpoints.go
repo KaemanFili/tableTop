@@ -7,34 +7,35 @@ import (
 	"net/http"
 	"os"
 	"strconv"
-	"tableTop/main/internal/auth"
 
-	"tableTop/main/internal/app"
+	"tableTop/main/internal/app/model"
+	"tableTop/main/internal/app/persistence"
+	"tableTop/main/internal/auth"
 )
 
 type EndpointHandler struct {
-	state            *app.AppState
+	state            *model.AppState
 	webSocketHandler *WebSocketHandler
 	gridTemplate     *template.Template
 	unitTemplate     *template.Template
 	indexTemplate    *template.Template
-	library          *app.UnitLibrary
-	mapLibrary       *app.MapLibrary
+	library          *persistence.UnitLibrary
+	mapLibrary       *persistence.MapLibrary
 	assetRoot        string
 	routePrefix      string
 }
 
-func NewEndpointHandler(state *app.AppState, webSocketHandler *WebSocketHandler, library *app.UnitLibrary, maps ...*app.MapLibrary) *EndpointHandler {
+func NewEndpointHandler(state *model.AppState, webSocketHandler *WebSocketHandler, library *persistence.UnitLibrary, maps ...*persistence.MapLibrary) *EndpointHandler {
 	return newEndpointHandler(state, webSocketHandler, library, ".", maps...)
 }
 
-func NewTableEndpointHandler(state *app.AppState, ws *WebSocketHandler, units *app.UnitLibrary, maps *app.MapLibrary, assetRoot, prefix string) *EndpointHandler {
+func NewTableEndpointHandler(state *model.AppState, ws *WebSocketHandler, units *persistence.UnitLibrary, maps *persistence.MapLibrary, assetRoot, prefix string) *EndpointHandler {
 	handler := newEndpointHandler(state, ws, units, assetRoot, maps)
 	handler.routePrefix = prefix
 	return handler
 }
 
-func newEndpointHandler(state *app.AppState, webSocketHandler *WebSocketHandler, library *app.UnitLibrary, assetRoot string, maps ...*app.MapLibrary) *EndpointHandler {
+func newEndpointHandler(state *model.AppState, webSocketHandler *WebSocketHandler, library *persistence.UnitLibrary, assetRoot string, maps ...*persistence.MapLibrary) *EndpointHandler {
 	assets := os.DirFS(assetRoot)
 	handler := &EndpointHandler{
 		library:          library,
@@ -91,11 +92,11 @@ func (h *EndpointHandler) index(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-store")
-	sizes, _ := json.Marshal(app.UnitSizes())
+	sizes, _ := json.Marshal(model.UnitSizes())
 	data := struct {
 		spawnMenuData
 		UnitSizes    template.JS
-		UnitStatuses []app.UnitStatusOption
+		UnitStatuses []model.UnitStatusOption
 		IsGM         bool
 		User         *auth.User
 	}{UnitSizes: template.JS(sizes), UnitStatuses: h.state.UnitStatuses(), IsGM: auth.IsGM(r), User: auth.CurrentUser(r)}
@@ -127,7 +128,7 @@ func (h *EndpointHandler) newUnit(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusServiceUnavailable)
 		return
 	}
-	definition := app.UnitDefinition{ImageID: app.DefaultUnitImageID}
+	definition := model.UnitDefinition{ImageID: model.DefaultUnitImageID}
 	if id := r.URL.Query().Get("unitID"); id != "" {
 		var exists bool
 		definition, exists = h.library.UnitByID(id)
@@ -140,9 +141,9 @@ func (h *EndpointHandler) newUnit(w http.ResponseWriter, r *http.Request) {
 		case "":
 			// Keep the original /unit endpoint's neutral default.
 		case "npc":
-			definition = app.UnitDefinition{ImageID: app.NPCUnitImageID, Size: app.SizeSmall, ImageFit: app.DefaultImageFit()}
+			definition = model.UnitDefinition{ImageID: model.NPCUnitImageID, Size: model.SizeSmall, ImageFit: model.DefaultImageFit()}
 		case "pc":
-			definition = app.UnitDefinition{ImageID: app.PCUnitImageID, Size: app.SizeMedium, ImageFit: app.DefaultImageFit()}
+			definition = model.UnitDefinition{ImageID: model.PCUnitImageID, Size: model.SizeMedium, ImageFit: model.DefaultImageFit()}
 		default:
 			http.Error(w, "unknown unit type", http.StatusBadRequest)
 			return
@@ -153,7 +154,7 @@ func (h *EndpointHandler) newUnit(w http.ResponseWriter, r *http.Request) {
 	ws := h.webSocketHandler
 	ws.boardMutex.Lock()
 	defer ws.boardMutex.Unlock()
-	if h.state.UnitCount() >= app.MaxBoardUnits {
+	if h.state.UnitCount() >= model.MaxBoardUnits {
 		http.Error(w, "This board has reached its 500-token limit. Remove tokens before spawning more.", http.StatusConflict)
 		return
 	}

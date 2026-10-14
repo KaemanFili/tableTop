@@ -4,11 +4,12 @@ import (
 	"encoding/json"
 	"math"
 	"strconv"
-	"tableTop/main/internal/app"
+
+	"tableTop/main/internal/app/model"
 )
 
 // Paint and erasure are ordered brush marks; replaying them restores partial holes.
-type fogMark = app.FogMark
+type fogMark = model.FogMark
 
 func (h *WebSocketHandler) updateFog(owner string, data []byte) error {
 	var mark fogMark
@@ -32,8 +33,8 @@ func (h *WebSocketHandler) updateFog(owner string, data []byte) error {
 	if mark.Generation != h.boardGeneration {
 		return nil
 	}
-	if len(h.fogMarks) >= app.MaxFogMarks || len(mark.Points) > app.MaxBoardPoints-h.drawingPoints {
-		return app.ErrCapacity
+	if len(h.fogMarks) >= model.MaxFogMarks || len(mark.Points) > model.MaxBoardPoints-h.drawingPoints {
+		return model.ErrCapacity
 	}
 	h.drawingPoints += len(mark.Points)
 	h.fogMarks = append(h.fogMarks, mark)
