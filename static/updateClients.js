@@ -147,6 +147,10 @@ function receivePositions(event) {
 let receivedBoardSession = false;
 function receiveBoardUpdate(event) {
     const message = JSON.parse(event.data);
+    if (message.type === 'sessionPresence') {
+        document.dispatchEvent(new CustomEvent('sessionPresence', {detail: message}));
+        return;
+    }
     if (message.type === 'boardLimitReached') {
         const error = document.getElementById('utility-error');
         error.textContent = `${message.message}. Refresh to resync your drawing; ask the GM to clear unused content.`;
@@ -214,10 +218,11 @@ connectBoardSocket('/ws/updatePosForClients', socket => {
         refreshUnits();
     });
 });
-connectBoardSocket(`/ws/updateUnitsForClients${document.body.dataset.gm === 'true' ? '?gm=true' : ''}`, socket => {
+connectBoardSocket(`/ws/updateUnitsForClients?presence=true${document.body.dataset.gm === 'true' ? '&gm=true' : ''}`, socket => {
     newUnitUpdateSocket = socket;
     socket.onmessage = receiveBoardUpdate;
     socket.addEventListener('close', () => {
         document.dispatchEvent(new CustomEvent('rulerDisconnected'));
+        document.dispatchEvent(new CustomEvent('sessionPresence', {detail: {members: [], disconnected: true}}));
     });
 });

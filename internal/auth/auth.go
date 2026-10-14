@@ -26,10 +26,11 @@ type Config struct {
 }
 
 type User struct {
-	ID      string
-	Name    string
-	IsGM    bool
-	IsAdmin bool
+	ID        string
+	Name      string
+	AvatarURL string
+	IsGM      bool
+	IsAdmin   bool
 }
 
 type userKey struct{}

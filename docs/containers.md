@@ -95,9 +95,38 @@ their data volumes.
 
 ## Persistent data
 
-The default configuration mounts a named volume at `/app/data`. Session
-membership, unit libraries, saved maps, and artwork survive container replacement.
-The volume starts independently of an existing host `data/` directory.
+The storage location depends on how the app is started:
+
+| Deployment option | Application data location | Uses repository-root `data/`? |
+| --- | --- | --- |
+| Host process started from the repository root (`go run .` or `./main`) | `./data`, relative to the process working directory | Yes |
+| Default Docker Compose | Named volume `tabletop_tabletop-data`, mounted at `/app/data` | No |
+| Compose with `-host-data` or `compose.host-data.yaml` | Repository-root `data/`, bind-mounted at `/app/data` | Yes |
+| Compose with `-dev` | Separate named volume `tabletop_tabletop-dev-data`, mounted at `/app/data` | No |
+
+`TABLETOP_DATA_VOLUME` overrides the default production volume name. The Docker
+image does not copy the repository's `data/` into the container. The default
+volume starts independently of that directory; switching to `-host-data` selects
+a different data source and does not migrate existing volume contents.
+
+The persistent server whitelist is `access.json` in the selected data location.
+Its `members` array contains admitted Discord user IDs; `invites` contains
+pending invitation hashes and expiry times. For default Compose, the live file
+is `/app/data/access.json` inside the app container, not the repository's
+`data/access.json`. Administrators are configured separately through
+`TABLETOP_ADMIN_USER_IDS`. Server access remains in this file even when MongoDB
+is enabled. Development mode bypasses authentication.
+
+To verify the running container's actual data mount, run from the repository
+root (include the same wrapper flags used to start it):
+
+```sh
+docker inspect "$(./compose/compose.sh ps -q tabletop)" \
+  --format '{{range .Mounts}}{{if eq .Destination "/app/data"}}{{.Type}} {{.Name}} {{.Source}} -> {{.Destination}}{{end}}{{end}}'
+```
+
+A `volume` result identifies Docker-managed storage; a `bind` result identifies
+the mounted host directory. Application files survive container replacement.
 Live board state and login sessions still reset when the process restarts, as
 they do outside a container. Save maps to retain live board content.
 
@@ -143,6 +172,8 @@ other processes are outside this cap. An ordinary Docker named volume has no
 configured size limit of its own; for an OS-enforced physical ceiling, use a
 filesystem quota or a dedicated filesystem for the data directory. Run one app
 process per data root, as the app quota lock is held within that process.
+
+### Use the repository's data directory
 
 To use your existing host `data/` directory instead, use the optional override
 on Linux with your host UID and GID:

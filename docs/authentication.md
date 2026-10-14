@@ -54,7 +54,10 @@ adding `?gm=true` does not grant access.
 Administrators sign in without invitations and use **Invite players** in the
 lobby to admit other Discord accounts. Each invitation admits one account,
 expires after seven days, and can be revoked before use. Admission persists in
-`data/access.json`; returning members do not need new invitations. Invited
+`access.json` in the active data directory; returning members do not need new
+invitations. With default Compose, this is `/app/data/access.json` in the app's
+named volume, separate from repository-root `data/`. See
+[deployment storage locations](containers.md#persistent-data). Invited
 players still need each game's join code. See [public hosting](public-hosting.md)
 for configuration, limits, and backups.
 

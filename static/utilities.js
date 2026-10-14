@@ -77,7 +77,7 @@
     });
     document.addEventListener('uiVisibilityChanged', event => { if (!event.detail.visible) selectTool(''); });
     document.addEventListener('keydown', event => {
-        if (event.key === 'Escape') selectTool('');
+        if (event.key === 'Escape' && !event.defaultPrevented) selectTool('');
     });
 
     function cellSize() {

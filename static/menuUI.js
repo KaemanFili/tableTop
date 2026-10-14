@@ -9,6 +9,10 @@ const menuUI = Object.freeze({
         const margin = 8;
         let left = target.right + gap;
         let top = align === 'center' ? target.top + (target.height - bounds.height) / 2 : target.top;
+        if (placement === 'below') {
+            left = target.left + (target.width - bounds.width) / 2;
+            top = target.bottom + gap;
+        }
         if (placement === 'above') {
             left = target.left + (target.width - bounds.width) / 2;
             const above = target.top - bounds.height - gap;

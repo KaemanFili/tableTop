@@ -66,6 +66,11 @@
 
     function showResults(target, message) {
         target.replaceChildren();
+        if (target === result && message.rollerName) {
+            const roller = document.createElement('div');
+            roller.textContent = `${message.rollerName} rolled${message.private ? ' privately' : ''}`;
+            target.append(roller);
+        }
         message.groups.forEach(group => {
             const modifier = group.modifier === 0 ? '' : ` ${group.modifier > 0 ? '+' : '−'}${Math.abs(group.modifier)}`;
             const line = document.createElement('div');
@@ -79,8 +84,9 @@
     }
 
     function notify(message) {
-        const title = message.private ? 'Your private roll' :
-            ownRequests.has(message.requestId) ? 'You rolled' : 'A player rolled';
+        const title = message.rollerName
+            ? `${message.rollerName} rolled${message.private ? ' privately' : ''}`
+            : message.private ? 'Your private roll' : ownRequests.has(message.requestId) ? 'You rolled' : 'A player rolled';
         const details = document.createElement('div');
         showResults(details, message);
         notifications.show(title, details);

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/endpoints"
@@ -47,6 +48,7 @@ func (p *discordProvider) User(ctx context.Context, client *http.Client) (User, 
 		ID         string `json:"id"`
 		Username   string `json:"username"`
 		GlobalName string `json:"global_name"`
+		Avatar     string `json:"avatar"`
 	}
 	if err := json.NewDecoder(io.LimitReader(response.Body, 1<<20)).Decode(&profile); err != nil {
 		return User{}, err
@@ -58,5 +60,9 @@ func (p *discordProvider) User(ctx context.Context, client *http.Client) (User, 
 	if name == "" {
 		name = profile.Username
 	}
-	return User{ID: profile.ID, Name: name}, nil
+	user := User{ID: profile.ID, Name: name}
+	if profile.Avatar != "" {
+		user.AvatarURL = "https://cdn.discordapp.com/avatars/" + url.PathEscape(profile.ID) + "/" + url.PathEscape(profile.Avatar) + ".png?size=64"
+	}
+	return user, nil
 }

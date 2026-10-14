@@ -294,6 +294,8 @@ async function testDiceRoller(browser) {
         w.matchMedia('(prefers-reduced-motion: reduce)').matches, 'Dice animation did not complete or fall back');
     if (animated) assertAnimationResults(d, animated);
     assert(d.querySelectorAll('.dice-notification').length === 1, 'Origin received duplicate notifications');
+    assert(d.querySelector('#dice-notifications article > strong').textContent === 'GM rolled', 'Roll notification omitted roller name');
+    assert(d.getElementById('dice-result').textContent.includes('GM rolled'), 'Dice popup omitted roller name');
     const previousResult = d.getElementById('dice-result').textContent;
     const quantity = d.querySelector('[name="quantity"]');
     quantity.value = '1.5';
@@ -409,7 +411,7 @@ async function testPrivateGMRolls(browser) {
         d.getElementById('roll-all-dice').click();
         await until(() => d.getElementById('dice-menu').getAttribute('aria-busy') === 'false', 'Private GM roll did not finish');
         assertDiceResults(d, selected);
-        assert(d.querySelector('#dice-notifications article:last-child > strong').textContent === 'Your private roll', 'GM notification was not marked private');
+        assert(d.querySelector('#dice-notifications article:last-child > strong').textContent === 'GM rolled privately', 'GM notification was not marked private');
         if (d.querySelector('#dice-layer canvas')) {
             await until(() => animated, 'Private roll animation did not finish');
             assertAnimationResults(d, animated);
@@ -1072,6 +1074,67 @@ async function testFogBoardActions({w, d, units}) {
     assert(units().length === count, 'Fog action removed units');
 }
 
+async function testSessionUsers({w, d}) {
+    const frameElement = document.getElementById('app');
+    frameElement.style.width = '1200px';
+    await until(() => w.innerWidth === 1200 && !d.getElementById('ui-overlay').contains(d.getElementById('session-users-toggle')), 'Roster desktop layout did not settle');
+    await new Promise(resolve => w.requestAnimationFrame(() => w.requestAnimationFrame(resolve)));
+    const button = d.getElementById('session-users-toggle');
+    const panel = d.getElementById('session-users');
+    const icons = () => [...d.querySelectorAll('.session-user-icon')];
+    await until(() => icons().length === 1, 'Local session presence did not settle');
+    button.dispatchEvent(new w.MouseEvent('contextmenu', {bubbles: true, cancelable: true}));
+    assert(!panel.hidden && button.getAttribute('aria-expanded') === 'true', 'Right-click did not open session users');
+    assert(panel.getBoundingClientRect().top >= button.getBoundingClientRect().bottom, 'Session users did not open below username');
+    const frame = document.createElement('iframe');
+    frame.src = '/';
+    document.body.append(frame);
+    try {
+        await until(() => icons().length === 2, 'New player did not appear in session users');
+        const player = icons().find(icon => icon.title === 'Player');
+        assert(player && player.getAttribute('aria-label') === 'Player', 'Player icon is missing its name');
+        player.focus({preventScroll: true});
+        assert(w.getComputedStyle(player.querySelector('.session-user-name')).display !== 'none', `Player name tooltip is not accessible on focus (panel hidden: ${panel.hidden}, active: ${d.activeElement?.outerHTML})`);
+        const positions = icons().map(icon => icon.getBoundingClientRect());
+        assert(Math.abs(positions[0].top - positions[1].top) < 1 && positions[1].left > positions[0].left, 'Player icons are not horizontal');
+        // Remote dice rolls carry the authenticated display name (Player in dev).
+        await fetch('/dice/roll', {method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({requestId: 'roster-roll', groups: [{qty: 1, sides: 6, modifier: 0}]})});
+        await until(() => d.querySelector('#dice-notifications article:last-child > strong')?.textContent === 'Player rolled', 'Remote roller name was not shown');
+    } finally { frame.remove(); }
+    await until(() => icons().length === 1, 'Disconnected player remained in session users');
+    button.click();
+    assert(panel.hidden, 'Session users did not close');
+    button.click();
+    assert(!panel.hidden, 'Session users cannot open by click');
+    d.dispatchEvent(new w.KeyboardEvent('keydown', {key: 'Escape', bubbles: true, cancelable: true}));
+    assert(panel.hidden && d.activeElement === button, 'Session users did not dismiss with Escape');
+    frameElement.style.width = '390px';
+    await until(() => w.innerWidth === 390 && d.getElementById('ui-overlay').contains(button), 'Roster mobile layout did not settle');
+    const tools = d.getElementById('mobile-tools-toggle');
+    if (tools.getAttribute('aria-expanded') !== 'true') tools.click();
+    button.click();
+    assert(!panel.hidden && button.getBoundingClientRect().width > 0, 'Opening mobile roster hid its account button');
+    assert(panel.getBoundingClientRect().right <= w.innerWidth, 'Mobile roster overflowed the screen');
+    d.dispatchEvent(new w.KeyboardEvent('keydown', {key: 'Escape', bubbles: true, cancelable: true}));
+    assert(panel.hidden && d.activeElement === button, 'Mobile roster did not restore focus');
+    const showAvatar = avatarUrl => d.dispatchEvent(new w.CustomEvent('sessionPresence', {detail: {
+        members: [{id: 'avatar-test', name: 'Avatar User', avatarUrl}],
+    }}));
+    showAvatar('/static/favicon-64.png');
+    await until(() => d.querySelector('.session-user-avatar')?.complete &&
+        !d.querySelector('.session-user-avatar').hidden, 'Profile photo did not load');
+    assert(d.querySelector('.session-user-icon > span').hidden, 'Initials remained visible over profile photo');
+    assert(d.querySelector('.session-user-icon').title === 'Avatar User', 'Profile photo lost its username');
+    showAvatar('/static/missing-avatar-test.png');
+    await until(() => !d.querySelector('.session-user-avatar'), 'Broken profile photo did not fall back');
+    assert(!d.querySelector('.session-user-icon > span').hidden, 'Broken profile photo hid the initials');
+    showAvatar('https://[');
+    assert(d.querySelector('.session-user-icon')?.title === 'Avatar User' &&
+        !d.querySelector('.session-user-avatar'), 'Malformed profile URL prevented fallback');
+}
+
+
 // These scenarios share one board: each spawn changes the count expected by
 // the next scenario, and the movement check leaves the status menu open.
 const scenarios = [
@@ -1093,6 +1156,7 @@ const scenarios = [
     ['tools across zoom levels', testToolsAcrossZoomLevels],
     ['automatic reconnect and resync', testAutomaticReconnect],
     ['fog thickness and whole board actions', testFogBoardActions],
+    ['session users and roller names', testSessionUsers],
     ['map view centers on load and reload', testMapViewCentering],
 ];
 

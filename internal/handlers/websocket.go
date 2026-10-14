@@ -41,6 +41,7 @@ type WebSocketHandler struct {
 
 	positionClients          map[*websocket.Conn]*socketWriter
 	boardClients             map[*websocket.Conn]*socketWriter
+	presenceClients          map[*websocket.Conn]sessionMember
 	positionMutex            sync.Mutex
 	positionBroadcastEnabled bool
 	positionBroadcastRunning bool
@@ -67,6 +68,7 @@ func NewWebSocketHandler(state *app.AppState) *WebSocketHandler {
 		upgrader:        websocket.Upgrader{HandshakeTimeout: 5 * time.Second},
 		positionClients: make(map[*websocket.Conn]*socketWriter),
 		boardClients:    make(map[*websocket.Conn]*socketWriter),
+		presenceClients: make(map[*websocket.Conn]sessionMember),
 		rulers:          make(map[string]boardRuler),
 		strokes:         make(map[string]penStroke),
 		erasedStrokes:   make(map[string]bool),
@@ -300,7 +302,7 @@ func (h *WebSocketHandler) updateBoardUtilityValues(w http.ResponseWriter, r *ht
 	sessionID := rand.Text()
 	defer h.unregisterBoardUtilitiesClient(conn, sessionID)
 
-	if err := h.registerBoardUtilitiesClient(conn, sessionID); err != nil {
+	if err := h.registerBoardUtilitiesClient(conn, sessionID, r); err != nil {
 		log.Println("Send initial board state:", err)
 		return
 	}
@@ -309,7 +311,7 @@ func (h *WebSocketHandler) updateBoardUtilityValues(w http.ResponseWriter, r *ht
 
 // Registration and the initial state share a lock so live updates cannot
 // arrive before the session identity and existing drawings.
-func (h *WebSocketHandler) registerBoardUtilitiesClient(conn *websocket.Conn, sessionID string) error {
+func (h *WebSocketHandler) registerBoardUtilitiesClient(conn *websocket.Conn, sessionID string, r *http.Request) error {
 	h.boardMutex.Lock()
 	defer h.boardMutex.Unlock()
 	initial := make([][]byte, 0, 2+len(h.rulers)+len(h.strokes)+len(h.fogMarks))
@@ -349,6 +351,16 @@ func (h *WebSocketHandler) registerBoardUtilitiesClient(conn *websocket.Conn, se
 		}
 	}
 	h.boardClients[conn] = newSocketWriter(conn, initial, false)
+	if r.URL.Query().Get("presence") == "true" {
+		member := sessionMember{ID: sessionID, Name: "Player"}
+		if user := auth.CurrentUser(r); user != nil {
+			member.ID, member.Name, member.AvatarURL = user.ID, user.Name, user.AvatarURL
+		} else if auth.IsGM(r) {
+			member.Name = "GM"
+		}
+		h.presenceClients[conn] = member
+		h.broadcastPresenceLocked()
+	}
 	return nil
 }
 
@@ -406,6 +418,10 @@ func (h *WebSocketHandler) unregisterBoardUtilitiesClient(conn *websocket.Conn, 
 		writer.stop()
 	}
 	delete(h.boardClients, conn)
+	if _, exists := h.presenceClients[conn]; exists {
+		delete(h.presenceClients, conn)
+		h.broadcastPresenceLocked()
+	}
 	if _, exists := h.rulers[sessionID]; exists {
 		delete(h.rulers, sessionID)
 		data, _ := json.Marshal(boardRuler{Type: "rulerChanged", ID: sessionID, Clear: true})

@@ -7,7 +7,7 @@
         <link rel="icon" href="/static/favicon.ico?v=1" sizes="16x16 32x32 48x48" type="image/x-icon">
         <link rel="icon" href="/static/favicon-64.png?v=1" sizes="64x64" type="image/png">
         <script defer src="/static/vendor/htmx-2.0.11.min.js"></script>
-        <link rel="stylesheet" href="/static/style.css?v=69">
+        <link rel="stylesheet" href="/static/style.css?v=72">
     </head>
     <body data-gm="{{ .IsGM }}" data-session-prefix="{{ boardPrefix }}">
         <div
@@ -20,12 +20,15 @@
         </div>
         <button type="button" id="toggle-ui-controls" aria-expanded="true" aria-controls="ui-overlay board-controls signed-in-user dice-notifications mobile-tools-toggle" title="Hide controls">Hide UI</button>
         <button type="button" id="mobile-tools-toggle" aria-expanded="false" aria-controls="ui-overlay">Tools</button>
-        {{ if .User }}
         <nav id="signed-in-user" aria-label="Session and account">
-            <a href="/lobby">Sessions</a><span>{{ .User.Name }}</span>
-            <form action="/auth/logout" method="post"><button type="submit">Sign out</button></form>
+            {{ if .User }}<a href="/lobby">Sessions</a>{{ end }}
+            <button type="button" id="session-users-toggle" aria-expanded="false" aria-controls="session-users" title="Players in this session (right-click to view)">{{ if .User }}{{ .User.Name }}{{ else if .IsGM }}GM{{ else }}Player{{ end }}</button>
+            {{ if .User }}<form action="/auth/logout" method="post"><button type="submit">Sign out</button></form>{{ end }}
         </nav>
-        {{ end }}
+        <section id="session-users" aria-label="Players currently in this session" hidden>
+            <div id="session-user-icons" role="list"></div>
+            <p id="session-users-status" role="status">Connecting…</p>
+        </section>
         <div id="board-controls">
             <div id="board-zoom-controls" role="group" aria-label="Board zoom">
                 <button type="button" id="board-zoom-out" aria-label="Zoom board out">−</button>
@@ -172,21 +175,22 @@
         <script type="application/json" id="unit-sizes">{{ .UnitSizes }}</script>
         <script defer src="/static/session.js?v=2"></script>
         <script defer src="/static/pan.js?v=2"></script>
-        <script defer src="/static/menuUI.js?v=7"></script>
+        <script defer src="/static/menuUI.js?v=8"></script>
         <script defer src="/static/tokenMenu.js?v=15"></script>
         <script defer src="/static/boardInput.js?v=2"></script>
         <script defer src="/static/drag.js?v=18"></script>
-        <script defer src="/static/updateClients.js?v=23"></script>
+        <script defer src="/static/sessionUsers.js?v=2"></script>
+        <script defer src="/static/updateClients.js?v=24"></script>
         <script defer src="/static/boardGeometry.js?v=3"></script>
         <script defer src="/static/boardZoom.js?v=7"></script>
-        <script defer src="/static/utilities.js?v=19"></script>
+        <script defer src="/static/utilities.js?v=20"></script>
         <script defer src="/static/pen.js?v=10"></script>
         <script defer src="/static/fog.js?v=8"></script>
         <script defer src="/static/brushCursor.js?v=6"></script>
-        <script defer src="/static/ui.js?v=14"></script>
+        <script defer src="/static/ui.js?v=15"></script>
         <script defer src="/static/notifications.js?v=1"></script>
         <script defer src="/static/diceAnimation.js?v=2"></script>
-        <script defer src="/static/dice.js?v=14"></script>
+        <script defer src="/static/dice.js?v=15"></script>
         <script defer src="/static/mapEditor.js?v=2"></script>
         <script defer src="/static/imageFit.js?v=3"></script>
         <script defer src="/static/librarySearch.js?v=4"></script>

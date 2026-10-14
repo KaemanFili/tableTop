@@ -23,7 +23,8 @@ Use `menuUI.position(panel, anchor, options)` separately for menus with their ow
 lifecycle. The token menu keeps its nested status keyboard navigation and remote
 movement handling, while sharing positioning with the toolbar menus.
 `placement: 'above'` centers a panel above its anchor and moves it below when
-there is insufficient room. The default placement is beside the anchor;
+there is insufficient room. `placement: 'below'` centers a panel below its
+anchor, as used by the session user list. The default placement is beside the anchor;
 `align: 'center'` centers it vertically. `gap` defaults to eight pixels.
 All placements stay within the viewport margins. Pass the same options as the
 third argument to `menuUI.popover(panel, buttons, options)` to configure a toolbar
@@ -37,6 +38,14 @@ Closing, hiding UI, or switching panels removes the backdrop. The `onOpen` and
 gestures, and mobile dice never automatically focuses a field. Counts and
 modifiers support both touch steppers and explicit keyboard entry.
 
+
+Right-click the account name to see a horizontal list of connected session
+users. Clicking or keyboard activation also opens the list. Profile photos from
+the sign-in provider appear when available, including Discord avatars. Initial
+icons remain the fallback when a photo is absent or fails to load. Hovering or
+focusing an icon shows its display name. The list updates on joins, disconnects, and reconnects, and multiple tabs
+for the same signed-in account share one icon. On phones, opening the list keeps
+the account controls visible.
 
 # Notifications
 
@@ -65,3 +74,12 @@ Dice inputs unlock as soon as the HTTP response provides the authoritative
 result, independently of animation loading or playback. Animation has no shadows,
 is skipped for more than 20 physical dice (percentile dice count as two), and has
 at most three pending rolls. All numerical results and notifications still appear.
+
+Dice notifications and the dice result panel show the roller's display name.
+The server supplies this name from the signed-in account, independently of the
+OAuth provider. Development mode uses GM or Player. Private rolls include the
+name only in the originating client's result and are not broadcast.
+
+Discord profile photos are read during sign-in. After deploying avatar support,
+existing users must sign out and sign back in to populate their photo. Other
+sign-in providers can supply the optional `AvatarURL` on the shared user identity.

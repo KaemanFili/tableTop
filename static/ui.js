@@ -68,7 +68,7 @@
     }
     addCloseButtons();
     document.addEventListener('uiPanelOpening', event => {
-        if (!mobile.matches) return;
+        if (!mobile.matches || event.detail.id === 'session-users') return;
         setToolsOpen(false);
         for (const id of ['spawn-menu', 'map-editor']) {
             if (id !== event.detail.id) closePanel(id);

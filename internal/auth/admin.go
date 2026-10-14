@@ -26,7 +26,8 @@ var adminTemplate = template.Must(template.New("admin").Parse(`<!doctype html>
   <title>Invite players · tableTop</title>
   <link rel="icon" href="/static/favicon.ico?v=1" sizes="16x16 32x32 48x48" type="image/x-icon">
   <link rel="icon" href="/static/favicon-64.png?v=1" sizes="64x64" type="image/png">
-  <link rel="stylesheet" href="/static/style.css?v=67">
+  <link rel="stylesheet" href="/static/style.css?v=72">
+  <script defer src="/static/invitations.js?v=1"></script>
 </head>
 <body class="lobby-page admin-page">
 <main>
@@ -46,7 +47,12 @@ var adminTemplate = template.Must(template.New("admin").Parse(`<!doctype html>
       {{if .Link}}
       <div class="invite-created">
         <p role="status">Invitation created. Copy this link now; it is only shown once.</p>
-        <label>Invite link<input readonly value="{{.Link}}" onclick="this.select()"></label>
+        <label for="invite-link">Invite link</label>
+        <div class="invite-link-controls">
+          <input id="invite-link" readonly value="{{.Link}}">
+          <button type="button" id="copy-invite-link" aria-describedby="copy-invite-status">Copy link</button>
+        </div>
+        <p id="copy-invite-status" role="status" aria-live="polite"></p>
       </div>
       {{end}}
       <p class="admin-note">Players also need a game’s join code after accepting an invitation.</p>

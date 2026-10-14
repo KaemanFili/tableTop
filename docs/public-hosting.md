@@ -9,7 +9,11 @@ not grant GM privileges in another user's tabletop.
 Each generated invitation link admits one new Discord account and expires after
 seven days. Share it privately. Only its hash is persisted, so the link is shown
 once. Admins can revoke pending invitations. Admitted players are stored in
-`data/access.json` and can return without another invitation. Existing game
+`access.json` in the active data directory and can return without another
+invitation. Default Compose stores it at `/app/data/access.json` in the app's
+named volume; the repository-root `data/` is used only for a host process started
+there or the host-data override. See
+[deployment storage locations](containers.md#persistent-data). Existing game
 membership does not automatically enroll someone in the server: invite existing
 players once after this change. There are at most 256 admitted accounts and
 100 pending invitations. Game membership still requires its separate join code.

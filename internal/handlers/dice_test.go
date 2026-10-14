@@ -51,6 +51,7 @@ func TestDiceRollSharedResultsAndValidation(t *testing.T) {
 	}
 	for _, body := range []string{
 		`{}`, `{"requestId":"test","groups":[]}`,
+		`{"requestId":"test","rollerName":"Imposter","groups":[{"qty":1,"sides":6,"modifier":0}]}`,
 		`{"requestId":"test","groups":[{"qty":0,"sides":6,"modifier":0}]}`,
 		`{"requestId":"test","groups":[{"qty":1,"sides":7,"modifier":0}]}`,
 		`{"requestId":"test","groups":[{"qty":1.5,"sides":6,"modifier":0}]}`,

@@ -44,6 +44,9 @@ func (discordTransport) RoundTrip(request *http.Request) (*http.Response, error)
 	} else {
 		id := strings.TrimPrefix(request.Header.Get("Authorization"), "Bearer ")
 		body = fmt.Sprintf(`{"id":%q,"username":%q}`, id, id)
+		if id == "owner" {
+			body = `{"id":"owner","username":"owner","avatar":"0123456789abcdef0123456789abcdef"}`
+		}
 	}
 	return &http.Response{StatusCode: 200, Body: io.NopCloser(strings.NewReader(body)), Header: http.Header{"Content-Type": {"application/json"}}}, nil
 }
@@ -132,7 +135,7 @@ func TestDiceBroadcastsStayWithinSession(t *testing.T) {
 		roll := fmt.Sprintf(`{"requestId":%q,"groups":[{"qty":1,"sides":6,"modifier":0}]}`, test.id)
 		f.request(owner, "POST", test.session.path+"dice/roll", roll, http.StatusOK)
 		var event map[string]any
-		if err := test.socket.ReadJSON(&event); err != nil || event["type"] != "diceRolled" || event["requestId"] != test.id {
+		if err := test.socket.ReadJSON(&event); err != nil || event["type"] != "diceRolled" || event["requestId"] != test.id || event["rollerName"] != "owner" {
 			t.Fatalf("wrong session broadcast: %v %v", event, err)
 		}
 	}
@@ -187,7 +190,7 @@ type tableTestFixture struct {
 	dir, assets    string
 	login          func(string) *http.Client
 	request        func(*http.Client, string, string, string, int) (*http.Response, string)
-	connect        func(*http.Client, string) *websocket.Conn
+	connect        func(*http.Client, string, ...bool) *websocket.Conn
 }
 
 func newTableTestFixture(t *testing.T) tableTestFixture {
@@ -243,7 +246,7 @@ func newTableTestFixture(t *testing.T) tableTestFixture {
 		}
 		return response, string(data)
 	}
-	connect := func(client *http.Client, path string) *websocket.Conn {
+	connect := func(client *http.Client, path string, presence ...bool) *websocket.Conn {
 		t.Helper()
 		u, _ := url.Parse(server.URL)
 		cookies := client.Jar.Cookies(u)
@@ -251,7 +254,11 @@ func newTableTestFixture(t *testing.T) tableTestFixture {
 		for _, cookie := range cookies {
 			cookieHeader = append(cookieHeader, cookie.Name+"="+cookie.Value)
 		}
-		conn, _, err := websocket.DefaultDialer.Dial("ws"+strings.TrimPrefix(server.URL, "http")+path+"ws/updateUnitsForClients?gm=true", http.Header{"Cookie": {strings.Join(cookieHeader, "; ")}})
+		query := "?gm=true"
+		if len(presence) > 0 && presence[0] {
+			query += "&presence=true"
+		}
+		conn, _, err := websocket.DefaultDialer.Dial("ws"+strings.TrimPrefix(server.URL, "http")+path+"ws/updateUnitsForClients"+query, http.Header{"Cookie": {strings.Join(cookieHeader, "; ")}})
 		if err != nil {
 			t.Fatal(err)
 		}
