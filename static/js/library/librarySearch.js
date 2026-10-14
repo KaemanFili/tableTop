@@ -3,6 +3,18 @@
     const queries = new Map();
     const normalize = value => value.normalize('NFKD').replace(/\p{M}/gu, '').toLowerCase();
 
+    // A response can arrive after more typing but before the next debounced
+    // request starts. Keep the live input (and its pending request) in that case.
+    document.addEventListener('htmx:beforeSwap', event => {
+        const request = event.detail.requestConfig;
+        const source = request?.elt;
+        if (!source?.matches('[data-library-search-input][hx-get]')) return;
+        const current = document.getElementById(source.id);
+        if (source !== current || request.parameters.q !== current.value) {
+            event.detail.shouldSwap = false;
+        }
+    });
+
     function initialize(container) {
         if (initialized.has(container)) return;
         const input = container.querySelector('[data-library-search-input]');

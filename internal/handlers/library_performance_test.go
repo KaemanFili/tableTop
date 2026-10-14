@@ -87,6 +87,14 @@ func TestBrowserLargeCatalogSearch(t *testing.T) {
 	h.RegisterRoutes(mux)
 	mux.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir(testAssetRoot(t)+"/static"))))
 	results := make(chan string, 1)
+	searchReady, releaseSearch := make(chan struct{}), make(chan struct{})
+	mux.HandleFunc("GET /browser/search-ready", func(w http.ResponseWriter, r *http.Request) {
+		select {
+		case <-searchReady:
+		case <-r.Context().Done():
+		}
+	})
+	mux.HandleFunc("POST /browser/release-search", func(w http.ResponseWriter, r *http.Request) { close(releaseSearch) })
 	mux.HandleFunc("POST /browser/result", func(w http.ResponseWriter, r *http.Request) { results <- r.URL.Query().Get("error") })
 	mux.HandleFunc("GET /browser", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/html")
@@ -104,6 +112,24 @@ func TestBrowserLargeCatalogSearch(t *testing.T) {
  document.querySelector('.library-pagination button:last-child').click();
  await wait(()=>document.querySelector('[data-library-defaults] [data-library-name]')?.dataset.libraryName!==first);
  await new Promise(r=>setTimeout(r,50));
+ const typingInput=document.getElementById('unit-library-search');
+ typingInput.focus();
+ search('dra');
+ await fetch('/browser/search-ready');
+ search('dragon');
+ typingInput.setSelectionRange(3,3);
+ const oldFinished=new Promise(resolve=>document.addEventListener('htmx:afterRequest',function finished(event){
+  if(event.detail.requestConfig?.parameters.q!=='dra')return;
+  document.removeEventListener('htmx:afterRequest',finished);
+  resolve();
+ }));
+ await fetch('/browser/release-search',{method:'POST'});
+ await oldFinished;
+ if(document.getElementById('unit-library-search')!==typingInput||typingInput.value!=='dragon')throw new Error('Older search response replaced newer typing');
+ if(document.activeElement!==typingInput||typingInput.selectionStart!==3)throw new Error('Older search response lost focus or caret');
+ await wait(()=>document.getElementById('unit-library-search')!==typingInput);
+ if(document.getElementById('unit-library-search').value!=='dragon')throw new Error('Latest query was not retained');
+ if([...document.querySelectorAll('[data-library-name]')].some(e=>!e.dataset.libraryName.toLowerCase().includes('dragon')))throw new Error('Latest search was not applied after ignoring stale response');
  search('dragon ancient');
  await wait(()=>document.querySelector('[data-library-defaults][open]')&&document.querySelector('[data-library-name]')?.dataset.libraryName.includes('Ancient'));
  const names=[...document.querySelectorAll('[data-library-name]')].map(e=>e.dataset.libraryName.toLowerCase());
@@ -120,6 +146,22 @@ func TestBrowserLargeCatalogSearch(t *testing.T) {
 	server := newTestServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if strings.HasPrefix(r.URL.Path, "/images/") {
 			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+		if r.URL.Path == "/spawn-menu" && r.URL.Query().Get("q") == "dra" {
+			response := httptest.NewRecorder()
+			mux.ServeHTTP(response, r)
+			close(searchReady)
+			select {
+			case <-releaseSearch:
+			case <-r.Context().Done():
+				return
+			}
+			for key, values := range response.Header() {
+				w.Header()[key] = values
+			}
+			w.WriteHeader(response.Code)
+			w.Write(response.Body.Bytes())
 			return
 		}
 		mux.ServeHTTP(w, r)

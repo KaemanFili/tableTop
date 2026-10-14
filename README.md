@@ -73,6 +73,8 @@ See [repository architecture](docs/architecture.md) for package responsibilities
 dependency direction, browser script ordering, and where to add new code.
 [Go architecture diagrams](docs/architecture-diagrams.md) show package imports,
 main structs/interfaces, and file ownership.
+[Learning guide](docs/learning-guide.md) explains the runtime flow and the main
+model/session/server boundaries for someone new to the codebase.
 [Menus](docs/menus.md), [movement](docs/movement.md), and [erasers](docs/erasers.md)
 explain the corresponding browser behavior.
 
