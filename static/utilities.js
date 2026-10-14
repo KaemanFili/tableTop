@@ -24,7 +24,7 @@
         const measurement = rulers.get(rulerID);
         if (!clear && !measurement) return;
         if (newUnitUpdateSocket.readyState !== WebSocket.OPEN) {
-            error.textContent = 'Could not share ruler. Refresh to reconnect.';
+            error.textContent = 'Could not share ruler. Reconnecting automatically; try again shortly.';
             error.hidden = false;
             return;
         }
@@ -165,7 +165,7 @@
         if (!event.target.closest('#grid-container, #unitOverlay .unit')) return;
         event.preventDefault();
         if (!rulerID || newUnitUpdateSocket.readyState !== WebSocket.OPEN) {
-            error.textContent = 'Could not share ruler. Refresh to reconnect.';
+            error.textContent = 'Could not share ruler. Reconnecting automatically; try again shortly.';
             error.hidden = false;
             return;
         }

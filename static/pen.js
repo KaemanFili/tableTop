@@ -78,7 +78,7 @@
         sendTimer = null;
         if (!active) return;
         if (newUnitUpdateSocket.readyState !== WebSocket.OPEN) {
-            error.textContent = 'Could not share drawing. Refresh to reconnect.';
+            error.textContent = 'Could not share drawing. Reconnecting automatically; try again shortly.';
             error.hidden = false;
             return;
         }
@@ -154,7 +154,7 @@
     function eraseAt(point) {
         if (!point) return;
         if (newUnitUpdateSocket.readyState !== WebSocket.OPEN) {
-            error.textContent = 'Could not erase drawing. Refresh to reconnect.';
+            error.textContent = 'Could not erase drawing. Reconnecting automatically; try again shortly.';
             error.hidden = false;
             return;
         }
@@ -194,7 +194,7 @@
             {...stroke, remote: !(stroke.finished && stroke.offset === 0)});
     });
     document.addEventListener('penErased', event => event.detail.ids.forEach(removeStroke));
-    document.addEventListener('boardCleared', () => {
+    function resetDrawing() {
         clearTimeout(sendTimer);
         sendTimer = null;
         active = null;
@@ -203,7 +203,9 @@
         strokes.clear();
         erasedIDs.clear();
         layer.replaceChildren();
-    });
+    }
+    document.addEventListener('boardCleared', resetDrawing);
+    document.addEventListener('boardResync', resetDrawing);
     document.addEventListener('rulerDisconnected', () => {
         clearTimeout(sendTimer);
         sendTimer = null;
@@ -223,7 +225,7 @@
         if (!event.target.closest('#grid-container, #unitOverlay .unit')) return;
         event.preventDefault();
         if (!owner || newUnitUpdateSocket.readyState !== WebSocket.OPEN) {
-            error.textContent = 'Could not share drawing. Refresh to reconnect.';
+            error.textContent = 'Could not share drawing. Reconnecting automatically; try again shortly.';
             error.hidden = false;
             return;
         }

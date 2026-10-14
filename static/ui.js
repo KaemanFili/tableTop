@@ -140,7 +140,7 @@
         success.hidden = true;
         if (newUnitUpdateSocket.readyState !== WebSocket.OPEN) {
             event.preventDefault();
-            error.textContent = 'Refresh to reconnect before saving the map.';
+            error.textContent = 'Reconnecting automatically. Try saving the map again shortly.';
             error.hidden = false;
         }
     });
@@ -180,7 +180,7 @@
         message.hidden = true;
         if (newUnitUpdateSocket.readyState !== WebSocket.OPEN) {
             event.preventDefault();
-            message.textContent = 'Refresh to reconnect before loading a map.';
+            message.textContent = 'Reconnecting automatically. Try loading a map again shortly.';
             message.hidden = false;
         }
     });
@@ -203,7 +203,7 @@
         error.hidden = true;
         if (newUnitUpdateSocket.readyState !== WebSocket.OPEN) {
             event.preventDefault();
-            error.textContent = 'Refresh to reconnect before clearing the map.';
+            error.textContent = 'Reconnecting automatically. Try clearing the map again shortly.';
             error.hidden = false;
         }
     });

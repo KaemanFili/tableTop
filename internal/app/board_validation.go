@@ -53,7 +53,7 @@ func validateSavedUnit(unit UnitData) error {
 }
 
 func validateSavedStroke(stroke PenStroke) error {
-	if stroke.Type != "penStroke" || !statusColorPattern.MatchString(stroke.Color) || !finiteRange(stroke.Width, 1, 12) || len(stroke.Points) == 0 || len(stroke.Points) > 8192 {
+	if stroke.Type != "penStroke" || !statusColorPattern.MatchString(stroke.Color) || !finiteRange(stroke.Width, 1, 240) || len(stroke.Points) == 0 || len(stroke.Points) > 8192 {
 		return errors.New("invalid saved stroke")
 	}
 	for _, point := range stroke.Points {
@@ -65,6 +65,9 @@ func validateSavedStroke(stroke PenStroke) error {
 }
 
 func validateSavedFog(mark FogMark) error {
+	if mark.Type == "fogMark" && mark.Mode == "fill" && mark.Width == 0 && len(mark.Points) == 0 {
+		return nil
+	}
 	if mark.Type != "fogMark" || (mark.Mode != "paint" && mark.Mode != "erase") || !finiteRange(mark.Width, 0.25, 6) || len(mark.Points) == 0 {
 		return errors.New("invalid saved fog")
 	}

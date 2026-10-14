@@ -43,7 +43,7 @@ func TestPenLiveStrokesInitialStateAndDisconnect(t *testing.T) {
 		`{"type":"penStroke","id":"1","points":[{"x":-1,"y":1}]}`,
 		`{"type":"penStroke","id":"1","points":[]}`,
 		`{"type":"penStroke","id":"1","points":[{"x":1,"y":1}],"color":"red"}`,
-		`{"type":"penStroke","id":"1","points":[{"x":1,"y":1}],"width":13}`,
+		`{"type":"penStroke","id":"1","points":[{"x":1,"y":1}],"width":241}`,
 		`{"type":"penStroke","id":"1","points":[{"x":1,"y":1}],"width":-1}`,
 	} {
 		if err := first.WriteMessage(websocket.TextMessage, []byte(invalid)); err != nil {
@@ -51,7 +51,7 @@ func TestPenLiveStrokesInitialStateAndDisconnect(t *testing.T) {
 		}
 	}
 	points := []rulerPoint{{X: 1, Y: 1}, {X: 1.5, Y: 2}}
-	update := penStroke{Type: "penStroke", ID: "1", Owner: secondID, Points: points, Color: "#ff3344", Width: 12}
+	update := penStroke{Type: "penStroke", ID: "1", Owner: secondID, Points: points, Color: "#ff3344", Width: 240}
 	if err := first.WriteJSON(update); err != nil {
 		t.Fatal(err)
 	}

@@ -41,3 +41,29 @@ func (h *WebSocketHandler) updateFog(owner string, data []byte) error {
 	h.broadcastUnitsLocked(message)
 	return nil
 }
+
+// Replace fog history so whole-board actions also release old drawing capacity.
+func (h *WebSocketHandler) setFog(owner string, data []byte) {
+	var request struct {
+		Covered    *bool  `json:"covered"`
+		Generation uint64 `json:"generation"`
+	}
+	if json.Unmarshal(data, &request) != nil || request.Covered == nil {
+		return
+	}
+	h.boardMutex.Lock()
+	defer h.boardMutex.Unlock()
+	if request.Generation != h.boardGeneration {
+		return
+	}
+	for _, mark := range h.fogMarks {
+		h.drawingPoints -= len(mark.Points)
+	}
+	h.fogMarks = nil
+	h.broadcastValueLocked(map[string]string{"type": "fogReset"})
+	if *request.Covered {
+		mark := fogMark{Type: "fogMark", ID: owner + "/fill", Owner: owner, Mode: "fill", Generation: h.boardGeneration}
+		h.fogMarks = append(h.fogMarks, mark)
+		h.broadcastValueLocked(mark)
+	}
+}

@@ -320,7 +320,7 @@ func (h *WebSocketHandler) registerBoardUtilitiesClient(conn *websocket.Conn, se
 		}
 		return err
 	}
-	if err := appendInitial(map[string]any{"type": "rulerSession", "id": sessionID, "generation": h.boardGeneration}); err != nil {
+	if err := appendInitial(map[string]any{"type": "rulerSession", "id": sessionID, "generation": h.boardGeneration, "map": h.currentMap}); err != nil {
 		return err
 	}
 	if h.currentMap != nil {
@@ -381,6 +381,10 @@ func (h *WebSocketHandler) handleBoardUtilitiesMessage(sessionID string, data []
 		return nil
 	}
 	switch message.Type {
+	case "fogSet":
+		if isGM {
+			h.setFog(sessionID, data)
+		}
 	case "fogMark":
 		if isGM {
 			return h.updateFog(sessionID, data)

@@ -1013,6 +1013,65 @@ async function testToolsAcrossZoomLevels(browser) {
     d.dispatchEvent(new w.KeyboardEvent('keydown', {key: 'Escape', bubbles: true}));
 }
 
+async function testAutomaticReconnect({w, d, units, remoteSpawn}) {
+    const oldSockets = w.eval('[posUpdateSocket, newUnitUpdateSocket, updateServerSocket]');
+    const count = units().length;
+    let resynced = false;
+    d.addEventListener('boardResync', () => { resynced = true; }, {once: true});
+    // A local-only stroke must disappear when the authoritative snapshot returns.
+    d.dispatchEvent(new w.CustomEvent('penStroke', {detail: {
+        id: 'stale-offline-stroke', owner: 'offline', offset: 0,
+        points: [{x: 1, y: 1}, {x: 2, y: 2}], finished: true,
+    }}));
+    const stalePath = d.querySelector('#drawing-layer path:last-child');
+    assert(stalePath, 'Reconnect fixture was not drawn');
+    oldSockets.forEach(socket => socket.close());
+    await until(() => oldSockets.every(socket => socket.readyState === w.WebSocket.CLOSED), 'Sockets did not close');
+    await remoteSpawn();
+    await until(() => resynced && w.eval('[posUpdateSocket, newUnitUpdateSocket, updateServerSocket]')
+        .every((socket, i) => socket !== oldSockets[i] && socket.readyState === w.WebSocket.OPEN), 'Sockets did not reconnect automatically');
+    await until(() => units().length === count + 1, 'Reconnect missed a unit created while offline');
+    assert(!stalePath.isConnected, 'Reconnect retained stale drawing');
+    const shared = await (await fetch('/browser/gestures')).json();
+    await until(() => d.querySelectorAll('#drawing-layer path').length === Object.keys(shared.strokes).length,
+        'Reconnect did not restore the shared drawings');
+    assert(document.getElementById('app').contentDocument === d, 'Reconnect reloaded the page');
+    // Verify the replacement send socket still moves units on the server.
+    const token = units()[0];
+    w.eval('updateServerSocket').send(JSON.stringify({ID: token.id, Left: 123, Top: 234}));
+    await until(async () => (await (await fetch('/browser/state')).json()).some(unit =>
+        unit.ID === token.id && unit.Left === 123 && unit.Top === 234), 'Replacement movement socket did not send');
+}
+
+async function testFogBoardActions({w, d, units}) {
+    const max = d.getElementById('fog-width').max;
+    assert(d.getElementById('pen-width').max === max && d.getElementById('fog-eraser-width').max === max,
+        'Brush maximum thickness does not match fog');
+    const canvas = d.getElementById('fog-layer');
+    const context = canvas.getContext('2d');
+    const alpha = (x, y) => context.getImageData(x, y, 1, 1).data[3];
+    const covered = () => [[0, 0], [2559, 0], [0, 2559], [2559, 2559], [1280, 1280]]
+        .every(([x, y]) => alpha(x, y) === 255);
+    const count = units().length;
+    const openFogMenu = () => d.getElementById('utility-fog').dispatchEvent(new w.MouseEvent('contextmenu', {bubbles: true, cancelable: true}));
+    openFogMenu();
+    assert(!d.getElementById('fog-settings').hidden, 'Fog right-click menu did not open');
+    d.getElementById('fog-cover-board').click();
+    await until(covered, 'Cover board did not fill all fog pixels');
+    let sessionReturned = false;
+    d.addEventListener('rulerSession', () => { sessionReturned = true; }, {once: true});
+    w.eval('newUnitUpdateSocket').close();
+    await until(() => sessionReturned && covered(), 'Full fog was lost on reconnect');
+    w.eval('newUnitUpdateSocket').send(JSON.stringify({type: 'fogMark', id: '90001', mode: 'erase',
+        width: 6, points: [{x: 32, y: 32}], generation: w.eval('boardGeneration')}));
+    await until(() => alpha(1280, 1280) === 0 && alpha(0, 0) === 255, 'Maximum-size eraser did not cut through full fog');
+    openFogMenu();
+    d.getElementById('fog-clear-board').click();
+    await until(() => [[0, 0], [2559, 0], [0, 2559], [2559, 2559], [1280, 1280]]
+        .every(([x, y]) => alpha(x, y) === 0), 'Remove all fog did not clear the board');
+    assert(units().length === count, 'Fog action removed units');
+}
+
 // These scenarios share one board: each spawn changes the count expected by
 // the next scenario, and the movement check leaves the status menu open.
 const scenarios = [
@@ -1032,6 +1091,8 @@ const scenarios = [
     ['remote player movement and drawing streams', testRemoteStreaming],
     ['board zoom keeps UI fixed', testBoardZoomKeepsUIFixed],
     ['tools across zoom levels', testToolsAcrossZoomLevels],
+    ['automatic reconnect and resync', testAutomaticReconnect],
+    ['fog thickness and whole board actions', testFogBoardActions],
     ['map view centers on load and reload', testMapViewCentering],
 ];
 

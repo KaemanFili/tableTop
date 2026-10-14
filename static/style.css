@@ -226,7 +226,8 @@ body.map-panning * {
   z-index: 2;
   width: calc(var(--cell-size) * 64);
   height: calc(var(--cell-size) * 64);
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40' viewBox='0 0 40 40'%3E%3Cpath d='M0 0H40M0 0V40' fill='none' stroke='black' stroke-dasharray='1 2'/%3E%3C/svg%3E");
+  /* Solid lines with a light edge stay visible over both light and dark maps. */
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40' viewBox='0 0 40 40'%3E%3Cpath d='M.5 40V.5H40' fill='none' stroke='white' stroke-opacity='.4' stroke-width='3'/%3E%3Cpath d='M.5 40V.5H40' fill='none' stroke='black' stroke-opacity='.6'/%3E%3C/svg%3E");
   background-size: var(--cell-size) var(--cell-size);
 }
 
@@ -584,6 +585,13 @@ body.map-panning * {
 #pen-settings input:last-child,
 #fog-settings input:last-child {
   margin-bottom: 0;
+}
+
+#fog-settings button {
+  display: block;
+  width: 100%;
+  margin-top: 8px;
+  text-align: left;
 }
 
 #pen-width-value,

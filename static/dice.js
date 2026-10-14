@@ -107,7 +107,7 @@
         ownRequests.add(requestId);
         try {
             if (newUnitUpdateSocket.readyState !== WebSocket.OPEN) {
-                throw new Error('Refresh to reconnect before rolling dice.');
+                throw new Error('Reconnecting automatically. Try rolling dice again shortly.');
             }
             const response = await fetch(boardURL(`/dice/roll${shareRolls ? '?gm=true' : ''}`), {
                 method: 'POST',

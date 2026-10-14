@@ -34,7 +34,27 @@
         });
     }
 
+    for (const [id, covered] of [['fog-cover-board', true], ['fog-clear-board', false]]) {
+        document.getElementById(id)?.addEventListener('click', () => {
+            finish();
+            if (!owner || newUnitUpdateSocket.readyState !== WebSocket.OPEN) {
+                error.textContent = 'Could not change fog. Reconnecting automatically; try again shortly.';
+                error.hidden = false;
+                return;
+            }
+            newUnitUpdateSocket.send(JSON.stringify({type: 'fogSet', covered, generation: boardGeneration}));
+            error.hidden = true;
+            settingsMenu.close();
+        });
+    }
+
     function paint(target, mark) {
+        if (mark.mode === 'fill') {
+            target.globalCompositeOperation = 'source-over';
+            target.fillStyle = '#111827';
+            target.fillRect(0, 0, canvas.width, canvas.height);
+            return;
+        }
         target.globalCompositeOperation = mark.mode === 'erase' ? 'destination-out' : 'source-over';
         target.strokeStyle = '#111827';
         target.lineWidth = mark.width * canvas.width / 64;
@@ -77,7 +97,7 @@
         sendTimer = null;
         if (!batch) return;
         if (newUnitUpdateSocket.readyState !== WebSocket.OPEN) {
-            error.textContent = 'Could not share fog. Refresh to reconnect.';
+            error.textContent = 'Could not share fog. Reconnecting automatically; try again shortly.';
             error.hidden = false;
             pending.clear();
             batch = null;
@@ -113,12 +133,7 @@
         lastPoint = null;
     }
 
-    document.addEventListener('fogReset', () => {
-        confirmedContext.clearRect(0, 0, canvas.width, canvas.height);
-        pending.clear();
-        renderPending();
-    });
-    document.addEventListener('boardCleared', () => {
+    function resetDrawing() {
         clearTimeout(sendTimer);
         sendTimer = null;
         drawing = false;
@@ -127,7 +142,10 @@
         pending.clear();
         confirmedContext.clearRect(0, 0, canvas.width, canvas.height);
         renderPending();
-    });
+    }
+    document.addEventListener('fogReset', resetDrawing);
+    document.addEventListener('boardCleared', resetDrawing);
+    document.addEventListener('boardResync', resetDrawing);
     document.addEventListener('fogMark', event => {
         const mark = event.detail;
         paint(confirmedContext, mark);
@@ -151,7 +169,7 @@
         if (!event.target.closest('#grid-container, #unitOverlay .unit')) return;
         event.preventDefault();
         if (!owner || newUnitUpdateSocket.readyState !== WebSocket.OPEN) {
-            error.textContent = 'Could not share fog. Refresh to reconnect.';
+            error.textContent = 'Could not share fog. Reconnecting automatically; try again shortly.';
             error.hidden = false;
             return;
         }

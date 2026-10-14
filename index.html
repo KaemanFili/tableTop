@@ -7,7 +7,7 @@
         <link rel="icon" href="/static/favicon.ico?v=1" sizes="16x16 32x32 48x48" type="image/x-icon">
         <link rel="icon" href="/static/favicon-64.png?v=1" sizes="64x64" type="image/png">
         <script defer src="/static/vendor/htmx-2.0.11.min.js"></script>
-        <link rel="stylesheet" href="/static/style.css?v=67">
+        <link rel="stylesheet" href="/static/style.css?v=69">
     </head>
     <body data-gm="{{ .IsGM }}" data-session-prefix="{{ boardPrefix }}">
         <div
@@ -118,7 +118,9 @@
                         <label for="fog-width">Brush thickness <output id="fog-width-value" for="fog-width">80 px</output></label>
                         <input type="range" id="fog-width" min="20" max="240" step="10" value="80">
                         <label for="fog-eraser-width">Eraser thickness <output id="fog-eraser-width-value" for="fog-eraser-width">40 px</output></label>
-                        <input type="range" id="fog-eraser-width" min="10" max="120" step="10" value="40">
+                        <input type="range" id="fog-eraser-width" min="10" max="240" step="10" value="40">
+                        <button type="button" id="fog-cover-board">Cover entire board in fog</button>
+                        <button type="button" id="fog-clear-board">Remove all fog</button>
                     </div>
                 </div>
                 <section id="map-editor" class="spawn-menu" aria-label="Create New Map" hidden></section>
@@ -168,23 +170,23 @@
         </div>
         <div id="token-status-tooltip" class="token-status-tooltip" role="tooltip" hidden></div>
         <script type="application/json" id="unit-sizes">{{ .UnitSizes }}</script>
-        <script defer src="/static/session.js?v=1"></script>
+        <script defer src="/static/session.js?v=2"></script>
         <script defer src="/static/pan.js?v=2"></script>
         <script defer src="/static/menuUI.js?v=7"></script>
         <script defer src="/static/tokenMenu.js?v=15"></script>
         <script defer src="/static/boardInput.js?v=2"></script>
-        <script defer src="/static/drag.js?v=17"></script>
-        <script defer src="/static/updateClients.js?v=22"></script>
+        <script defer src="/static/drag.js?v=18"></script>
+        <script defer src="/static/updateClients.js?v=23"></script>
         <script defer src="/static/boardGeometry.js?v=3"></script>
         <script defer src="/static/boardZoom.js?v=7"></script>
-        <script defer src="/static/utilities.js?v=18"></script>
-        <script defer src="/static/pen.js?v=9"></script>
-        <script defer src="/static/fog.js?v=6"></script>
+        <script defer src="/static/utilities.js?v=19"></script>
+        <script defer src="/static/pen.js?v=10"></script>
+        <script defer src="/static/fog.js?v=8"></script>
         <script defer src="/static/brushCursor.js?v=6"></script>
-        <script defer src="/static/ui.js?v=13"></script>
+        <script defer src="/static/ui.js?v=14"></script>
         <script defer src="/static/notifications.js?v=1"></script>
         <script defer src="/static/diceAnimation.js?v=2"></script>
-        <script defer src="/static/dice.js?v=13"></script>
+        <script defer src="/static/dice.js?v=14"></script>
         <script defer src="/static/mapEditor.js?v=2"></script>
         <script defer src="/static/imageFit.js?v=3"></script>
         <script defer src="/static/librarySearch.js?v=4"></script>

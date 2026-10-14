@@ -1,7 +1,7 @@
-const posUpdateSocket = new WebSocket(`${location.protocol === 'https:' ? 'wss:' : 'ws:'}//${location.host}${boardURL('/ws/updatePosForClients')}`);
+let posUpdateSocket;
 let boardGeneration = 0;
 
-const newUnitUpdateSocket = new WebSocket(`${location.protocol === 'https:' ? 'wss:' : 'ws:'}//${location.host}${boardURL('/ws/updateUnitsForClients')}${document.body.dataset.gm === 'true' ? '?gm=true' : ''}`);
+let newUnitUpdateSocket;
 
 // Coalesce refreshes during a drag; unit refreshes must never replace a dragged token.
 let unitsRefreshPending = false;
@@ -130,7 +130,7 @@ document.addEventListener('boardMapChanged', event => {
     map.hidden = false;
 });
 
-posUpdateSocket.onmessage = function(event) {
+function receivePositions(event) {
     const units = JSON.parse(event.data);
     units.forEach(unit => {
         const el = document.getElementById(unit.ID);
@@ -144,11 +144,8 @@ posUpdateSocket.onmessage = function(event) {
     });
 };
 
-posUpdateSocket.onerror = function(err) {
-    console.error("WebSocket error:", err);
-};
-
-newUnitUpdateSocket.onmessage = function(event) {
+let receivedBoardSession = false;
+function receiveBoardUpdate(event) {
     const message = JSON.parse(event.data);
     if (message.type === 'boardLimitReached') {
         const error = document.getElementById('utility-error');
@@ -165,7 +162,17 @@ newUnitUpdateSocket.onmessage = function(event) {
         document.dispatchEvent(new CustomEvent('boardCleared', {detail: message}));
         return;
     }
-    if (message.type === 'rulerSession') boardGeneration = message.generation || 0;
+    if (message.type === 'rulerSession') {
+        boardGeneration = message.generation || 0;
+        if (receivedBoardSession) {
+            pendingUnitPositions.clear();
+            removedUnitIDs.clear();
+            document.dispatchEvent(new CustomEvent('boardResync'));
+            document.dispatchEvent(new CustomEvent('boardMapChanged', {detail: {map: message.map}}));
+            refreshUnits();
+        }
+        receivedBoardSession = true;
+    }
     if (message.type === 'fogMark' || message.type === 'fogReset') {
         document.dispatchEvent(new CustomEvent(message.type, {detail: message}));
         return;
@@ -197,6 +204,20 @@ newUnitUpdateSocket.onmessage = function(event) {
     if (message === 'unit created') refreshUnits();
 };
 
-newUnitUpdateSocket.addEventListener('close', () => {
-    document.dispatchEvent(new CustomEvent('rulerDisconnected'));
+connectBoardSocket('/ws/updatePosForClients', socket => {
+    const reconnecting = !!posUpdateSocket;
+    posUpdateSocket = socket;
+    socket.onmessage = receivePositions;
+    socket.addEventListener('open', () => {
+        if (!reconnecting) return;
+        pendingUnitPositions.clear();
+        refreshUnits();
+    });
+});
+connectBoardSocket(`/ws/updateUnitsForClients${document.body.dataset.gm === 'true' ? '?gm=true' : ''}`, socket => {
+    newUnitUpdateSocket = socket;
+    socket.onmessage = receiveBoardUpdate;
+    socket.addEventListener('close', () => {
+        document.dispatchEvent(new CustomEvent('rulerDisconnected'));
+    });
 });

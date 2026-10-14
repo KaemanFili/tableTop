@@ -54,7 +54,7 @@ func (h *WebSocketHandler) updatePen(owner string, data []byte) error {
 		if update.Width == 0 {
 			update.Width = 3
 		}
-		if !penColorPattern.MatchString(update.Color) || math.IsNaN(update.Width) || math.IsInf(update.Width, 0) || update.Width < 1 || update.Width > 12 {
+		if !penColorPattern.MatchString(update.Color) || math.IsNaN(update.Width) || math.IsInf(update.Width, 0) || update.Width < 1 || update.Width > 240 {
 			return nil
 		}
 		stroke = penStroke{Type: "penStroke", ID: update.ID, Owner: owner, Color: update.Color, Width: update.Width, Generation: update.Generation}

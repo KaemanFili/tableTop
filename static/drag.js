@@ -1,9 +1,6 @@
 let isDragging = false;
-const updateServerSocket = new WebSocket(`${location.protocol === 'https:' ? 'wss:' : 'ws:'}//${location.host}${boardURL('/ws/updateServer')}`);
-
-updateServerSocket.onopen = () => {
-    console.log("webSocket connection established");
-};
+let updateServerSocket;
+connectBoardSocket('/ws/updateServer', socket => { updateServerSocket = socket; });
 
 boardInput.addEventListener("down", function (e) {
     if (e.button !== 0) return;
