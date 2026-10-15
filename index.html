@@ -7,7 +7,7 @@
         <link rel="icon" href="/static/favicon.ico?v=1" sizes="16x16 32x32 48x48" type="image/x-icon">
         <link rel="icon" href="/static/favicon-64.png?v=1" sizes="64x64" type="image/png">
         <script defer src="/static/vendor/htmx-2.0.11.min.js"></script>
-        <link rel="stylesheet" href="/static/style.css?v=72">
+        <link rel="stylesheet" href="/static/style.css?v=75">
     </head>
     <body data-gm="{{ .IsGM }}" data-session-prefix="{{ boardPrefix }}">
         <div
@@ -173,6 +173,7 @@
         </div>
         <div id="token-status-tooltip" class="token-status-tooltip" role="tooltip" hidden></div>
         <script type="application/json" id="unit-sizes">{{ .UnitSizes }}</script>
+        <script type="application/json" id="player-hotkeys">{{ .Hotkeys }}</script>
         <script defer src="/static/js/realtime/connection.js?v=2"></script>
         <script defer src="/static/js/board/pan.js?v=2"></script>
         <script defer src="/static/js/shared/menuUI.js?v=8"></script>
@@ -184,6 +185,8 @@
         <script defer src="/static/js/board/boardGeometry.js?v=3"></script>
         <script defer src="/static/js/board/boardZoom.js?v=7"></script>
         <script defer src="/static/js/board/utilities.js?v=20"></script>
+        <script defer src="/static/js/shared/hotkeys.js?v=1"></script>
+        <script defer src="/static/js/board/hotkeys.js?v=4"></script>
         <script defer src="/static/js/board/pen.js?v=10"></script>
         <script defer src="/static/js/board/fog.js?v=8"></script>
         <script defer src="/static/js/board/brushCursor.js?v=6"></script>

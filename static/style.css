@@ -1692,3 +1692,9 @@ body[data-ui-hidden="true"] #session-users { display: none; }
 .invite-link-controls button { flex-shrink: 0; min-height: 44px; white-space: nowrap; }
 .admin-page #copy-invite-status { margin: 8px 0 0; }
 .admin-page #copy-invite-status:empty { display: none; }
+
+.preferences-actions { display: flex; flex-wrap: wrap; gap: 0.75rem; }
+.hotkey-assignments { margin: 1.5rem 0; }
+.hotkey-assignments > div { display: flex; justify-content: space-between; gap: 1rem; padding: 0.6rem 0; border-bottom: 1px solid var(--ui-border); }
+.hotkey-assignments dd { margin: 0; color: var(--ui-muted); }
+.hotkey-assignments kbd { color: var(--ui-text); }

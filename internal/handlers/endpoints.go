@@ -23,15 +23,19 @@ type EndpointHandler struct {
 	mapLibrary       *persistence.MapLibrary
 	assetRoot        string
 	routePrefix      string
+	preferences      *persistence.PlayerPreferencesLibrary
 }
 
 func NewEndpointHandler(state *model.AppState, webSocketHandler *WebSocketHandler, library *persistence.UnitLibrary, maps ...*persistence.MapLibrary) *EndpointHandler {
 	return newEndpointHandler(state, webSocketHandler, library, ".", maps...)
 }
 
-func NewTableEndpointHandler(state *model.AppState, ws *WebSocketHandler, units *persistence.UnitLibrary, maps *persistence.MapLibrary, assetRoot, prefix string) *EndpointHandler {
+func NewTableEndpointHandler(state *model.AppState, ws *WebSocketHandler, units *persistence.UnitLibrary, maps *persistence.MapLibrary, assetRoot, prefix string, preferences ...*persistence.PlayerPreferencesLibrary) *EndpointHandler {
 	handler := newEndpointHandler(state, ws, units, assetRoot, maps)
 	handler.routePrefix = prefix
+	if len(preferences) > 0 {
+		handler.preferences = preferences[0]
+	}
 	return handler
 }
 
@@ -93,13 +97,19 @@ func (h *EndpointHandler) index(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-store")
 	sizes, _ := json.Marshal(model.UnitSizes())
+	preferences := model.PlayerPreferences{}
+	if user := auth.CurrentUser(r); user != nil && h.preferences != nil {
+		preferences = h.preferences.ForUser(user.ID)
+	}
+	hotkeys, _ := json.Marshal(preferences.Hotkeys)
 	data := struct {
 		spawnMenuData
 		UnitSizes    template.JS
 		UnitStatuses []model.UnitStatusOption
 		IsGM         bool
 		User         *auth.User
-	}{UnitSizes: template.JS(sizes), UnitStatuses: h.state.UnitStatuses(), IsGM: auth.IsGM(r), User: auth.CurrentUser(r)}
+		Hotkeys      template.JS
+	}{UnitSizes: template.JS(sizes), UnitStatuses: h.state.UnitStatuses(), IsGM: auth.IsGM(r), User: auth.CurrentUser(r), Hotkeys: template.JS(hotkeys)}
 	if err := h.indexTemplate.ExecuteTemplate(w, "index.html", data); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}

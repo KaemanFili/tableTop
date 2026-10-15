@@ -105,7 +105,7 @@ func (limits *StorageLimits) check(path string, size int64) error {
 	parts := strings.Split(relative, string(filepath.Separator))
 	if parts[0] == "sessions" && len(parts) >= 3 {
 		tableRoot = filepath.Join(limits.root, parts[0], parts[1])
-	} else if relative == "sessions.json" || relative == "access.json" {
+	} else if relative == "sessions.json" || relative == "access.json" || relative == "preferences.json" {
 		tableRoot = ""
 	}
 	var totalUsed, tableUsed int64
@@ -132,7 +132,7 @@ func (limits *StorageLimits) check(path string, size int64) error {
 		}
 		totalUsed += info.Size()
 		inTable := tableRoot != "" && strings.HasPrefix(filePath, tableRoot+string(filepath.Separator))
-		if tableRoot == limits.root && (filePath == filepath.Join(limits.root, "sessions.json") || filePath == filepath.Join(limits.root, "access.json") || strings.HasPrefix(filePath, filepath.Join(limits.root, "sessions")+string(filepath.Separator))) {
+		if tableRoot == limits.root && (filePath == filepath.Join(limits.root, "sessions.json") || filePath == filepath.Join(limits.root, "access.json") || filePath == filepath.Join(limits.root, "preferences.json") || strings.HasPrefix(filePath, filepath.Join(limits.root, "sessions")+string(filepath.Separator))) {
 			inTable = false
 		}
 		if inTable {

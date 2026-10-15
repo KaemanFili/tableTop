@@ -55,6 +55,37 @@ the one-time application credentials and redirect URL configuration.
 With Discord configured, session ownership controls GM access. Explicit `-dev`
 mode enables the local development board.
 
+### Player preferences and hotkeys
+
+Open **Preferences** from the lobby to visit your separate settings dashboard.
+Choose a utility from the dropdown, focus **Hotkey**, press the desired key
+combination, then select **Save hotkey**. A letter (A–Z) or number (0–9) can be
+combined with Ctrl, Alt/Option, Shift, and/or Meta. P and Ctrl+P can activate
+different utilities. Editing one utility preserves all other assignments.
+The current bindings appear below the editor. **Clear hotkey**, then **Save
+hotkey**, removes the selected binding; **Clear all hotkeys** removes them all.
+You can also paste a combination such as `Ctrl+Shift+P` into the field using
+the context menu. Key combinations are normalized before storage.
+Preferences belong to the signed-in account and apply across its tabletops,
+browsers, sign-ins, and server restarts. Open or reload a board after saving.
+
+In a desktop browser, press an assigned key to toggle that utility, just like
+clicking its toolbar button. Button tooltips display assigned keys. Shortcuts
+ignore typing fields, composed text, held-key repeats, and AltGr text entry.
+Modifiers must match exactly: Ctrl+P does not also trigger P or Ctrl+Shift+P.
+Some combinations are reserved by the browser or operating system and may not
+reach the page; choose another binding in that case. Shortcuts pause while the
+UI is hidden. Escape still deselects the tool.
+Fog shortcuts work only where the account is the GM. Players can save fog
+bindings for their own future games without gaining GM access elsewhere.
+
+Account preferences are stored atomically in `data/preferences.json`, alongside
+local membership settings, including when MongoDB stores map/unit libraries.
+They count toward the server's file quota, not an individual tabletop's quota,
+and are included in existing data-directory backups. Deleting a tabletop does
+not delete account preferences. Unauthenticated `-dev` mode has no account
+preferences.
+
 ## Structure
 
 - `main.go`: application entrypoint and route wiring.

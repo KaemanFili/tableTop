@@ -19,6 +19,7 @@ import (
 
 type Manager struct {
 	library      *persistence.TableLibrary
+	preferences  *persistence.PlayerPreferencesLibrary
 	dir, assets  string
 	mu           sync.Mutex
 	boards       map[string]*managedBoard
@@ -42,16 +43,22 @@ func NewWithStore(dir, assets string, store persistence.LibraryStore, limits ...
 	if err != nil {
 		return nil, err
 	}
+	preferences, err := persistence.NewPlayerPreferencesLibrary(dir, storage)
+	if err != nil {
+		return nil, err
+	}
 	bounds, err := plugins.BoundsFromEnvironment()
 	if err != nil {
 		return nil, err
 	}
-	manager := &Manager{library: library, dir: dir, assets: assets, boards: make(map[string]*managedBoard), limits: storage, store: store, pluginDirs: plugins.Directories(assets), pluginBounds: bounds}
+	manager := &Manager{library: library, preferences: preferences, dir: dir, assets: assets, boards: make(map[string]*managedBoard), limits: storage, store: store, pluginDirs: plugins.Directories(assets), pluginBounds: bounds}
 	return manager, nil
 }
 
 func (m *Manager) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /lobby", m.lobby)
+	mux.HandleFunc("GET /preferences", m.showPreferences)
+	mux.HandleFunc("POST /preferences", m.savePreferences)
 	mux.HandleFunc("POST /sessions", m.create)
 	mux.HandleFunc("POST /sessions/join", m.join)
 	mux.HandleFunc("POST /sessions/{table}/initialize", m.retryInitialization)
@@ -75,7 +82,7 @@ var lobbyTemplate = template.Must(template.New("lobby").Parse(`<!doctype html>
   <title>Your sessions · tableTop</title>
   <link rel="icon" href="/static/favicon.ico?v=1" sizes="16x16 32x32 48x48" type="image/x-icon">
   <link rel="icon" href="/static/favicon-64.png?v=1" sizes="64x64" type="image/png">
-  <link rel="stylesheet" href="/static/style.css?v=67">
+  <link rel="stylesheet" href="/static/style.css?v=74">
 </head>
 <body class="lobby-page session-lobby">
 <p class="lobby-loading" data-lobby-loading role="status" aria-live="polite" hidden></p>
@@ -84,6 +91,7 @@ var lobbyTemplate = template.Must(template.New("lobby").Parse(`<!doctype html>
     <div><h1>Your sessions</h1><p>Create a session or join with a code.</p></div>
     <div class="lobby-account">
       <span>{{.User.Name}}</span>
+      <a href="/preferences">Preferences</a>
       {{if .User.IsAdmin}}<a href="/admin/invites">Invite players</a>{{end}}
       <form action="/auth/logout" method="post"><button>Sign out</button></form>
     </div>
@@ -296,7 +304,7 @@ func (m *Manager) handler(id string) (http.Handler, error) {
 		return nil, err
 	}
 	sockets := handlers.NewWebSocketHandler(state)
-	endpoints := handlers.NewTableEndpointHandler(state, sockets, units, maps, m.assets, "/sessions/"+id)
+	endpoints := handlers.NewTableEndpointHandler(state, sockets, units, maps, m.assets, "/sessions/"+id, m.preferences)
 	mux := http.NewServeMux()
 	endpoints.RegisterRoutes(mux)
 	sockets.RegisterRoutes(mux)
