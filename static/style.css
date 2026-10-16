@@ -362,6 +362,7 @@ body.map-panning * {
   cursor: wait;
 }
 .status-circle:hover,
+.status-circle.touch-hover,
 .status-circle:focus-visible {
   border-color: white;
   outline: 2px solid var(--ui-accent);
@@ -1102,7 +1103,7 @@ body.map-panning * {
   touch-action: pan-y;
   overscroll-behavior: contain;
   width: min(360px, calc(100vw - 16px));
-  max-height: calc(100dvh - 120px);
+  max-height: var(--popover-max-height, calc(100dvh - 120px));
   overflow-y: auto;
   box-sizing: border-box;
   padding: 12px;
@@ -1587,7 +1588,7 @@ body[data-tool="fog-eraser"] #grid-container {
 #board-controls[hidden], #mobile-tools-toggle[hidden] { display: none; }
 #mobile-tools-toggle, #mobile-brush-settings, .mobile-sheet-close { display: none; }
 body[data-ui-hidden="true"] :is(#ui-overlay, #board-controls, #mobile-tools-toggle, #signed-in-user, #dice-menu, #dice-backdrop,
-  #dice-notifications, #token-menu, #token-statuses, #token-status-tooltip, #brush-cursor, #dice-layer) { display: none; }
+  #dice-notifications, #token-menu, #token-statuses, #token-status-tooltip, #touch-hover-tooltip, #brush-cursor, #dice-layer) { display: none; }
 
 @media (max-width: 700px) {
   #toggle-ui-controls { top: max(8px, env(safe-area-inset-top)); right: 8px; min-height: 44px; font-size: 0.875rem; }
@@ -1606,10 +1607,10 @@ body[data-ui-hidden="true"] :is(#ui-overlay, #board-controls, #mobile-tools-togg
   body[data-mobile-tools="open"] #ui-overlay { padding: 8px; background: var(--ui-surface); border: 1px solid var(--ui-border); border-radius: 8px; pointer-events: auto; }
   body[data-mobile-tools="open"] #mobile-brush-settings { display: block; }
   #ui-overlay .spawn-menu, #map-editor, #dice-menu, #pen-settings, #fog-settings, #map-options {
-    position: fixed; top: auto !important; left: 8px !important; right: 8px; bottom: calc(72px + env(safe-area-inset-bottom));
-    width: auto; max-height: min(60dvh, calc(100dvh - 144px)); overflow-y: auto; box-sizing: border-box; z-index: 1150;
+    position: fixed; top: auto !important; left: 8px !important; right: 8px; bottom: calc(var(--popover-bottom, 0px) + var(--popover-gap, 72px) + env(safe-area-inset-bottom));
+    width: auto; max-height: var(--popover-max-height, min(60dvh, calc(100dvh - 144px))); overflow-y: auto; box-sizing: border-box; z-index: 1150;
   }
-  .mobile-sheet-close { display: block; align-self: flex-end; margin: 0 0 8px auto; }
+  .mobile-sheet-close { display: block; position: sticky; top: 0; z-index: 1; align-self: flex-end; margin: 0 0 8px auto; }
   #dice-notifications { bottom: calc(72px + env(safe-area-inset-bottom)); max-height: 20dvh; pointer-events: none; }
   #dice-notifications .dice-notification { pointer-events: auto; }
 }
@@ -1698,3 +1699,14 @@ body[data-ui-hidden="true"] #session-users { display: none; }
 .hotkey-assignments > div { display: flex; justify-content: space-between; gap: 1rem; padding: 0.6rem 0; border-bottom: 1px solid var(--ui-border); }
 .hotkey-assignments dd { margin: 0; color: var(--ui-muted); }
 .hotkey-assignments kbd { color: var(--ui-text); }
+
+.touch-hover { outline: 2px solid var(--ui-accent); outline-offset: 2px; }
+.touch-hover-tooltip {
+  position: fixed; z-index: 1300; max-width: calc(100vw - 16px); box-sizing: border-box;
+  padding: 6px 9px; border: 1px solid var(--ui-border); border-radius: 8px;
+  background: var(--ui-surface); color: var(--ui-text); font: 12px/1.4 system-ui, sans-serif;
+  white-space: pre-line; overflow-wrap: anywhere; pointer-events: none;
+}
+.touch-hover-tooltip[hidden] { display: none; }
+button.touch-hover:not(.status-circle) { background-color: var(--ui-raised) !important; border-color: #697589 !important; }
+.session-user-icon.touch-hover .session-user-name { display: none; }

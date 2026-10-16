@@ -631,7 +631,47 @@ async function testMobileMenus(browser) {
     modifier.focus({preventScroll: true});
     d.dispatchEvent(new w.Event('scroll'));
     assert(!dice.hidden && d.activeElement === modifier, 'Keyboard scrolling closed the editor');
+    const viewport = d.getElementById('board-viewport');
+    viewport.dispatchEvent(new w.Event('scroll'));
+    await pause(40);
+    assert(!dice.hidden && d.activeElement === modifier, 'Keyboard-induced board scrolling dismissed or blurred dice');
+    modifier.value = '7';
+    // Older Android/WebView behavior resizes the layout viewport itself.
+    frame.style.height = '420px';
+    await until(() => w.innerHeight === 420, 'Keyboard layout resize did not settle');
+    await pause(60);
+    assert(!dice.hidden && d.activeElement === modifier && modifier.value === '7', 'Layout keyboard resize lost the dice editor');
+    assert(dice.getBoundingClientRect().bottom <= 420 && dice.getBoundingClientRect().top >= 0, 'Dice sheet moved outside the keyboard-sized viewport');
+    frame.style.height = '844px';
+    await until(() => w.innerHeight === 844, 'Keyboard layout resize did not restore');
+    // Current Chrome shrinks/pans only the visual viewport. Exercise that event
+    // independently of window.resize, without requiring a physical keyboard.
+    if (w.visualViewport) {
+        const visual = w.visualViewport;
+        const previous = new Map(['height', 'offsetTop'].map(key => [key, Object.getOwnPropertyDescriptor(visual, key)]));
+        try {
+            Object.defineProperty(visual, 'height', {configurable: true, value: 360});
+            Object.defineProperty(visual, 'offsetTop', {configurable: true, value: 20});
+            visual.dispatchEvent(new w.Event('resize'));
+            visual.dispatchEvent(new w.Event('scroll'));
+            viewport.dispatchEvent(new w.Event('scroll'));
+            await pause(60);
+            assert(!dice.hidden && d.activeElement === modifier && modifier.value === '7', 'Visual keyboard resize lost the dice editor');
+            const bounds = dice.getBoundingClientRect();
+            assert(bounds.top >= 20 && bounds.bottom <= 380, `Dice sheet is obscured by the keyboard: ${bounds.top},${bounds.bottom}`);
+            const field = modifier.getBoundingClientRect();
+            assert(field.top >= bounds.top && field.bottom <= bounds.bottom, 'Focused dice field is outside the visible sheet');
+        } finally {
+            for (const [key, descriptor] of previous) {
+                if (descriptor) Object.defineProperty(visual, key, descriptor);
+                else delete visual[key];
+            }
+            visual.dispatchEvent(new w.Event('resize'));
+        }
+    }
+    modifier.value = '0';
     modifier.blur();
+    await pause(60);
     const count = d.querySelectorAll('.dice-group').length;
     d.getElementById('add-dice-group').click();
     assert(d.querySelectorAll('.dice-group').length === count + 1 && !d.activeElement.matches('input, select'), 'Adding mobile dice focused a keyboard field');
@@ -664,6 +704,73 @@ async function testMobileMenus(browser) {
         pen.getBoundingClientRect().height > 0, 'Desktop layout did not restore');
 }
 
+async function testTouchHover(browser) {
+    const {w, d, units} = browser;
+    const frame = document.getElementById('app');
+    frame.style.width = '390px';
+    await until(() => w.innerWidth === 390, 'Touch hover viewport did not settle');
+    await pause(80);
+    d.dispatchEvent(new w.KeyboardEvent('keydown', {key: 'Escape', bubbles: true, cancelable: true}));
+    const tools = d.getElementById('mobile-tools-toggle');
+    if (tools.getAttribute('aria-expanded') !== 'true') tools.click();
+    await pause(40);
+    const tooltip = d.getElementById('touch-hover-tooltip');
+    const pen = d.getElementById('utility-pen');
+    const pointer = (target, type, dx = 0, id = 81, primary = true) => {
+        const bounds = target.getBoundingClientRect();
+        target.dispatchEvent(new w.PointerEvent(type, {
+            pointerId: id, pointerType: 'touch', isPrimary: primary, bubbles: true, cancelable: true,
+            button: 0, buttons: type === 'pointerup' ? 0 : 1,
+            clientX: bounds.left + 5 + dx, clientY: bounds.top + 5,
+        }));
+    };
+    pointer(pen, 'pointerdown');
+    assert(tooltip.hidden, 'A short tap immediately showed hover');
+    await until(() => !tooltip.hidden, 'Long press did not show utility tooltip');
+    assert(tooltip.textContent === pen.title && pen.classList.contains('touch-hover'), 'Long press lost the desktop hover label or highlight');
+    assert(pen.getAttribute('aria-describedby')?.includes(tooltip.id), 'Touch tooltip is not described for accessibility');
+    pointer(pen, 'pointerup');
+    pen.dispatchEvent(new w.MouseEvent('click', {bubbles: true, cancelable: true}));
+    assert(!d.body.dataset.tool, 'Long press also activated a utility');
+    assert(!tooltip.hidden, 'Tooltip vanished before the finger could move away');
+    d.dispatchEvent(new w.Event('scroll'));
+    assert(tooltip.hidden && !pen.classList.contains('touch-hover'), 'Scrolling left a hover highlight behind');
+    pointer(pen, 'pointerdown');
+    pointer(pen, 'pointermove', 30);
+    await pause(560);
+    assert(tooltip.hidden, 'A moving touch triggered long-press hover');
+    pointer(pen, 'pointerup', 30);
+    pointer(pen, 'pointerdown');
+    pointer(pen, 'pointerdown', 0, 82, false);
+    await pause(560);
+    assert(tooltip.hidden, 'A multi-touch gesture triggered hover');
+    pointer(pen, 'pointerup');
+    pointer(pen, 'pointerup', 0, 82, false);
+    const token = units()[0];
+    // Pinch handlers consume secondary touch events; pending hover must cancel
+    // before those handlers run, even when both fingers land on the board.
+    pointer(token, 'pointerdown');
+    pointer(d.getElementById('grid-container'), 'pointerdown', 0, 82, false);
+    await pause(560);
+    assert(tooltip.hidden, 'Pinching the board triggered token hover');
+    pointer(token, 'pointerup');
+    pointer(d.getElementById('grid-container'), 'pointerup', 0, 82, false);
+    const position = {left: token.style.left, top: token.style.top};
+    pointer(token, 'pointerdown');
+    await until(() => !tooltip.hidden, 'Long press did not show unit details');
+    assert(tooltip.textContent === token.title && tooltip.textContent.includes('Size:'), 'Unit hover lost its details');
+    assert(!w.eval('isDragging'), 'Long press left a token drag active');
+    assert(token.style.left === position.left && token.style.top === position.top, 'Long press moved the token');
+    token.dispatchEvent(new w.MouseEvent('contextmenu', {bubbles: true, cancelable: true}));
+    assert(!d.getElementById('token-menu').hidden, 'Touch hover prevented the existing token action menu');
+    pointer(token, 'pointerup');
+    d.dispatchEvent(new w.Event('scroll'));
+    d.dispatchEvent(new w.KeyboardEvent('keydown', {key: 'Escape', bubbles: true, cancelable: true}));
+    frame.style.width = '1200px';
+    await until(() => w.innerWidth === 1200 && d.getElementById('board-space').style.getPropertyValue('--board-viewport-width') === '1200px', 'Touch hover viewport did not restore');
+    await pause(60);
+}
+
 async function testTouchBoardGestures(browser) {
     const {w, d, units} = browser;
     const pointer = (target, type, x, y, id = 7, primary = true) => target.dispatchEvent(new w.PointerEvent(type, {
@@ -686,7 +793,7 @@ async function testTouchBoardGestures(browser) {
     await pause(40);
     const movedBounds = token.getBoundingClientRect();
     assert(Math.abs(movedBounds.left - bounds.left - 34) < 1 && Math.abs(movedBounds.top - bounds.top - 22) < 1,
-        'Touch token did not visibly follow finger before release');
+        `Touch token did not visibly follow finger before release: ${movedBounds.left - bounds.left},${movedBounds.top - bounds.top}; dragging=${w.eval('isDragging')}; scale=${w.eval('boardZoom.scale')}`);
     pointer(d, 'pointerup', bounds.left + 44, bounds.top + 32);
     assert(!w.eval('isDragging'), 'Touch drag did not finish');
     await until(async () => {
@@ -1150,6 +1257,7 @@ const scenarios = [
     ['notification lifecycle', testNotificationLifecycle],
     ['unit and map library search', testLibrarySearch],
     ['mobile menus and drawing bounds', testMobileMenus],
+    ['long press hover details', testTouchHover],
     ['touch board gestures', testTouchBoardGestures],
     ['remote player movement and drawing streams', testRemoteStreaming],
     ['board zoom keeps UI fixed', testBoardZoomKeepsUIFixed],

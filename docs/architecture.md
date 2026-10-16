@@ -79,6 +79,8 @@ Preserve that order when adding dependencies:
 - `realtime/connection.js` provides `boardURL` and `connectBoardSocket`.
 - `shared/menuUI.js` loads before scripts that create menus.
 - `board/boardInput.js` loads before drag and drawing tools.
+- `shared/touchHover.js` loads after board input and before board zoom so
+  multi-touch cancels pending hover before the pinch handlers consume events.
 - `board/drag.js` defines drag state used by `realtime/boardSync.js`.
 - `board/boardGeometry.js` loads before tools that calculate board coordinates.
 - `shared/notifications.js` and `dice/diceAnimation.js` load before `dice/dice.js`.

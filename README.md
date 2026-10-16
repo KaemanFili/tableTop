@@ -239,6 +239,13 @@ On desktop, Sessions and account controls sit at the top center. Zoom controls
 stack vertically on the right, with a separate dice button. On phones, account
 controls join the Tools tray.
 
+On touch screens, hold a utility button or token still for half a second to
+show its hover label and highlight. Moving or using multiple fingers cancels
+the hold. Releasing after a hold does not activate the button; the label remains
+briefly visible so you can read it. Token context menus remain available.
+The dice editor stays open when the on-screen keyboard resizes or scrolls the
+visible viewport, keeps the focused field visible, and preserves entered values.
+
 GM users can select **Fog of war** (the fog icon) and drag to paint an 80 px brush
 over the grid and tokens. **Erase fog** removes just the brushed area with a 40 px
 eraser, leaving the rest of the fog in place. Pen drawings have their own eraser.

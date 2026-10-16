@@ -55,7 +55,8 @@
         circles[0].focus({preventScroll: true});
     });
     for (const circle of circles) {
-        circle.addEventListener('pointerenter', () => {
+        circle.addEventListener('pointerenter', event => {
+            if (event.pointerType === 'touch') return;
             hoveredStatus = circle;
             updateTooltip();
         });
